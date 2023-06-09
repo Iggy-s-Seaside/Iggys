@@ -1,9 +1,9 @@
-import './App.css';
+import Off_tap from './views/Off_tap';
 
 function App() {
     return (
         <>
-            <p>home</p>
+            <Off_tap />
         </>
     );
 }
