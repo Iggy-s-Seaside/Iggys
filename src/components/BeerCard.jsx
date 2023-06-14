@@ -1,10 +1,9 @@
 function BeerCard({ item: { name, type, price, description } }) {
     return (
         <div>
-            <h1>
+            <h3>
                 {name.toUpperCase()} {price}
-            </h1>
-            <p>{type}</p>
+            </h3>
             <p>{description}</p>
         </div>
     );

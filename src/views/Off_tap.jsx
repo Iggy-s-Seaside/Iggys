@@ -12,14 +12,37 @@ function Off_tap() {
         getData();
     }, []);
 
+    const typeLoop = (type, item) => {
+        if (item.type.toLowerCase().includes(type)) {
+            return <BeerCard key={item.id} item={item} />;
+        }
+    };
+
     return (
         <>
             <div>
-                {items.map((item) => {
-                    if (item.type.includes('IPA')) {
-                        return <BeerCard key={item.id} item={item} />;
-                    }
-                })}
+                <h1>IPA</h1>
+                {items.map((item) => typeLoop('ipa', item))}
+            </div>
+            <div>
+                <h1>Lager</h1>
+                {items.map((item) => typeLoop('lager', item))}
+            </div>
+            <div>
+                <h1>Pilsner</h1>
+                {items.map((item) => typeLoop('pilsner', item))}
+            </div>
+            <div>
+                <h1>Hard Cider</h1>
+                {items.map((item) => typeLoop('cider', item))}
+            </div>
+            <div>
+                <h1>Hard Seltzer</h1>
+                {items.map((item) => typeLoop('seltzer', item))}
+            </div>
+            <div>
+                <h1>Stout</h1>
+                {items.map((item) => typeLoop('stout', item))}
             </div>
         </>
     );
