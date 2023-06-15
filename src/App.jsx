@@ -1,9 +1,33 @@
-import Off_tap from './views/Off_tap';
+import Beers from './views/Beers';
+
+import {
+    Route,
+    RouterProvider,
+    createBrowserRouter,
+    createRoutesFromElements,
+} from 'react-router-dom';
+import Root from './components/Root';
+import Home from './views/Home';
+import Cocktails from './views/Cocktails';
+import Appetizers from './views/Appetizers';
+import Contact from './views/Contact';
+
+const router = createBrowserRouter(
+    createRoutesFromElements(
+        <Route path="/" element={<Root />}>
+            <Route path="/" element={<Home />} />
+            <Route path="beers" element={<Beers />} />
+            <Route path="cocktails" element={<Cocktails />} />
+            <Route path="appetizers" element={<Appetizers />} />
+            <Route path="contact" element={<Contact />} />
+        </Route>
+    )
+);
 
 function App() {
     return (
         <>
-            <Off_tap />
+            <RouterProvider router={router} />
         </>
     );
 }

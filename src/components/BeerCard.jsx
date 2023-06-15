@@ -1,11 +1,13 @@
+import { Box, Typography } from '@mui/material';
+
 function BeerCard({ item: { name, type, price, description } }) {
     return (
-        <div>
-            <h3>
+        <Box>
+            <Typography>
                 {name.toUpperCase()} {price}
-            </h3>
+            </Typography>
             <p>{description}</p>
-        </div>
+        </Box>
     );
 }
 
