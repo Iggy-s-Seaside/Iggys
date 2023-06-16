@@ -36,6 +36,7 @@ function Beers() {
                     alignItems: 'center',
                     textAlign: 'center',
                     marginBottom: '50px',
+                    // bgcolor: '#3c666d',
                 }}
             >
                 <Typography sx={{ marginBottom: '50px' }} variant="h3">
@@ -46,9 +47,22 @@ function Beers() {
                     display="grid"
                     gridTemplateColumns="repeat(12, 1fr)"
                     gap={2}
+                    sx={{
+                        border: 1,
+                        borderColor: 'primary.main',
+                        borderRadius: 1,
+                        padding: '20px',
+                    }}
                 >
                     {onTap.map((item) => (
-                        <Box gridColumn="span 6" key={item.id}>
+                        <Box
+                            gridColumn={{
+                                md: 'span 6',
+                                sm: 'span 12',
+                                xs: 'span 12',
+                            }}
+                            key={item.id}
+                        >
                             <BeerCard item={item} />
                         </Box>
                     ))}
@@ -59,6 +73,7 @@ function Beers() {
                 sx={{
                     alignItems: 'center',
                     textAlign: 'center',
+                    // bgcolor: '#3c666d',
                 }}
             >
                 <Typography sx={{ marginBottom: '50px' }} variant="h3">
@@ -70,50 +85,104 @@ function Beers() {
                     display="grid"
                     gridTemplateColumns="repeat(12, 1fr)"
                     gap={2}
+                    sx={{
+                        border: 1,
+                        borderColor: 'primary.main',
+                        borderRadius: 1,
+                        padding: '20px',
+                    }}
                 >
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             IPA
                         </Typography>
                         {items.map((item) => typeLoop('ipa', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             Lager
                         </Typography>
                         {items.map((item) => typeLoop('lager', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             Pilsner
                         </Typography>
                         {items.map((item) => typeLoop('pilsner', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             Hard Cider
                         </Typography>
                         {items.map((item) => typeLoop('cider', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             Hard Seltzer
                         </Typography>
                         {items.map((item) => typeLoop('seltzer', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             Stout
                         </Typography>
                         {items.map((item) => typeLoop('stout', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             Hefeweizen
                         </Typography>
                         {items.map((item) => typeLoop('hefeweizen', item))}
                     </Box>
-                    <Box gridColumn="span 6">
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
                         <Typography sx={{ textAlign: 'left' }} variant="h3">
                             N/A
                         </Typography>
