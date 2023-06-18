@@ -15,7 +15,6 @@ function Beers() {
             const dataTap = await getOnTap();
             setItems(data);
             setOnTap(dataTap);
-            console.log('in useeffect', dataTap);
             setLoading(false);
         };
         getData();
