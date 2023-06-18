@@ -1,11 +1,13 @@
 import styled from '@emotion/styled';
-import { Avatar, Box, Divider, Typography } from '@mui/material';
+import { Box, Divider, Typography } from '@mui/material';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 
 const Root = () => {
     const location = useLocation();
     const StyledLink = styled(Link)`
         text-decoration: none;
+        color: rgb(255, 255, 255);
+        /* color: #64dfdf; */
     `;
     return (
         <>
@@ -13,9 +15,12 @@ const Root = () => {
                 sx={{
                     display: 'flex',
                     justifyContent: 'flex-end',
+                    position: 'fixed',
                     height: '100px',
                     width: '100%',
-                    // bgcolor: 'black',
+                    bgcolor: '#3c666d',
+                    zIndex: 1,
+                    // opacity: 0.9,
                 }}
             >
                 <Box
@@ -28,7 +33,7 @@ const Root = () => {
                         width: '120',
                     }}
                     alt="iggy's mini logo"
-                    src="/iggy.jpeg"
+                    src="/Iggys_hero.png"
                 />
                 {location.pathname != '/' && (
                     <Typography sx={{ m: '50px 15px' }}>
