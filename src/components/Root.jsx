@@ -1,8 +1,19 @@
 import styled from '@emotion/styled';
-import { Box, Divider, Typography } from '@mui/material';
+import {
+    Box,
+    Button,
+    Divider,
+    Menu,
+    MenuItem,
+    Typography,
+    useTheme,
+} from '@mui/material';
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import PopupState, { bindTrigger, bindMenu } from 'material-ui-popup-state';
 
 const Root = () => {
+    const theme = useTheme();
+    console.log(theme);
     const location = useLocation();
     const StyledLink = styled(Link)`
         text-decoration: none;
@@ -35,23 +46,35 @@ const Root = () => {
                     alt="iggy's mini logo"
                     src="/Iggys_hero.png"
                 />
-                {location.pathname != '/' && (
-                    <Typography sx={{ m: '50px 15px' }}>
-                        <StyledLink to="/">Home</StyledLink>
-                    </Typography>
+                {theme.breakpoints.down('xl') ? (
+                    <PopupState variant="popover" popupId="demo-popup-menu">
+                        {(popupState) => (
+                            <>
+                                <Button
+                                    variant="contained"
+                                    {...bindTrigger(popupState)}
+                                >
+                                    Dashboard
+                                </Button>
+                                <Menu {...bindMenu(popupState)}>
+                                    <MenuItem onClick={popupState.close}>
+                                        <Typography>
+                                            <StyledLink to="/">Home</StyledLink>
+                                        </Typography>
+                                    </MenuItem>
+                                    <MenuItem onClick={popupState.close}>
+                                        My account
+                                    </MenuItem>
+                                    <MenuItem onClick={popupState.close}>
+                                        Logout
+                                    </MenuItem>
+                                </Menu>
+                            </>
+                        )}
+                    </PopupState>
+                ) : (
+                    <Typography>hello </Typography>
                 )}
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/beers">Beers</StyledLink>
-                </Typography>
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/cocktails">Cocktails</StyledLink>
-                </Typography>
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/appetizers">Appetizers</StyledLink>
-                </Typography>
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/contact">Contact</StyledLink>
-                </Typography>
             </Box>
             <Divider />
 
