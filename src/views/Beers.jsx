@@ -8,12 +8,14 @@ function Beers() {
     const [loading, setLoading] = useState(true);
     const [items, setItems] = useState([]);
     const [onTap, setOnTap] = useState([]);
+    const tap = true;
     useEffect(() => {
         const getData = async () => {
             const data = await getOffTap();
             const dataTap = await getOnTap();
             setItems(data);
             setOnTap(dataTap);
+            console.log('in useeffect', dataTap);
             setLoading(false);
         };
         getData();
@@ -64,7 +66,7 @@ function Beers() {
                             }}
                             key={item.id}
                         >
-                            <BeerCard item={item} />
+                            <BeerCard item={item} tap={tap} />
                         </Box>
                     ))}
                 </Box>
@@ -100,7 +102,10 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
                             IPA
                         </Typography>
                         {items.map((item) => typeLoop('ipa', item))}
@@ -112,8 +117,11 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
-                            Lager
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
+                            LAGER
                         </Typography>
                         {items.map((item) => typeLoop('lager', item))}
                     </Box>
@@ -124,8 +132,11 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
-                            Pilsner
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
+                            PILSNER
                         </Typography>
                         {items.map((item) => typeLoop('pilsner', item))}
                     </Box>
@@ -136,8 +147,11 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
-                            Hard Cider
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
+                            HARD CIDER
                         </Typography>
                         {items.map((item) => typeLoop('cider', item))}
                     </Box>
@@ -148,8 +162,11 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
-                            Hard Seltzer
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
+                            HARD SELTZER
                         </Typography>
                         {items.map((item) => typeLoop('seltzer', item))}
                     </Box>
@@ -160,8 +177,11 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
-                            Stout
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
+                            STOUT
                         </Typography>
                         {items.map((item) => typeLoop('stout', item))}
                     </Box>
@@ -172,8 +192,11 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
-                            Hefeweizen
+                        <Typography
+                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            variant="h3"
+                        >
+                            HEFEWEIZEN
                         </Typography>
                         {items.map((item) => typeLoop('hefeweizen', item))}
                     </Box>
