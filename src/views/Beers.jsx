@@ -36,6 +36,7 @@ function Beers() {
                     alignItems: 'center',
                     textAlign: 'center',
                     marginBottom: '50px',
+                    marginTop: '100px',
                     // bgcolor: '#3c666d',
                 }}
             >

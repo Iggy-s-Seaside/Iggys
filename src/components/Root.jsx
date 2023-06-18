@@ -15,9 +15,12 @@ const Root = () => {
                 sx={{
                     display: 'flex',
                     justifyContent: 'flex-end',
+                    position: 'fixed',
                     height: '100px',
                     width: '100%',
                     bgcolor: '#3c666d',
+                    zIndex: 1,
+                    opacity: 0.9,
                 }}
             >
                 <Box
