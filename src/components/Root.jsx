@@ -8,6 +8,7 @@ import {
     Typography,
     useTheme,
 } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import { Link, Outlet } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import PopupState, { bindTrigger, bindMenu } from 'material-ui-popup-state';
@@ -20,6 +21,11 @@ const Root = () => {
         color: rgb(255, 255, 255);
         /* color: #64dfdf; */
     `;
+
+    const StyledMenuLink = styled(Link)(({ theme }) => ({
+        textDecoration: NamedNodeMap,
+        color: theme.palette.common.black,
+    }));
     return (
         <>
             <Box
@@ -54,19 +60,43 @@ const Root = () => {
                                     variant="contained"
                                     {...bindTrigger(popupState)}
                                 >
-                                    Dashboard
+                                    <MenuIcon />
                                 </Button>
                                 <Menu {...bindMenu(popupState)}>
                                     <MenuItem onClick={popupState.close}>
                                         <Typography>
-                                            <StyledLink to="/">Home</StyledLink>
+                                            <StyledMenuLink to="/">
+                                                Home
+                                            </StyledMenuLink>
                                         </Typography>
                                     </MenuItem>
                                     <MenuItem onClick={popupState.close}>
-                                        My account
+                                        <Typography>
+                                            <StyledMenuLink to="/beers">
+                                                Beers
+                                            </StyledMenuLink>
+                                        </Typography>
                                     </MenuItem>
                                     <MenuItem onClick={popupState.close}>
-                                        Logout
+                                        <Typography>
+                                            <StyledMenuLink to="/cocktails">
+                                                Cocktails
+                                            </StyledMenuLink>
+                                        </Typography>
+                                    </MenuItem>
+                                    <MenuItem onClick={popupState.close}>
+                                        <Typography>
+                                            <StyledMenuLink to="/appetizers">
+                                                Appetizers
+                                            </StyledMenuLink>
+                                        </Typography>
+                                    </MenuItem>
+                                    <MenuItem onClick={popupState.close}>
+                                        <Typography>
+                                            <StyledMenuLink to="/contact">
+                                                Contact
+                                            </StyledMenuLink>
+                                        </Typography>
                                     </MenuItem>
                                 </Menu>
                             </>
