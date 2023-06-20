@@ -12,21 +12,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </ThemeProvider>
     </React.StrictMode>
 );
-
-// {location.pathname != '/' && (
-//     <Typography sx={{ m: '50px 15px' }}>
-//         <StyledLink to="/">Home</StyledLink>
-//     </Typography>
-// )}
-// <Typography sx={{ m: '50px 15px' }}>
-//     <StyledLink to="/beers">Beers</StyledLink>
-// </Typography>
-// <Typography sx={{ m: '50px 15px' }}>
-//     <StyledLink to="/cocktails">Cocktails</StyledLink>
-// </Typography>
-// <Typography sx={{ m: '50px 15px' }}>
-//     <StyledLink to="/appetizers">Appetizers</StyledLink>
-// </Typography>
-// <Typography sx={{ m: '50px 15px' }}>
-//     <StyledLink to="/contact">Contact</StyledLink>
-// </Typography>

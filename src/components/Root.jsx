@@ -8,13 +8,13 @@ import {
     Typography,
     useTheme,
 } from '@mui/material';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import PopupState, { bindTrigger, bindMenu } from 'material-ui-popup-state';
 
 const Root = () => {
     const theme = useTheme();
-    console.log(theme);
-    const location = useLocation();
+    const smallScreen = useMediaQuery((theme) => theme.breakpoints.down('sm'));
     const StyledLink = styled(Link)`
         text-decoration: none;
         color: rgb(255, 255, 255);
@@ -46,7 +46,7 @@ const Root = () => {
                     alt="iggy's mini logo"
                     src="/Iggys_hero.png"
                 />
-                {theme.breakpoints.down('xl') ? (
+                {smallScreen ? (
                     <PopupState variant="popover" popupId="demo-popup-menu">
                         {(popupState) => (
                             <>
@@ -73,7 +73,23 @@ const Root = () => {
                         )}
                     </PopupState>
                 ) : (
-                    <Typography>hello </Typography>
+                    <>
+                        <Typography sx={{ m: '50px 15px' }}>
+                            <StyledLink to="/">Home</StyledLink>
+                        </Typography>
+                        <Typography sx={{ m: '50px 15px' }}>
+                            <StyledLink to="/beers">Beers</StyledLink>
+                        </Typography>
+                        <Typography sx={{ m: '50px 15px' }}>
+                            <StyledLink to="/cocktails">Cocktails</StyledLink>
+                        </Typography>
+                        <Typography sx={{ m: '50px 15px' }}>
+                            <StyledLink to="/appetizers">Appetizers</StyledLink>
+                        </Typography>
+                        <Typography sx={{ m: '50px 15px' }}>
+                            <StyledLink to="/contact">Contact</StyledLink>
+                        </Typography>
+                    </>
                 )}
             </Box>
             <Divider />
