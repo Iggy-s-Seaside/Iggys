@@ -1,14 +1,13 @@
-import styled from '@emotion/styled';
-import { Box, Divider, Typography } from '@mui/material';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Box, Divider, useTheme } from '@mui/material';
+import { Outlet } from 'react-router-dom';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import RootHeaderMenu from './RootHeaderMenu';
+import RootHeaderLinks from './RootHeaderLinks';
 
 const Root = () => {
-    const location = useLocation();
-    const StyledLink = styled(Link)`
-        text-decoration: none;
-        color: rgb(255, 255, 255);
-        /* color: #64dfdf; */
-    `;
+    const theme = useTheme();
+    const smallScreen = useMediaQuery((theme) => theme.breakpoints.down('sm'));
+
     return (
         <>
             <Box
@@ -35,23 +34,7 @@ const Root = () => {
                     alt="iggy's mini logo"
                     src="/Iggys_hero.png"
                 />
-                {location.pathname != '/' && (
-                    <Typography sx={{ m: '50px 15px' }}>
-                        <StyledLink to="/">Home</StyledLink>
-                    </Typography>
-                )}
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/beers">Beers</StyledLink>
-                </Typography>
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/cocktails">Cocktails</StyledLink>
-                </Typography>
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/appetizers">Appetizers</StyledLink>
-                </Typography>
-                <Typography sx={{ m: '50px 15px' }}>
-                    <StyledLink to="/contact">Contact</StyledLink>
-                </Typography>
+                {smallScreen ? <RootHeaderMenu /> : <RootHeaderLinks />}
             </Box>
             <Divider />
 
