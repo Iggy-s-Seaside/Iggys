@@ -6,8 +6,10 @@ import { getCocktails } from '../services/cocktails';
 import { getShots } from '../services/shots';
 import WellCard from '../components/WellCard';
 import StyledDividerLine from '../styled/StyledDividerLine';
+import { StyledTypography } from '../styled/StyledTypography';
 
 function Cocktails() {
+    const [loading, setLoading] = useState(true);
     const [cocktails, setCocktails] = useState([]);
     const [shots, setShots] = useState([]);
     useEffect(() => {
@@ -16,9 +18,14 @@ function Cocktails() {
             const shotData = await getShots();
             setShots(shotData);
             setCocktails(data);
+            setLoading(false);
         };
         fetchCocktails();
     }, []);
+    if (loading) {
+        // will make loader for this
+        return <p>loader</p>;
+    }
     return (
         <>
             <Container
@@ -31,21 +38,22 @@ function Cocktails() {
                 }}
             >
                 <Box sx={{ mt: '100px', mb: '50px' }}>
-                    <Typography variant="h3" mb="50px">
+                    <StyledTypography variant="h3" mb="50px">
                         Cocktails
-                    </Typography>
+                    </StyledTypography>
                     {cocktails.map((data) => (
                         <React.Fragment key={data.id}>
                             <CocktailCard data={data} />
                             <StyledDividerLine />
                         </React.Fragment>
                     ))}
-                    <Divider />
-                    <Typography variant="h3">Well Drinks</Typography>
+                    <StyledTypography variant="h3">
+                        Well Drinks
+                    </StyledTypography>
                     <WellCard />
                     <StyledDividerLine />
                     <Divider />
-                    <Typography variant="h3">Shots</Typography>
+                    <StyledTypography variant="h3">Shots</StyledTypography>
                     {shots.map((data) => (
                         <React.Fragment key={data.id}>
                             <CocktailCard data={data} />
