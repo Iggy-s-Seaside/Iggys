@@ -16,7 +16,8 @@ const Root = () => {
                     position: 'fixed',
                     height: '100px',
                     width: '100%',
-                    bgcolor: '#3c666d',
+                    // bgcolor: '#3c666d',
+                    bgcolor: 'primary.main',
                     zIndex: 1,
                     // opacity: 0.9,
                 }}

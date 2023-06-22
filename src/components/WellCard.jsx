@@ -1,7 +1,6 @@
 import { Box, Grid, Typography } from '@mui/material';
-import PropTypes from 'prop-types';
 
-function CocktailCard({ data: { ingredients, price, name } }) {
+function WellCard() {
     return (
         <>
             <Box sx={{ textAlign: 'left' }}>
@@ -10,17 +9,22 @@ function CocktailCard({ data: { ingredients, price, name } }) {
                     justifyContent="space-between"
                     alignItems="center"
                 >
-                    <Grid item xs={9}>
-                        <Typography variant="h6">{name}</Typography>
-                        <Typography variant="body1">{ingredients}</Typography>
+                    <Grid item sx={9}>
+                        <Typography variant="h6">
+                            Gin, Vodka, Rum, Tequila, or Whiskey with your
+                            choice of Mixer
+                        </Typography>
+                        <Typography variant="body1">
+                            ADD $1.00 for freshed squeezed juice
+                        </Typography>
                     </Grid>
-                    <Grid item xs={3}>
+                    <Grid item sx={3}>
                         <Typography
                             variant="subtitle1"
                             align="right"
                             sx={{ fontWeight: 'bold' }}
                         >
-                            {price}
+                            $7.00
                         </Typography>
                     </Grid>
                 </Grid>
@@ -29,11 +33,4 @@ function CocktailCard({ data: { ingredients, price, name } }) {
     );
 }
 
-CocktailCard.propTypes = {
-    data: PropTypes.object,
-    name: PropTypes.string,
-    ingredients: PropTypes.string,
-    price: PropTypes.string,
-};
-
-export default CocktailCard;
+export default WellCard;
