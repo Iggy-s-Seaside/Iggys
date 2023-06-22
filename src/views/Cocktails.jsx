@@ -47,13 +47,14 @@ function Cocktails() {
                             <StyledDividerLine />
                         </React.Fragment>
                     ))}
-                    <StyledTypography variant="h3">
+                    <StyledTypography variant="h3" mb="50px">
                         Well Drinks
                     </StyledTypography>
                     <WellCard />
                     <StyledDividerLine />
-                    <Divider />
-                    <StyledTypography variant="h3">Shots</StyledTypography>
+                    <StyledTypography variant="h3" mb="50px">
+                        Shots
+                    </StyledTypography>
                     {shots.map((data) => (
                         <React.Fragment key={data.id}>
                             <CocktailCard data={data} />
