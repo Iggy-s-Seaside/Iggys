@@ -3,6 +3,7 @@ import { getOffTap } from '../services/off_tap';
 import BeerCard from '../components/BeerCard';
 import { Box, Container, Divider, Typography } from '@mui/material';
 import { getOnTap } from '../services/on_tap';
+import { StyledTypography } from '../styled/StyledTypography';
 
 function Beers() {
     const [loading, setLoading] = useState(true);
@@ -41,10 +42,10 @@ function Beers() {
                     // bgcolor: '#3c666d',
                 }}
             >
-                <Typography sx={{ marginBottom: '50px' }} variant="h3">
+                <StyledTypography sx={{ marginBottom: '50px' }} variant="h3">
                     {' '}
-                    ON TAP{' '}
-                </Typography>
+                    On Tap{' '}
+                </StyledTypography>
                 <Box
                     display="grid"
                     gridTemplateColumns="repeat(12, 1fr)"
@@ -78,10 +79,10 @@ function Beers() {
                     // bgcolor: '#3c666d',
                 }}
             >
-                <Typography sx={{ marginBottom: '50px' }} variant="h3">
+                <StyledTypography sx={{ marginBottom: '50px' }} variant="h3">
                     {' '}
-                    OFF TAP{' '}
-                </Typography>
+                    Off Tap{' '}
+                </StyledTypography>
 
                 <Box
                     display="grid"
@@ -101,12 +102,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            IPA
-                        </Typography>
+                            Ipa
+                        </StyledTypography>
                         {items.map((item) => typeLoop('ipa', item))}
                     </Box>
                     <Box
@@ -116,12 +117,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            LAGER
-                        </Typography>
+                            Lager
+                        </StyledTypography>
                         {items.map((item) => typeLoop('lager', item))}
                     </Box>
                     <Box
@@ -131,12 +132,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            PILSNER
-                        </Typography>
+                            Pilsner
+                        </StyledTypography>
                         {items.map((item) => typeLoop('pilsner', item))}
                     </Box>
                     <Box
@@ -146,12 +147,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            HARD CIDER
-                        </Typography>
+                            Hard Cider
+                        </StyledTypography>
                         {items.map((item) => typeLoop('cider', item))}
                     </Box>
                     <Box
@@ -161,12 +162,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            HARD SELTZER
-                        </Typography>
+                            Hard Seltzer
+                        </StyledTypography>
                         {items.map((item) => typeLoop('seltzer', item))}
                     </Box>
                     <Box
@@ -176,12 +177,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            STOUT
-                        </Typography>
+                            Stout
+                        </StyledTypography>
                         {items.map((item) => typeLoop('stout', item))}
                     </Box>
                     <Box
@@ -191,12 +192,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography
+                        <StyledTypography
                             sx={{ textAlign: 'left', letterSpacing: 2 }}
                             variant="h3"
                         >
-                            HEFEWEIZEN
-                        </Typography>
+                            Hefeweizen
+                        </StyledTypography>
                         {items.map((item) => typeLoop('hefeweizen', item))}
                     </Box>
                     <Box
@@ -206,9 +207,12 @@ function Beers() {
                             xs: 'span 12',
                         }}
                     >
-                        <Typography sx={{ textAlign: 'left' }} variant="h3">
+                        <StyledTypography
+                            sx={{ textAlign: 'left' }}
+                            variant="h3"
+                        >
                             N/A
-                        </Typography>
+                        </StyledTypography>
                         {items.map((item) => typeLoop('na', item))}
                     </Box>
                 </Box>

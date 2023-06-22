@@ -1,4 +1,6 @@
 import { createTheme } from '@mui/material';
+import '@fontsource/montserrat';
+import '@fontsource/lobster-two';
 
 export const theme = createTheme({
     palette: {
@@ -13,5 +15,8 @@ export const theme = createTheme({
             primary: 'rgb(255,255,255)',
             secondary: '#64dfdf',
         },
+    },
+    typography: {
+        fontFamily: 'Montserrat, sans-serif',
     },
 });

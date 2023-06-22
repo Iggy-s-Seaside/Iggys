@@ -1,5 +1,3 @@
-import Beers from './views/Beers';
-
 import {
     Route,
     RouterProvider,
@@ -7,6 +5,7 @@ import {
     createRoutesFromElements,
 } from 'react-router-dom';
 import Root from './components/Root';
+import Beers from './views/Beers';
 import Home from './views/Home';
 import Cocktails from './views/Cocktails';
 import Appetizers from './views/Appetizers';

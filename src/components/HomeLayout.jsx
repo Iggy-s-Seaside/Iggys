@@ -1,8 +1,7 @@
 import { styled } from '@mui/material/styles';
 import PropTypes from 'prop-types';
 import Container from '@mui/material/Container';
-import Box from '@mui/material/Box';
-
+import { Box } from '@mui/material';
 const HomeLayoutRoot = styled('section')(({ theme }) => ({
     color: theme.palette.common.white,
     position: 'relative',
