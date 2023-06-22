@@ -1,11 +1,10 @@
-import { Box, Divider, useTheme } from '@mui/material';
+import { Box, Divider } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import RootHeaderMenu from './RootHeaderMenu';
 import RootHeaderLinks from './RootHeaderLinks';
 
 const Root = () => {
-    const theme = useTheme();
     const smallScreen = useMediaQuery((theme) => theme.breakpoints.down('sm'));
 
     return (
