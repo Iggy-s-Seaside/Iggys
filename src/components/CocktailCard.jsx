@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 function CocktailCard({ data: { ingredients, price, name } }) {
     return (
         <>
-            <Box sx={{ textAlign: 'left' }}>
+            <Box mb="30px" sx={{ textAlign: 'left' }}>
                 <Grid
                     container
                     justifyContent="space-between"
