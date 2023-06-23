@@ -15,7 +15,11 @@ function BeerCard({
                     alignItems="center"
                 >
                     <Grid item xs={9}>
-                        <Typography color={'primary.main'} variant="h6">
+                        <Typography
+                            fontWeight={'bold'}
+                            color={'primary.main'}
+                            variant="h6"
+                        >
                             {name.toUpperCase()}
                         </Typography>
                         <Typography color={'#C7945A'} variant="subtitle1">
