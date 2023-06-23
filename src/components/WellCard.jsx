@@ -10,11 +10,15 @@ function WellCard() {
                     alignItems="center"
                 >
                     <Grid item sx={9}>
-                        <Typography variant="h6">
+                        <Typography
+                            fontWeight={'bold'}
+                            color={'#089c8f'}
+                            variant="h5"
+                        >
                             Gin, Vodka, Rum, Tequila, or Whiskey with your
                             choice of Mixer
                         </Typography>
-                        <Typography variant="body1">
+                        <Typography color={'#C7945A'} variant="body1">
                             ADD $1.00 for freshed squeezed juice
                         </Typography>
                     </Grid>

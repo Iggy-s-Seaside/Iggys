@@ -15,15 +15,17 @@ function BeerCard({
                     alignItems="center"
                 >
                     <Grid item xs={9}>
-                        <Typography variant="h6">
+                        <Typography color={'primary.main'} variant="h6">
                             {name.toUpperCase()}
                         </Typography>
-                        <Typography variant="subtitle1">{brewery}</Typography>
-                        <Typography variant="subtitle2">
+                        <Typography color={'#C7945A'} variant="subtitle1">
+                            {brewery}
+                        </Typography>
+                        <Typography color={'#C7945A'} variant="subtitle2">
                             {description}
                         </Typography>
                         {tap && (
-                            <Typography variant="subtitle2">
+                            <Typography color={'#C7945A'} variant="subtitle2">
                                 ABV: {abv} {type}
                             </Typography>
                         )}
@@ -32,7 +34,8 @@ function BeerCard({
                         <Typography
                             variant="subtitle1"
                             align="right"
-                            sx={{ fontWeight: 'bold' }}
+                            fontWeight={'bold'}
+                            color={'primary.main'}
                         >
                             {price}
                         </Typography>

@@ -11,14 +11,24 @@ function CocktailCard({ data: { ingredients, price, name } }) {
                     alignItems="center"
                 >
                     <Grid item xs={9}>
-                        <Typography variant="h6">{name}</Typography>
-                        <Typography variant="body1">{ingredients}</Typography>
+                        <Typography
+                            fontWeight={'bold'}
+                            // color={'#089c8f'}
+                            color={'primary.main'}
+                            variant="h5"
+                        >
+                            {name}
+                        </Typography>
+                        <Typography color={'#C7945A'} variant="body1">
+                            {ingredients}
+                        </Typography>
                     </Grid>
                     <Grid item xs={3}>
                         <Typography
                             variant="subtitle1"
                             align="right"
-                            sx={{ fontWeight: 'bold' }}
+                            fontWeight={'bold'}
+                            color={'primary.main'}
                         >
                             {price}
                         </Typography>

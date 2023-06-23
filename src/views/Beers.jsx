@@ -103,7 +103,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Ipa
@@ -118,7 +122,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Lager
@@ -133,7 +141,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Pilsner
@@ -148,7 +160,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Hard Cider
@@ -163,7 +179,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Hard Seltzer
@@ -178,7 +198,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Stout
@@ -193,7 +217,11 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left', letterSpacing: 2 }}
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
                             variant="h3"
                         >
                             Hefeweizen
@@ -208,7 +236,7 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{ textAlign: 'left' }}
+                            sx={{ textAlign: 'left', mb: '50px' }}
                             variant="h3"
                         >
                             N/A
