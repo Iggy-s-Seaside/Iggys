@@ -12,7 +12,7 @@ function WellCard() {
                     <Grid item sx={9}>
                         <Typography
                             fontWeight={'bold'}
-                            color={'#089c8f'}
+                            color={'primary.main'}
                             variant="h5"
                         >
                             Gin, Vodka, Rum, Tequila, or Whiskey with your
