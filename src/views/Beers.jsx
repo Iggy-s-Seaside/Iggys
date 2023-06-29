@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getOffTap } from '../services/off_tap';
 import BeerCard from '../components/BeerCard';
-import { Box, Container, Divider, Typography } from '@mui/material';
+import { Box, Container } from '@mui/material';
 import { getOnTap } from '../services/on_tap';
 import { StyledTypography } from '../styled/StyledTypography';
 
@@ -70,7 +70,7 @@ function Beers() {
                     ))}
                 </Box>
             </Container>
-            <Divider />
+
             <Container
                 sx={{
                     alignItems: 'center',
