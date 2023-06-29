@@ -1,11 +1,15 @@
 import { Box, Divider } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import RootHeaderMenu from './RootHeaderMenu';
 import RootHeaderLinks from './RootHeaderLinks';
 
 const Root = () => {
     const smallScreen = useMediaQuery((theme) => theme.breakpoints.down('sm'));
+    const navigate = useNavigate();
+    const handleImageClick = () => {
+        navigate('/');
+    };
 
     return (
         <>
@@ -34,6 +38,7 @@ const Root = () => {
                     }}
                     alt="iggy's mini logo"
                     src="/Iggys_hero.png"
+                    onClick={handleImageClick}
                 />
                 {smallScreen ? <RootHeaderMenu /> : <RootHeaderLinks />}
             </Box>
