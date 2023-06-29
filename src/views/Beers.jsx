@@ -20,7 +20,6 @@ function Beers() {
         };
         getData();
     }, []);
-    //TODO: ADD MB="50" TO HEADERS!!!! CHECK SUPABASE FOR PRODUCT INCONSISTENCIES
     const typeLoop = (type, item) => {
         if (item.type.toLowerCase().includes(type)) {
             return <BeerCard key={item.id} item={item} />;
@@ -37,7 +36,7 @@ function Beers() {
                 sx={{
                     alignItems: 'center',
                     textAlign: 'center',
-                    marginBottom: '50px',
+                    marginBottom: '100px',
                     marginTop: '100px',
                     // bgcolor: '#3c666d',
                 }}

@@ -19,7 +19,10 @@ function CocktailCard({ data: { ingredients, price, name } }) {
                         >
                             {name}
                         </Typography>
-                        <Typography color={'#C7945A'} variant="body1">
+                        <Typography
+                            color={'text.complimentary'}
+                            variant="body1"
+                        >
                             {ingredients}
                         </Typography>
                     </Grid>

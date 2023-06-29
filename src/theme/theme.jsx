@@ -9,11 +9,12 @@ export const theme = createTheme({
             secondary: '#033638',
         },
         primary: {
-            main: '#64dfdf',
+            main: '#69c9ca',
         },
         text: {
             primary: 'rgb(255,255,255)',
-            secondary: '#64dfdf',
+            secondary: '#69c9ca',
+            complimentary: '#CB9866',
         },
     },
     typography: {

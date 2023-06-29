@@ -18,18 +18,27 @@ function BeerCard({
                         <Typography
                             fontWeight={'bold'}
                             color={'primary.main'}
-                            variant="h6"
+                            variant="h5"
                         >
                             {name.toUpperCase()}
                         </Typography>
-                        <Typography color={'#C7945A'} variant="subtitle1">
+                        <Typography
+                            color={'text.complimentary'}
+                            variant="subtitle1"
+                        >
                             {brewery}
                         </Typography>
-                        <Typography color={'#C7945A'} variant="subtitle2">
+                        <Typography
+                            color={'text.complimentary'}
+                            variant="subtitle2"
+                        >
                             {description}
                         </Typography>
                         {tap && (
-                            <Typography color={'#C7945A'} variant="subtitle2">
+                            <Typography
+                                color={'text.complimentary'}
+                                variant="subtitle2"
+                            >
                                 ABV: {abv} {type}
                             </Typography>
                         )}

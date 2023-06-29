@@ -18,7 +18,10 @@ function WellCard() {
                             Gin, Vodka, Rum, Tequila, or Whiskey with your
                             choice of Mixer
                         </Typography>
-                        <Typography color={'#C7945A'} variant="body1">
+                        <Typography
+                            color={'text.complimentary'}
+                            variant="body1"
+                        >
                             ADD $1.00 for freshed squeezed juice
                         </Typography>
                     </Grid>
@@ -26,7 +29,8 @@ function WellCard() {
                         <Typography
                             variant="subtitle1"
                             align="right"
-                            sx={{ fontWeight: 'bold' }}
+                            fontWeight={'bold'}
+                            color={'primary.main'}
                         >
                             $7.00
                         </Typography>
