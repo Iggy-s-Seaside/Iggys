@@ -50,11 +50,6 @@ function Home() {
                     elit. Libero, officiis.
                 </Typography>
             </DividerCard>
-            <Video videoSrc={videoSource}>
-                <Typography color={'text.complimentary'} variant="h2">
-                    Look we can do videos also.
-                </Typography>
-            </Video>
             {/* taps outside */}
             <HomeLayout
                 sxBackground={{
