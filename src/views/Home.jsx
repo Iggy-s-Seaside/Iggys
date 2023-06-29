@@ -2,15 +2,11 @@ import { Typography } from '@mui/material';
 import HomeLayout from '../components/HomeLayout';
 import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
+import Video from '../components/Video';
 
-const {
-    backgroundImage,
-    wallInsideImage,
-    tapOutsideImage,
-    drinksVector,
-    martiniVector,
-    drinks2,
-} = imageUrls;
+const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2 } =
+    imageUrls;
+const videoSource = 'https://player.vimeo.com/video/840745031?h=580c906346';
 
 function Home() {
     return (
@@ -54,6 +50,11 @@ function Home() {
                     elit. Libero, officiis.
                 </Typography>
             </DividerCard>
+            <Video videoSrc={videoSource}>
+                <Typography color={'text.complimentary'} variant="h2">
+                    Look we can do videos also.
+                </Typography>
+            </Video>
             {/* taps outside */}
             <HomeLayout
                 sxBackground={{
