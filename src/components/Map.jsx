@@ -42,7 +42,7 @@ function Map() {
                 <GoogleMap
                     mapContainerStyle={containerStyle}
                     center={center}
-                    zoom={20}
+                    zoom={15}
                     onLoad={onLoad}
                 >
                     {marker && (
