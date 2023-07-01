@@ -2,11 +2,9 @@ import { Typography } from '@mui/material';
 import HomeLayout from '../components/HomeLayout';
 import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
-import Video from '../components/Video';
 
 const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2 } =
     imageUrls;
-const videoSource = 'https://player.vimeo.com/video/840745031?h=580c906346';
 
 function Home() {
     return (
@@ -67,7 +65,7 @@ function Home() {
                     alt="increase priority"
                 />
                 <Typography align="center" variant="h2" marked="center">
-                    SOMETHING ABOUT EVENTS
+                    DJ's on Saturday nights.
                 </Typography>
                 <Typography
                     color="inherit"
@@ -75,7 +73,7 @@ function Home() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    Dj dance dj dance
+                    Every Saturday dance from 8pm till midnight with us.
                 </Typography>
             </HomeLayout>
             <DividerCard
