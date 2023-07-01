@@ -9,7 +9,7 @@ const StyledCard = styled(Card)`
     padding: 24px;
     background-color: #f9f7f7;
     margin-top: 100px;
-    height: 50vh;
+    height: 40vh;
 `;
 
 export default StyledCard;

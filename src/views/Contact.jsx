@@ -51,7 +51,7 @@ const Contact = () => {
                         variant="body2"
                         align="center"
                     >
-                        Address: 200 S Franklin St, Seaside, OR (97138)
+                        200 S Franklin St, Seaside, OR (97138)
                     </Typography>
                 </CardContent>
             </StyledCard>
