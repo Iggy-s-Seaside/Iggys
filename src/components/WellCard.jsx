@@ -9,7 +9,7 @@ function WellCard() {
                     justifyContent="space-between"
                     alignItems="center"
                 >
-                    <Grid item sx={9}>
+                    <Grid item xs={9}>
                         <Typography
                             fontWeight={'bold'}
                             color={'primary.main'}
@@ -25,7 +25,7 @@ function WellCard() {
                             ADD $1.00 for freshed squeezed juice
                         </Typography>
                     </Grid>
-                    <Grid item sx={3}>
+                    <Grid item xs={3}>
                         <Typography
                             variant="subtitle1"
                             align="right"
