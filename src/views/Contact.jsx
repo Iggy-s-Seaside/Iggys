@@ -5,7 +5,9 @@ import StyledCard from '../styled/StyledCard';
 import StyledIconContainer from '../styled/StyledIconContainer';
 import StyledIcon from '../styled/StyledIcon';
 import Map from '../components/Map';
+import imageUrls from '../assets/links';
 
+const { barTop } = imageUrls;
 const Contact = () => {
     const handleEmailClick = () => {
         const recipient = 'Carnelinc@live.com';
@@ -30,7 +32,13 @@ const Contact = () => {
 
     return (
         <>
-            <StyledCard>
+            <StyledCard
+                sx={{
+                    backgroundImage: `url(${barTop})`,
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover',
+                }}
+            >
                 <StyledContactHeader variant="h5">
                     We would love to hear from you!
                 </StyledContactHeader>
@@ -47,9 +55,13 @@ const Contact = () => {
                 </StyledIconContainer>
                 <CardContent>
                     <Typography
-                        color={'#2c2c2c'}
-                        variant="body2"
+                        color={'rgb(255,255,255)'}
+                        variant="subtitle1"
                         align="center"
+                        sx={{
+                            fontWeight: 'bold',
+                            letterSpacing: '1px',
+                        }}
                     >
                         200 S Franklin St, Seaside, OR (97138)
                     </Typography>
