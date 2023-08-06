@@ -3,7 +3,7 @@ import HomeLayout from '../components/HomeLayout';
 import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
 
-const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2 } =
+const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2, mural } =
     imageUrls;
 
 function Home() {
@@ -122,6 +122,42 @@ function Home() {
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
                     Ambience
+                </Typography>
+            </HomeLayout>
+            {/* next info */}
+            <DividerCard
+                sxBackground={{
+                    backgroundImage: `url(${drinks2})`,
+                    backgroundPosition: 'center',
+                }}
+            >
+                <Typography
+                    color={'text.complimentary'}
+                    align="center"
+                    sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
+                ></Typography>
+            </DividerCard>
+            <HomeLayout
+                sxBackground={{
+                    backgroundImage: `url(${mural})`,
+                    backgroundPosition: 'center',
+                }}
+            >
+                <img
+                    style={{ display: 'none' }}
+                    src={backgroundImage}
+                    alt="increase priority"
+                />
+                <Typography align="center" variant="h2" marked="center">
+                    Info about hours
+                </Typography>
+                <Typography
+                    color="inherit"
+                    align="center"
+                    variant="h5"
+                    sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
+                >
+                    12-4pm food and whatever
                 </Typography>
             </HomeLayout>
         </>

@@ -8,7 +8,7 @@ const wallInsideImage =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-4.jpg';
 
 const tapOutsideImage =
-    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-22.jpg';
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-19.jpg';
 
 const drinksVector =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/drinks%20converted.svg';
@@ -22,6 +22,9 @@ const drinks2 =
 const barTop =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-11.jpg';
 
+const mural =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-16.jpg';
+
 const imageUrls = {
     backgroundImage,
     testBgImage,
@@ -31,5 +34,6 @@ const imageUrls = {
     martiniVector,
     drinks2,
     barTop,
+    mural,
 };
 export default imageUrls;
