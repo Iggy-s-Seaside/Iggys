@@ -18,6 +18,7 @@ const martiniVector =
 
 const drinks2 =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/drinks2.svg?t=2023-06-29T00%3A20%3A28.385Z';
+
 const imageUrls = {
     backgroundImage,
     testBgImage,
