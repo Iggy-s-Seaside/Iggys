@@ -39,12 +39,6 @@ function HomeLayout(props) {
                     alignItems: 'center',
                 }}
             >
-                {/* <img
-                    src="/iggybuilding.jpg"
-                    alt="iggy's building"
-                    width="147"
-                    height="80"
-                /> */}
                 {children}
                 <Box
                     sx={{

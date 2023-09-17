@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container, Divider, Typography } from '@mui/material';
+import { Box, Container } from '@mui/material';
 import CocktailCard from '../components/CocktailCard';
 import { useEffect, useState } from 'react';
 import { getCocktails } from '../services/cocktails';
