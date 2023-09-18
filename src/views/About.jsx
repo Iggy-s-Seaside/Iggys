@@ -21,6 +21,7 @@ function About() {
                 <Typography
                     color={'text.primary'}
                     align="center"
+                    mt={20}
                     sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
                 >
                     In 1983, Mary Weise saw potential in a property in downtown
