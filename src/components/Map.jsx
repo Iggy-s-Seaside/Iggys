@@ -38,7 +38,20 @@ function Map() {
 
     return (
         <>
-            <LoadScript googleMapsApiKey={key}>
+            {window.google === undefined ? (
+                <LoadScript googleMapsApiKey={key}>
+                    <GoogleMap
+                        mapContainerStyle={containerStyle}
+                        center={center}
+                        zoom={15}
+                        onLoad={onLoad}
+                    >
+                        {marker && (
+                            <Marker position={center} title="Center Marker" />
+                        )}
+                    </GoogleMap>
+                </LoadScript>
+            ) : (
                 <GoogleMap
                     mapContainerStyle={containerStyle}
                     center={center}
@@ -49,7 +62,7 @@ function Map() {
                         <Marker position={center} title="Center Marker" />
                     )}
                 </GoogleMap>
-            </LoadScript>
+            )}
         </>
     );
 }
