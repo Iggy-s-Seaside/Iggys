@@ -25,6 +25,9 @@ const barTop =
 const mural =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-15.jpg';
 
+const jellyFish =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-39.jpg?t=2023-09-18T00%3A46%3A42.133Z';
+
 const imageUrls = {
     backgroundImage,
     testBgImage,
@@ -35,5 +38,6 @@ const imageUrls = {
     drinks2,
     barTop,
     mural,
+    jellyFish,
 };
 export default imageUrls;
