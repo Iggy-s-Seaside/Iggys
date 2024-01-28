@@ -6,6 +6,7 @@ import StyledIconContainer from '../styled/StyledIconContainer';
 import StyledIcon from '../styled/StyledIcon';
 import Map from '../components/Map';
 import imageUrls from '../assets/links';
+import VisMap from '../components/VisMap';
 
 const { barTop } = imageUrls;
 const Contact = () => {
@@ -67,7 +68,8 @@ const Contact = () => {
                     </Typography>
                 </CardContent>
             </StyledCard>
-            <Map />
+            {/* <Map /> */}
+            <VisMap />
         </>
     );
 };
