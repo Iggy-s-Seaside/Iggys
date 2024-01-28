@@ -29,7 +29,7 @@ function Map() {
             const marker = new window.google.maps.Marker({
                 position: center,
                 map: map,
-                title: 'Center Marker',
+                title: 'Click to zoom',
             });
 
             setMarker(marker);
