@@ -45,6 +45,7 @@ function HappyHour() {
                     >
                         Happy Hour
                     </StyledTypography>
+                    <StyledDividerLine />
                 </Box>
                 {/* map happy hour drink specials  */}
                 <Box sx={{ mt: '100px', mb: '50px' }}>
