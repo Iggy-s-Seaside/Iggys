@@ -12,7 +12,7 @@ export default function VisMap() {
     return (
         <APIProvider apiKey={key}>
             <div style={{ height: '50vh', width: '100%' }}>
-                <Map zoom={18} center={position}>
+                <Map zoom={20} center={position}>
                     <Marker
                         // title={''} might not be needed
                         position={position}
