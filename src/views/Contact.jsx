@@ -1,4 +1,5 @@
 import { Email, Instagram, Facebook } from '@mui/icons-material';
+import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
 import { CardContent, Typography } from '@mui/material';
 import StyledContactHeader from '../styled/StyledContactHeader';
 import StyledCard from '../styled/StyledCard';
@@ -30,7 +31,10 @@ const Contact = () => {
             '_blank'
         );
     };
-
+    const handlePhoneClick = () => {
+        const phoneNumber = '+15037383773';
+        window.location.href = `tel:${phoneNumber}`;
+    };
     return (
         <>
             <StyledCard
@@ -52,6 +56,9 @@ const Contact = () => {
                     </StyledIcon>
                     <StyledIcon onClick={handleFacebookClick}>
                         <Facebook />
+                    </StyledIcon>
+                    <StyledIcon onClick={handlePhoneClick}>
+                        <LocalPhoneIcon />
                     </StyledIcon>
                 </StyledIconContainer>
                 <CardContent>
