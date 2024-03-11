@@ -11,6 +11,7 @@ import Cocktails from './views/Cocktails';
 import Appetizers from './views/Appetizers';
 import Contact from './views/Contact';
 import About from './views/About';
+import HappyHour from './views/HappyHour';
 
 const router = createBrowserRouter(
     createRoutesFromElements(
@@ -21,6 +22,7 @@ const router = createBrowserRouter(
             <Route path="appetizers" element={<Appetizers />} />
             <Route path="contact" element={<Contact />} />
             <Route path="about" element={<About />} />
+            <Route path="happy_hour" element={<HappyHour />} />
         </Route>
     )
 );
