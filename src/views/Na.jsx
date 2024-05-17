@@ -19,11 +19,10 @@ function Na() {
                         variant="h3"
                     >
                         Non alcoholic beverages
-                        <Typography color={'primary.main'} variant="h4">
-                            Mocktails, slushies, juices and sodas
-                        </Typography>
                     </StyledTypography>
-                    <StyledDividerLine />
+                    <Typography color={'primary.main'} variant="h4">
+                        Mocktails, slushies, juices and sodas
+                    </Typography>
                 </Box>
             </Container>
         </>

@@ -44,10 +44,10 @@ function HappyHour() {
                         variant="h3"
                     >
                         Happy Hour
-                        <Typography color={'primary.main'} variant="h4">
-                            3pm-5pm Every Day!
-                        </Typography>
                     </StyledTypography>
+                    <Typography color={'primary.main'} variant="h4">
+                        3pm-5pm Every Day!
+                    </Typography>
                     {/* <StyledDividerLine /> */}
                 </Box>
                 {/* map happy hour drink specials  */}
