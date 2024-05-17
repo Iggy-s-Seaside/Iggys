@@ -5,7 +5,7 @@ import RootHeaderMenu from './RootHeaderMenu';
 import RootHeaderLinks from './RootHeaderLinks';
 
 const Root = () => {
-    const smallScreen = useMediaQuery((theme) => theme.breakpoints.down('sm'));
+    const smallScreen = useMediaQuery((theme) => theme.breakpoints.down('mid'));
     const navigate = useNavigate();
     const handleImageClick = () => {
         navigate('/');
