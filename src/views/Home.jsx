@@ -2,7 +2,6 @@ import { Typography } from '@mui/material';
 import HomeLayout from '../components/HomeLayout';
 import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
-// testing
 
 const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2, mural } =
     imageUrls;
