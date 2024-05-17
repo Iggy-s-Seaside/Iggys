@@ -14,6 +14,9 @@ function RootHeaderLinks() {
                 <StyledLink to="/cocktails">Cocktails</StyledLink>
             </Typography>
             <Typography sx={{ m: '50px 15px' }}>
+                <StyledLink to="/Na">Non Alcholic</StyledLink>
+            </Typography>
+            <Typography sx={{ m: '50px 15px' }}>
                 <StyledLink to="/appetizers">Appetizers</StyledLink>
             </Typography>
             <Typography sx={{ m: '50px 15px' }}>

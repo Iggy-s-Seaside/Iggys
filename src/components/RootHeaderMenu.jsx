@@ -37,6 +37,13 @@ function RootHeaderMenu() {
                             </MenuItem>
                             <MenuItem onClick={popupState.close}>
                                 <Typography>
+                                    <StyledMenuLink to="/na">
+                                        Na Beverages
+                                    </StyledMenuLink>
+                                </Typography>
+                            </MenuItem>
+                            <MenuItem onClick={popupState.close}>
+                                <Typography>
                                     <StyledMenuLink to="/appetizers">
                                         Appetizers
                                     </StyledMenuLink>
