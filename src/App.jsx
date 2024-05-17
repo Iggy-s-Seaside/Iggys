@@ -13,6 +13,7 @@ import Contact from './views/Contact';
 import About from './views/About';
 import HappyHour from './views/HappyHour';
 import Na from './views/Na';
+import Footer from './components/Footer';
 
 const router = createBrowserRouter(
     createRoutesFromElements(
@@ -33,6 +34,7 @@ function App() {
     return (
         <>
             <RouterProvider router={router} />
+            <Footer />
         </>
     );
 }
