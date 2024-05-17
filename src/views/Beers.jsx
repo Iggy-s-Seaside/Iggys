@@ -185,6 +185,26 @@ function Beers() {
                             }}
                             variant="h3"
                         >
+                            Golden Ale
+                        </StyledTypography>
+                        {items.map((item) => typeLoop('golden', item))}
+                    </Box>
+
+                    <Box
+                        gridColumn={{
+                            md: 'span 6',
+                            sm: 'span 12',
+                            xs: 'span 12',
+                        }}
+                    >
+                        <StyledTypography
+                            sx={{
+                                textAlign: 'left',
+                                letterSpacing: 2,
+                                mb: '50px',
+                            }}
+                            variant="h3"
+                        >
                             Hard Seltzer
                         </StyledTypography>
                         {items.map((item) => typeLoop('seltzer', item))}
@@ -216,25 +236,6 @@ function Beers() {
                         }}
                     >
                         <StyledTypography
-                            sx={{
-                                textAlign: 'left',
-                                letterSpacing: 2,
-                                mb: '50px',
-                            }}
-                            variant="h3"
-                        >
-                            Hefeweizen
-                        </StyledTypography>
-                        {items.map((item) => typeLoop('hefeweizen', item))}
-                    </Box>
-                    <Box
-                        gridColumn={{
-                            md: 'span 6',
-                            sm: 'span 12',
-                            xs: 'span 12',
-                        }}
-                    >
-                        <StyledTypography
                             sx={{ textAlign: 'left', mb: '50px' }}
                             variant="h3"
                         >
@@ -249,3 +250,25 @@ function Beers() {
 }
 
 export default Beers;
+
+{
+    /* <Box
+    gridColumn={{
+        md: 'span 6',
+        sm: 'span 12',
+        xs: 'span 12',
+    }}
+>
+    <StyledTypography
+        sx={{
+            textAlign: 'left',
+            letterSpacing: 2,
+            mb: '50px',
+        }}
+        variant="h3"
+    >
+        Hefeweizen
+    </StyledTypography>
+    {items.map((item) => typeLoop('hefeweizen', item))}
+</Box> */
+}

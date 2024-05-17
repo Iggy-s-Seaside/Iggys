@@ -30,7 +30,7 @@ function ChowderCard() {
                             fontWeight="bold"
                             color="primary.main"
                         >
-                            $5.00
+                            $6.00
                         </Typography>
                     </Grid>
                     <Grid item>
@@ -48,7 +48,7 @@ function ChowderCard() {
                             fontWeight="bold"
                             color="primary.main"
                         >
-                            $8.00
+                            $10.00
                         </Typography>
                     </Grid>
                 </Grid>
