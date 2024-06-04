@@ -1,16 +1,17 @@
 import { Box } from '@mui/material';
-import React from 'react';
-
 function Footer() {
     return (
         <Box
             sx={{
-                height: '2.5rem',
+                height: 'auto',
                 width: '100%',
                 position: 'fixed',
                 bottom: '0',
                 paddingBottom: '2.5rem',
+                marginTop: 'auto',
                 bgcolor: 'primary.main',
+                zIndex: '1',
+                clear: 'both',
             }}
         ></Box>
     );

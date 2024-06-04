@@ -3,6 +3,8 @@ import { StyledTypography } from '../styled/StyledTypography';
 import StyledDividerLine from '../styled/StyledDividerLine';
 
 function Na() {
+    // useEffect getna()
+    // const [Na, setNa] = useState([]);
     return (
         <>
             <Container
@@ -23,6 +25,7 @@ function Na() {
                     <Typography color={'primary.main'} variant="h4">
                         Mocktails, slushies, juices and sodas
                     </Typography>
+                    {/* map na */}
                 </Box>
             </Container>
         </>
