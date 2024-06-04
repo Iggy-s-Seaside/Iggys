@@ -2,6 +2,8 @@ import { Typography } from '@mui/material';
 import HomeLayout from '../components/HomeLayout';
 import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
+import MuiCarousel from '../components/MuiCarousel';
+// import Slider from '../components/Slider';
 
 const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2, mural } =
     imageUrls;
@@ -146,6 +148,10 @@ function Home() {
                 >
                     12-4pm food and whatever
                 </Typography>
+            </HomeLayout>
+            <HomeLayout>
+                <MuiCarousel />
+                {/* <Slider /> */}
             </HomeLayout>
         </>
     );
