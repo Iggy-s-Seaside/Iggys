@@ -1,10 +1,11 @@
 import { Box } from '@mui/material';
 import { Slide } from 'react-slideshow-image';
-import imageUrls from '../assets/links';
 import styled from '@mui/material/styles/styled';
 import 'react-slideshow-image/dist/styles.css';
+import drinkLinks from '../assets/drinkLinks';
 
-const imageUrlsArr = Object.values(imageUrls);
+const imageUrlsArr = Object.values(drinkLinks);
+console, log(imageUrlsArr);
 
 console.log(imageUrlsArr);
 const Background = styled(Box)({

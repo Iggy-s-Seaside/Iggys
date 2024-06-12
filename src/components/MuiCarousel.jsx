@@ -1,25 +1,19 @@
 import React from 'react';
 import Carousel from 'react-material-ui-carousel';
-import { Paper, Button } from '@mui/material';
-import imageUrls from '../assets/links';
+import { Paper, Button, Box } from '@mui/material';
+import drinkLinks from '../assets/drinkLinks';
 import Item from './Item';
 
-const imageUrlsArr = Object.values(imageUrls);
+const imageUrlsArr = Object.values(drinkLinks);
 
 function MuiCarousel() {
     return (
         <Carousel
             indicators={false}
             sx={{
-                // maxHeight: '500px',
+                position: 'relative',
+                display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                // backgroundSize: 'cover',
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
             }}
         >
             {imageUrlsArr.map((image, index) => (
