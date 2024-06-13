@@ -2,6 +2,8 @@ import { Typography } from '@mui/material';
 import HomeLayout from '../components/HomeLayout';
 import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
+import MuiCarousel from '../components/MuiCarousel';
+import Footer from '../components/Footer';
 
 const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2, mural } =
     imageUrls;
@@ -38,11 +40,7 @@ function Home() {
                     backgroundPosition: 'center',
                 }}
             >
-                <Typography
-                    color={'text.complimentary'}
-                    align="center"
-                    sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
-                >
+                <Typography>
                     New Specials something something something.
                 </Typography>
             </DividerCard>
@@ -147,6 +145,23 @@ function Home() {
                     12-4pm food and whatever
                 </Typography>
             </HomeLayout>
+            <DividerCard
+                sxBackground={{
+                    backgroundImage: `url(${drinks2})`,
+                    backgroundPosition: 'center',
+                }}
+            >
+                <Typography
+                    color={'text.complimentary'}
+                    align="center"
+                    sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
+                >
+                    Hand Crafted Cocktails
+                </Typography>
+            </DividerCard>
+            <MuiCarousel />
+            <Footer />
+            {/* <Slider /> */}
         </>
     );
 }
