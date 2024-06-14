@@ -1,5 +1,5 @@
 const backgroundImage =
-    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-29.jpg';
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/IMG_8238.jpg';
 
 const testBgImage =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/cat.jpg';
