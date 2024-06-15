@@ -4,7 +4,8 @@ import imageUrls from '../assets/links';
 import DividerCard from '../components/DividerCard';
 import MuiCarousel from '../components/MuiCarousel';
 import Footer from '../components/Footer';
-
+import info from '../assets/info';
+const { welcome, familyFriendly, varietySeating, saturdays, na } = info;
 const { backgroundImage, wallInsideImage, tapOutsideImage, drinks2, mural } =
     imageUrls;
 
@@ -23,16 +24,16 @@ function Home() {
                     alt="increase priority"
                 />
                 <Typography align="center" variant="h2" marked="center">
-                    Iggy's Bar
+                    Welcome to Iggy's!
                 </Typography>
-                <Typography
+                {/* <Typography
                     color="inherit"
                     align="center"
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    Seaside's newest bar!
-                </Typography>
+                    {welcome}
+                </Typography> */}
             </HomeLayout>
             <DividerCard
                 sxBackground={{
@@ -40,8 +41,13 @@ function Home() {
                     backgroundPosition: 'center',
                 }}
             >
-                <Typography>
-                    New Specials something something something.
+                <Typography
+                    color={'text.complimentary'}
+                    align="center"
+                    sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
+                    marked="center"
+                >
+                    {welcome}
                 </Typography>
             </DividerCard>
             {/* taps outside */}
@@ -65,7 +71,7 @@ function Home() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    Every Saturday dance from 8pm till midnight with us.
+                    {saturdays}
                 </Typography>
             </HomeLayout>
             <DividerCard
@@ -80,7 +86,7 @@ function Home() {
                     sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
                     marked="center"
                 >
-                    INCREDIBLE AWESOME AMAZING HOLY MOLY
+                    {varietySeating}{' '}
                 </Typography>
             </DividerCard>
             {/* wall inside */}
