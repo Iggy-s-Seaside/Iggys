@@ -18,7 +18,7 @@ function Hours() {
                     alt="increase priority"
                 />
                 <Typography align="center" variant="h2" marked="center">
-                    Info about hours
+                    Open 7 Days a Week!
                 </Typography>
                 <Typography
                     color="inherit"
@@ -26,7 +26,7 @@ function Hours() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    12-4pm food and whatever
+                    12am - 12pm Daily
                 </Typography>
             </HomeLayout>
         </>

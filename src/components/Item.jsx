@@ -7,8 +7,8 @@ function Item({ image }) {
     return (
         <Paper
             sx={{
-                height: theme.breakpoints.down('sm') ? '50vh' : '100vh',
-                width: theme.breakpoints.down('sm') ? '100vw' : '50vw',
+                height: theme.breakpoints.down('md') ? '50vh' : '100vh',
+                width: theme.breakpoints.down('md') ? '100vw' : '50vw',
                 bgcolor: theme.palette.background.default,
                 backgroundImage: `url(${image})`,
                 backgroundSize: 'contain',

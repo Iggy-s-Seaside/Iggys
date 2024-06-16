@@ -28,6 +28,9 @@ const mural =
 const jellyFish =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Iggys-KaitlinGreen-39.jpg?t=2023-09-18T00%3A46%3A42.133Z';
 
+const nightOutside =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/IMG_8318.jpg';
+
 const imageUrls = {
     backgroundImage,
     testBgImage,
@@ -39,5 +42,6 @@ const imageUrls = {
     barTop,
     mural,
     jellyFish,
+    nightOutside,
 };
 export default imageUrls;

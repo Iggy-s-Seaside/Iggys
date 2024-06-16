@@ -1,7 +1,7 @@
 import HomeLayout from './HomeLayout';
 import { Typography } from '@mui/material';
 import imageUrls from '../assets/links';
-const { tapOutsideImage } = imageUrls;
+const { nightOutside } = imageUrls;
 import info from '../assets/info';
 const { saturdays } = info;
 
@@ -10,13 +10,13 @@ function Weekends() {
         <>
             <HomeLayout
                 sxBackground={{
-                    backgroundImage: `url(${tapOutsideImage})`,
+                    backgroundImage: `url(${nightOutside})`,
                     backgroundPosition: 'center',
                 }}
             >
                 <img
                     style={{ display: 'none' }}
-                    src={tapOutsideImage}
+                    src={nightOutside}
                     alt="increase priority"
                 />
                 <Typography align="center" variant="h2" marked="center">

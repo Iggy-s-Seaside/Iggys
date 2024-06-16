@@ -13,11 +13,11 @@ function Home() {
         <>
             <HeroMain />
             <DividerCard cardText={welcome} />
-            <Weekends />
+            <Hours />
             <DividerCard cardText={varietySeating} />
             <BarInfo />
             <DividerCard cardText={'Football Football Football'} />
-            <Hours />
+            <Weekends />
             <DividerCard cardText={'Hand Crafted Cocktails'} />
             <MuiCarousel />
             <Footer />
