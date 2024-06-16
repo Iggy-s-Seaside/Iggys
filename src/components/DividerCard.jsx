@@ -1,6 +1,8 @@
-import { Box, Container } from '@mui/material';
+import { Box, Container, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import PropTypes from 'prop-types';
+import imageUrls from '../assets/links';
+const { drinks2 } = imageUrls;
 
 const DividerCardLayoutRoot = styled('section')(({ theme }) => ({
     color: theme.palette.common.white,
@@ -25,7 +27,7 @@ const Background = styled(Box)({
 });
 
 function DividerCard(props) {
-    const { sxBackground, children } = props;
+    const { sxBackground, cardText, children } = props;
     return (
         <>
             <DividerCardLayoutRoot>
@@ -38,7 +40,15 @@ function DividerCard(props) {
                         alignItems: 'center',
                     }}
                 >
+                    <Typography
+                        color={'text.complimentary'}
+                        align="center"
+                        sx={{ typography: { xs: 'subtitle1', sm: 'h5' } }}
+                    >
+                        {cardText}
+                    </Typography>
                     {children}
+
                     <Box
                         sx={{
                             position: 'absolute',
@@ -51,7 +61,12 @@ function DividerCard(props) {
                             zIndex: -1,
                         }}
                     />
-                    <Background sx={sxBackground} />
+                    <Background
+                        sx={{
+                            backgroundImage: `url(${drinks2})`,
+                            backgroundPosition: 'center',
+                        }}
+                    />
                 </Container>
             </DividerCardLayoutRoot>
         </>
@@ -60,17 +75,7 @@ function DividerCard(props) {
 
 DividerCard.propTypes = {
     children: PropTypes.node,
-    sxBackground: PropTypes.oneOfType([
-        PropTypes.arrayOf(
-            PropTypes.oneOfType([
-                PropTypes.func,
-                PropTypes.object,
-                PropTypes.bool,
-            ])
-        ),
-        PropTypes.func,
-        PropTypes.object,
-    ]),
+    cardText: PropTypes.string,
 };
 
 export default DividerCard;
