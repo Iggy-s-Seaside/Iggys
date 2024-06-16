@@ -2,7 +2,7 @@ import HomeLayout from './HomeLayout';
 import { Typography } from '@mui/material';
 import imageUrls from '../assets/links';
 const { backgroundImage } = imageUrls;
-function Hero() {
+function HeroMain() {
     return (
         <>
             <HomeLayout
@@ -32,4 +32,4 @@ function Hero() {
     );
 }
 
-export default Hero;
+export default HeroMain;
