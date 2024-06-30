@@ -16,54 +16,80 @@ function RootHeaderMenu() {
                             <MenuIcon />
                         </Button>
                         <Menu {...bindMenu(popupState)}>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'primary.main' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/">Home</StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'text.complimentary' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/beers">
                                         Beers
                                     </StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{
+                                    bgcolor: 'primary.main',
+                                }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/cocktails">
                                         Cocktails
                                     </StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'text.complimentary' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/na">
                                         Non Alcoholic
                                     </StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'primary.main' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/appetizers">
                                         Appetizers
                                     </StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'text.complimentary' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/happy_hour">
                                         Happy Hour
                                     </StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'primary.main' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/contact">
                                         Contact
                                     </StyledMenuLink>
                                 </Typography>
                             </MenuItem>
-                            <MenuItem onClick={popupState.close}>
+                            <MenuItem
+                                sx={{ bgcolor: 'text.complimentary' }}
+                                onClick={popupState.close}
+                            >
                                 <Typography>
                                     <StyledMenuLink to="/about">
                                         About
