@@ -12,7 +12,7 @@ function HeroMain() {
             <HomeLayout
                 sxBackground={{
                     backgroundImage: `url(${backgroundImage})`,
-                    backgroundPosition: isMobile ? 'left' : 'center',
+                    backgroundPosition: isMobile ? 'right' : 'center',
                 }}
             >
                 <img
