@@ -31,6 +31,9 @@ const jellyFish =
 const nightOutside =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/IMG_8318.jpg';
 
+const djFlyer =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/dj.jpg';
+
 const imageUrls = {
     backgroundImage,
     testBgImage,
@@ -43,5 +46,6 @@ const imageUrls = {
     mural,
     jellyFish,
     nightOutside,
+    djFlyer,
 };
 export default imageUrls;

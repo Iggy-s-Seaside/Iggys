@@ -16,10 +16,18 @@ function Home() {
             <Hours />
             <DividerCard cardText={varietySeating} />
             <BarInfo />
-            <DividerCard cardText={'Football Football Football'} />
+            <DividerCard
+                cardText={
+                    'Sports everyday! Come enjoy the game with your friends, and banter with your rivals!'
+                }
+            />
             <Weekends />
-            <DividerCard cardText={'Hand Crafted Cocktails'} />
-            <MuiCarousel />
+            <DividerCard
+                cardText={
+                    'Enjoy unique Hand Crafted Cocktails made from fresh ingredients!'
+                }
+            />
+            {/* <MuiCarousel /> */}
             <Footer />
         </>
     );

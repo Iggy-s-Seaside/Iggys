@@ -22,8 +22,11 @@ function Na() {
                     >
                         Non alcoholic beverages
                     </StyledTypography>
-                    <Typography color={'primary.main'} variant="h4">
-                        Mocktails, slushies, juices and sodas
+                    <Typography color={'text.complimentary'} variant="h4">
+                        Ask your bartender about our Mocktails, slushies, juices
+                        and sodas!
+                        <br />
+                        More information coming soon!
                     </Typography>
                     {/* map na */}
                 </Box>

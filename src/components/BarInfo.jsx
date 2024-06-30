@@ -18,7 +18,7 @@ function BarInfo() {
                     alt="increase priority"
                 />
                 <Typography align="center" variant="h2" marked="center">
-                    SOMETHING ABOUT THE BAR
+                    {/* add text later */}
                 </Typography>
                 <Typography
                     color="inherit"
@@ -26,7 +26,7 @@ function BarInfo() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    Ambience
+                    {/* Ambience */}
                 </Typography>
             </HomeLayout>
         </>

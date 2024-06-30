@@ -11,7 +11,7 @@ const na =
     'Daily N/A slushies to keep you cool and take out bags for the beach! ';
 
 const saturdays =
-    'Come dance with us on Saturday nights from 8pm-midnight! Suggest your favorite songs for your friends to enjoy! ';
+    'Come dance with us on Saturday nights from 9pm-1am! Suggest your favorite songs for your friends to enjoy! ';
 
 const info = {
     welcome,
