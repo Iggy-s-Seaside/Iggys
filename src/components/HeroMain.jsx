@@ -1,14 +1,18 @@
 import HomeLayout from './HomeLayout';
-import { Typography } from '@mui/material';
+import { Typography, useMediaQuery } from '@mui/material';
 import imageUrls from '../assets/links';
+import { useTheme } from '@emotion/react';
 const { backgroundImage } = imageUrls;
+
 function HeroMain() {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     return (
         <>
             <HomeLayout
                 sxBackground={{
                     backgroundImage: `url(${backgroundImage})`,
-                    backgroundPosition: 'center',
+                    backgroundPosition: isMobile ? 'left' : 'center',
                 }}
             >
                 <img
