@@ -32,7 +32,7 @@ const Contact = () => {
         );
     };
     const handlePhoneClick = () => {
-        const phoneNumber = '+15037383773';
+        const phoneNumber = '+15037380672';
         window.location.href = `tel:${phoneNumber}`;
     };
     return (
