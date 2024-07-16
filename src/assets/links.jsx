@@ -34,6 +34,9 @@ const nightOutside =
 const djFlyer =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/dj.jpg';
 
+const wineCrab =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/wineCrab.JPG';
+
 const imageUrls = {
     backgroundImage,
     testBgImage,
@@ -47,5 +50,6 @@ const imageUrls = {
     jellyFish,
     nightOutside,
     djFlyer,
+    wineCrab,
 };
 export default imageUrls;
