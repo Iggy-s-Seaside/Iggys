@@ -25,7 +25,7 @@ function RootHeaderMenu() {
                                 </Typography>
                             </MenuItem>
                             <MenuItem
-                                sx={{ bgcolor: 'text.complimentary' }}
+                                sx={{ bgcolor: 'primary.alt' }}
                                 onClick={popupState.close}
                             >
                                 <Typography>
@@ -47,7 +47,7 @@ function RootHeaderMenu() {
                                 </Typography>
                             </MenuItem>
                             <MenuItem
-                                sx={{ bgcolor: 'text.complimentary' }}
+                                sx={{ bgcolor: 'primary.alt' }}
                                 onClick={popupState.close}
                             >
                                 <Typography>
@@ -67,7 +67,7 @@ function RootHeaderMenu() {
                                 </Typography>
                             </MenuItem>
                             <MenuItem
-                                sx={{ bgcolor: 'text.complimentary' }}
+                                sx={{ bgcolor: 'primary.alt' }}
                                 onClick={popupState.close}
                             >
                                 <Typography>
@@ -87,7 +87,7 @@ function RootHeaderMenu() {
                                 </Typography>
                             </MenuItem>
                             <MenuItem
-                                sx={{ bgcolor: 'text.complimentary' }}
+                                sx={{ bgcolor: 'primary.alt' }}
                                 onClick={popupState.close}
                             >
                                 <Typography>

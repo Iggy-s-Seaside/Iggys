@@ -16,6 +16,7 @@ function Home() {
             <Hours />
             <DividerCard cardText={varietySeating} />
             <BarInfo />
+            {/* change to lottery card */}
             <DividerCard cardText={sports} />
             <Weekends />
             <DividerCard cardText={enjoy} />

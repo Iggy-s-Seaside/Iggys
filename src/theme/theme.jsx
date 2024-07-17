@@ -10,6 +10,7 @@ export const theme = createTheme({
         },
         primary: {
             main: '#69c9ca',
+            alt: '#87ceeb',
         },
         text: {
             primary: 'rgb(255,255,255)',
