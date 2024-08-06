@@ -5,6 +5,7 @@ const StyledMenuLink = styled(Link)(({ theme }) => ({
     textDecoration: 'none',
     color: theme.palette.common.black,
     fontWeight: 'bold',
+    minWidth: '100%',
 }));
 
 export default StyledMenuLink;

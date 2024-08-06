@@ -13,11 +13,11 @@ export default function VisMap() {
         <APIProvider apiKey={key}>
             <div style={{ height: '50vh', width: '100%' }}>
                 <Map zoom={19} center={position}>
-                    <Marker
+                    {/* <Marker
                         title={'Take me there!'}
                         position={position}
                         onClick={openGoogleMaps}
-                    ></Marker>
+                    ></Marker> */}
                 </Map>
             </div>
         </APIProvider>
