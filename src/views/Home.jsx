@@ -2,7 +2,7 @@ import DividerCard from '../components/DividerCard';
 // import MuiCarousel from '../components/MuiCarousel';
 // import Footer from '../components/Footer';
 import info from '../assets/info';
-import Weekends from '../components/Weekends';
+// import Weekends from '../components/Weekends';np
 import BarInfo from '../components/BarInfo';
 import Hours from '../components/Hours';
 import HeroMain from '../components/HeroMain';
@@ -17,8 +17,8 @@ function Home() {
             <DividerCard cardText={varietySeating} />
             <BarInfo />
             {/* change to lottery card */}
-            <DividerCard cardText={sports} />
-            <Weekends />
+            {/* <DividerCard cardText={sports} /> */}
+            {/* <Weekends /> */}
             <DividerCard cardText={enjoy} />
             {/* <MuiCarousel /> */}
             {/* <Footer /> */}

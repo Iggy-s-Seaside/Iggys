@@ -26,7 +26,8 @@ function BarInfo() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    {/* Ambience */}
+                    Come watch Football with us! Every game Monday, Thursday,
+                    and Sunday!
                 </Typography>
             </HomeLayout>
         </>
