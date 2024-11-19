@@ -1,11 +1,13 @@
 import HomeLayout from './HomeLayout';
 import imageUrls from '../assets/links';
-import { Button, Typography } from '@mui/material';
+import { Typography } from '@mui/material';
 import ButtonLink from './ButtonLink';
+import useModalContext from '../hooks/useModalContext';
 
 const { showUp } = imageUrls;
 
 function EventMain() {
+    const { handleOpen } = useModalContext();
     return (
         <>
             <HomeLayout
@@ -28,7 +30,11 @@ function EventMain() {
                     restaurant.
                 </Typography>
                 {/* change link to form page */}
-                <ButtonLink to="/about" variant="contained">
+                <ButtonLink
+                    onClick={handleOpen}
+                    to="/contact"
+                    variant="contained"
+                >
                     Click here to submit your info!
                 </ButtonLink>
             </HomeLayout>

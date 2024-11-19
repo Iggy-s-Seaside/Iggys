@@ -8,6 +8,7 @@ import StyledIcon from '../styled/StyledIcon';
 import Map from '../components/Map';
 import imageUrls from '../assets/links';
 import VisMap from '../components/VisMap';
+import FormModal from '../components/FormModal';
 
 const { barTop } = imageUrls;
 const Contact = () => {
@@ -37,6 +38,7 @@ const Contact = () => {
     };
     return (
         <>
+            <FormModal />
             <StyledCard
                 sx={{
                     backgroundImage: `url(${barTop})`,
