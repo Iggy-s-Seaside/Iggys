@@ -1,6 +1,6 @@
 import { Email, Instagram, Facebook } from '@mui/icons-material';
 import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
-import { CardContent, Typography } from '@mui/material';
+import { Box, Button, CardContent, Typography } from '@mui/material';
 import StyledContactHeader from '../styled/StyledContactHeader';
 import StyledCard from '../styled/StyledCard';
 import StyledIconContainer from '../styled/StyledIconContainer';
@@ -9,9 +9,11 @@ import Map from '../components/Map';
 import imageUrls from '../assets/links';
 import VisMap from '../components/VisMap';
 import FormModal from '../components/FormModal';
+import useModalContext from '../hooks/useModalContext';
 
 const { barTop } = imageUrls;
 const Contact = () => {
+    const { handleOpen } = useModalContext();
     const handleEmailClick = () => {
         const recipient = 'Carnelinc@live.com';
         const subject = 'Inquiry about your services';
@@ -75,6 +77,33 @@ const Contact = () => {
                     >
                         200 S Franklin St, Seaside, OR (97138)
                     </Typography>
+                    <Box>
+                        <Typography
+                            color={'rgb(255,255,255)'}
+                            variant="subtitle1"
+                            align="center"
+                            sx={{
+                                fontWeight: 'bold',
+                                letterSpacing: '1px',
+                            }}
+                        >
+                            Need an event space? click below!
+                        </Typography>
+                        <Button
+                            sx={{
+                                margin: 'auto',
+                                display: 'block',
+                                opacity: 0.85,
+                                fontSize: '1rem',
+                                fontWeight: 'bold',
+                            }}
+                            size="small"
+                            variant="contained"
+                            onClick={handleOpen}
+                        >
+                            Event form
+                        </Button>
+                    </Box>
                 </CardContent>
             </StyledCard>
             {/* <Map /> */}

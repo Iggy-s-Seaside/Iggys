@@ -7,7 +7,15 @@ function FormModal() {
     return (
         <>
             <Modal open={open} onClose={handleClose}>
-                <Box sx={{ width: 400, bgcolor: 'background.paper', p: 2 }}>
+                <Box
+                    sx={{
+                        width: 500,
+                        bgcolor: 'background.paper',
+                        p: 2,
+                        margin: 'auto',
+                        display: 'block',
+                    }}
+                >
                     <EventForm />
                 </Box>
             </Modal>

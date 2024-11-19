@@ -1,32 +1,27 @@
-import { Box, Button, Container, TextField, Typography } from '@mui/material';
+import {
+    Box,
+    Button,
+    Container,
+    CssBaseline,
+    TextField,
+    Typography,
+} from '@mui/material';
 
 function EventForm() {
     return (
         <>
             <Container>
+                <CssBaseline />v
                 <Box component="form" sx={{ mt: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                        <Typography variant="h4">Add an Event</Typography>
+                        <Typography align="center" variant="h5" color="black">
+                            Provide your event request details
+                        </Typography>
                     </Box>
+
                     <TextField
+                        sx={{ input: { color: 'black' } }}
                         fullWidth
-                        label="Event Name"
-                        margin="normal"
-                        name="name"
-                        required
-                        variant="outlined"
-                    />
-                    <TextField
-                        fullWidth
-                        label="Location"
-                        margin="normal"
-                        name="location"
-                        required
-                        variant="outlined"
-                    />
-                    <TextField
-                        fullWidth
-                        label="Date"
                         margin="normal"
                         name="date"
                         required
@@ -34,8 +29,8 @@ function EventForm() {
                         variant="outlined"
                     />
                     <TextField
+                        sx={{ input: { color: 'black' } }}
                         fullWidth
-                        label="Time"
                         margin="normal"
                         name="time"
                         required
@@ -43,6 +38,7 @@ function EventForm() {
                         variant="outlined"
                     />
                     <TextField
+                        sx={{ input: { color: 'black' } }}
                         fullWidth
                         label="Email"
                         margin="normal"
@@ -52,6 +48,7 @@ function EventForm() {
                         variant="outlined"
                     />
                     <TextField
+                        sx={{ input: { color: 'black' } }}
                         fullWidth
                         label="Contact Info"
                         margin="normal"
@@ -60,7 +57,9 @@ function EventForm() {
                         variant="outlined"
                     />
                     <TextField
+                        sx={{ input: { color: 'black' } }}
                         fullWidth
+                        rows={4}
                         label="Description"
                         margin="normal"
                         name="description"
@@ -74,7 +73,7 @@ function EventForm() {
                         type="submit"
                         variant="contained"
                     >
-                        Add Event
+                        Submit
                     </Button>
                 </Box>
             </Container>
