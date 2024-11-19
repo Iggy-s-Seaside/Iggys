@@ -10,7 +10,7 @@ function FormModal() {
                 <Box
                     sx={{
                         width: 500,
-                        bgcolor: 'background.paper',
+                        bgcolor: '#191919',
                         p: 2,
                         margin: 'auto',
                         display: 'block',
