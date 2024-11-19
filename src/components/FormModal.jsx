@@ -9,11 +9,12 @@ function FormModal() {
             <Modal open={open} onClose={handleClose}>
                 <Box
                     sx={{
-                        width: 500,
-                        bgcolor: '#191919',
+                        width: { xs: '90%', sm: 500 },
+                        bgcolor: 'background.default',
                         p: 2,
                         margin: 'auto',
                         display: 'block',
+                        borderRadius: 2,
                     }}
                 >
                     <EventForm />
