@@ -39,7 +39,24 @@ const wineCrab =
 
 const djNight =
     'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/djnight.jpeg';
+
+const showUp =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/show_up.jpg';
+
+const slayClose =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Slay_close.jpg?t=2024-11-19T03%3A50%3A32.143Z';
+
+const slayWide =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Slay_wide.jpg?t=2024-11-19T03%3A51%3A33.545Z';
+
+const slayVid =
+    'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/Slay_vid.mp4?t=2024-11-19T03%3A58%3A56.357Z';
+
 const imageUrls = {
+    slayVid,
+    slayWide,
+    slayClose,
+    showUp,
     backgroundImage,
     testBgImage,
     wallInsideImage,

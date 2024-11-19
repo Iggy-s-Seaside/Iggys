@@ -6,7 +6,8 @@ import info from '../assets/info';
 import BarInfo from '../components/BarInfo';
 import Hours from '../components/Hours';
 import HeroMain from '../components/HeroMain';
-const { welcome, varietySeating, sports, enjoy } = info;
+import EventMain from '../components/EventMain';
+const { welcome, varietySeating, enjoy } = info;
 
 function Home() {
     return (
@@ -16,10 +17,12 @@ function Home() {
             <Hours />
             <DividerCard cardText={varietySeating} />
             <BarInfo />
+            <DividerCard cardText={enjoy} />
+            <EventMain />
+            <DividerCard />
             {/* change to lottery card */}
             {/* <DividerCard cardText={sports} /> */}
             {/* <Weekends /> */}
-            <DividerCard cardText={enjoy} />
             {/* <MuiCarousel /> */}
             {/* <Footer /> */}
         </>
