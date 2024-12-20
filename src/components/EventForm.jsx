@@ -6,13 +6,47 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
+import useForm from '../hooks/useForm';
+import emailjs from '@emailjs/browser';
 
 function EventForm() {
+    const { formState, handleChange } = useForm({
+        date: '',
+        email: '',
+        name: '',
+        message: '',
+    });
+
+    const handleSubmit = (e, formState) => {
+        e.preventDefault();
+        console.log(formState.name);
+
+        emailjs
+            .send(
+                import.meta.env.EMAIL_SERVICE_ID,
+                import.meta.env.EMAIL_TEMPLATE_ID,
+                { ...formState },
+                { publicKey: import.meta.env.EMAIL_USER_ID }
+            )
+            .then(
+                (result) => {
+                    console.log(result.text);
+                },
+                (error) => {
+                    console.log(error.text);
+                }
+            );
+    };
+
     return (
         <>
             <Container>
                 <CssBaseline />
-                <Box component="form" sx={{ mt: 3, mb: 3 }}>
+                <Box
+                    component="form"
+                    onSubmit={handleSubmit}
+                    sx={{ mt: 3, mb: 3 }}
+                >
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                         <Typography
                             align="center"
@@ -24,6 +58,8 @@ function EventForm() {
                     </Box>
 
                     <TextField
+                        onChange={handleChange}
+                        value={formState.date}
                         fullWidth
                         label="Arrival Date"
                         margin="normal"
@@ -42,42 +78,8 @@ function EventForm() {
                         }}
                     />
                     <TextField
-                        fullWidth
-                        margin="normal"
-                        label="Start Time"
-                        name="time"
-                        required
-                        type="time"
-                        variant="outlined"
-                        sx={{
-                            '& .MuiOutlinedInput-root': {
-                                '& fieldset': { borderColor: 'primary.main' },
-                                '& input': {
-                                    textAlign: 'right',
-                                    color: 'primary.main',
-                                },
-                            },
-                        }}
-                    />
-                    <TextField
-                        fullWidth
-                        margin="normal"
-                        label="End Time"
-                        name="time"
-                        required
-                        type="time"
-                        variant="outlined"
-                        sx={{
-                            '& .MuiOutlinedInput-root': {
-                                '& fieldset': { borderColor: 'primary.main' },
-                                '& input': {
-                                    textAlign: 'right',
-                                    color: 'primary.main',
-                                },
-                            },
-                        }}
-                    />
-                    <TextField
+                        onChange={handleChange}
+                        value={formState.email}
                         fullWidth
                         label="Email"
                         margin="normal"
@@ -95,10 +97,12 @@ function EventForm() {
                         }}
                     />
                     <TextField
+                        onChange={handleChange}
+                        value={formState.name}
                         fullWidth
-                        label="Additional Contact Info"
+                        label="Name"
                         margin="normal"
-                        name="contactInfo"
+                        name="name"
                         required
                         variant="outlined"
                         sx={{
@@ -111,12 +115,14 @@ function EventForm() {
                         }}
                     />
                     <TextField
+                        onChange={handleChange}
+                        value={formState.message}
                         fullWidth
                         multiline
                         rows={4}
-                        label="Description"
+                        label="Event Description, please include date, time. contact info"
                         margin="normal"
-                        name="description"
+                        name="message"
                         required
                         variant="outlined"
                         sx={{
