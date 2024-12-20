@@ -23,7 +23,7 @@ function RootHeaderLinks() {
                 <StyledLink to="/happy_hour">Happy Hour</StyledLink>
             </Typography>
             <Typography sx={{ m: '50px 15px' }}>
-                <StyledLink to="/contact">Contact</StyledLink>
+                <StyledLink to="/contact">Contact/Book Event</StyledLink>
             </Typography>
             <Typography sx={{ m: '50px 15px' }}>
                 <StyledLink to="/about">About</StyledLink>

@@ -99,7 +99,7 @@ function RootHeaderMenu() {
                                 >
                                     <Typography>
                                         <StyledMenuLink to="/contact">
-                                            Contact
+                                            Contact/ Book Event
                                         </StyledMenuLink>
                                     </Typography>
                                 </MenuItem>
