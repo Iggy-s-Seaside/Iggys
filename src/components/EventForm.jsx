@@ -24,7 +24,6 @@ function EventForm() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log(formState);
 
         emailjs
             .send(
@@ -35,14 +34,14 @@ function EventForm() {
             )
             .then(
                 (result) => {
-                    console.log(result.text, 'made it');
+                    console.log(result.text, result.status);
                 },
                 (error) => {
-                    console.log(error.text, 'did not make it');
+                    console.log(error.text, error.status);
                 }
             );
-        // resetForm();
-        // handleClose();
+        resetForm();
+        handleClose();
     };
 
     return (
@@ -109,7 +108,8 @@ function EventForm() {
                         fullWidth
                         label="Phone Number(optional)"
                         margin="normal"
-                        name="PhoneNumber"
+                        name="phoneNumber"
+                        type="tel"
                         variant="outlined"
                         sx={{
                             '& .MuiOutlinedInput-root': {
