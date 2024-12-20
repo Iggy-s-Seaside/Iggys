@@ -12,9 +12,12 @@ export default function useForm(inputs = {}) {
             };
         });
     };
-
+    const resetForm = () => {
+        setFormState({ ...inputs });
+    };
     return {
         formState,
         handleChange,
+        resetForm,
     };
 }

@@ -8,34 +8,41 @@ import {
 } from '@mui/material';
 import useForm from '../hooks/useForm';
 import emailjs from '@emailjs/browser';
+import useModalContext from '../hooks/useModalContext';
 
 function EventForm() {
-    const { formState, handleChange } = useForm({
+    const { handleClose } = useModalContext();
+    const { formState, handleChange, resetForm } = useForm({
         date: '',
-        email: '',
-        name: '',
+        from_email: '',
+        from_name: '',
         message: '',
+        phoneNumber: '',
+        to_email: import.meta.env.VITE_TO_EMAIL,
+        to_name: 'Kelsey',
     });
 
-    const handleSubmit = (e, formState) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
-        console.log(formState.name);
+        console.log(formState);
 
         emailjs
             .send(
-                import.meta.env.EMAIL_SERVICE_ID,
-                import.meta.env.EMAIL_TEMPLATE_ID,
-                { ...formState },
-                { publicKey: import.meta.env.EMAIL_USER_ID }
+                import.meta.env.VITE_EMAIL_SERVICE_ID,
+                import.meta.env.VITE_EMAIL_TEMPLATE_ID,
+                formState,
+                { publicKey: import.meta.env.VITE_EMAIL_PUBLIC_KEY }
             )
             .then(
                 (result) => {
-                    console.log(result.text);
+                    console.log(result.text, 'made it');
                 },
                 (error) => {
-                    console.log(error.text);
+                    console.log(error.text, 'did not make it');
                 }
             );
+        // resetForm();
+        // handleClose();
     };
 
     return (
@@ -79,11 +86,11 @@ function EventForm() {
                     />
                     <TextField
                         onChange={handleChange}
-                        value={formState.email}
+                        value={formState.from_email}
                         fullWidth
                         label="Email"
                         margin="normal"
-                        name="email"
+                        name="from_email"
                         required
                         type="email"
                         variant="outlined"
@@ -98,11 +105,28 @@ function EventForm() {
                     />
                     <TextField
                         onChange={handleChange}
-                        value={formState.name}
+                        value={formState.phoneNumber}
+                        fullWidth
+                        label="Phone Number(optional)"
+                        margin="normal"
+                        name="PhoneNumber"
+                        variant="outlined"
+                        sx={{
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': { borderColor: 'primary.main' },
+                                '& input': {
+                                    color: 'primary.main',
+                                },
+                            },
+                        }}
+                    />
+                    <TextField
+                        onChange={handleChange}
+                        value={formState.from_name}
                         fullWidth
                         label="Name"
                         margin="normal"
-                        name="name"
+                        name="from_name"
                         required
                         variant="outlined"
                         sx={{
@@ -120,7 +144,7 @@ function EventForm() {
                         fullWidth
                         multiline
                         rows={4}
-                        label="Event Description, please include date, time. contact info"
+                        label="Event Description, please include start and end time."
                         margin="normal"
                         name="message"
                         required
