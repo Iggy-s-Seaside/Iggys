@@ -5,9 +5,8 @@ import 'react-slideshow-image/dist/styles.css';
 import drinkLinks from '../assets/drinkLinks';
 
 const imageUrlsArr = Object.values(drinkLinks);
-console, log(imageUrlsArr);
-
 console.log(imageUrlsArr);
+
 const Background = styled(Box)({
     display: 'flex',
     alignItems: 'center',
