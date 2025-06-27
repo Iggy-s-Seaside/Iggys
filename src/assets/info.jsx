@@ -13,8 +13,7 @@ const na =
 const saturdays =
     'Come dance with us on Saturday nights from 9pm-1am! Suggest your favorite songs for your friends to enjoy! ';
 
-const sports =
-    'Sports everyday! Come enjoy the game with your friends, and banter with your rivals!';
+const sports = 'Sports everyday! Come enjoy the game with your friends!';
 
 const enjoy =
     'Enjoy unique Hand Crafted Cocktails made from fresh ingredients!';

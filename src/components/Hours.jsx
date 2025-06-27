@@ -26,9 +26,10 @@ function Hours() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    12pm - 12am Monday-Saturday
-                    <br />
-                    9:45am - 12am Sunday
+                    Noon till Midnight Every Day!
+                    {/* code back in during football season */}
+                    {/* <br />
+                    9:45am - 12am Sunday */}
                 </Typography>
             </HomeLayout>
         </>

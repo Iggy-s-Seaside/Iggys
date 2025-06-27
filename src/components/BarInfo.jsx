@@ -2,6 +2,8 @@ import HomeLayout from './HomeLayout';
 import { Typography } from '@mui/material';
 import imageUrls from '../assets/links';
 const { wallInsideImage } = imageUrls;
+import info from '../assets/info';
+const { sports } = info;
 
 function BarInfo() {
     return (
@@ -26,8 +28,7 @@ function BarInfo() {
                     variant="h5"
                     sx={{ mb: 4, mt: { xs: 4, sm: 10 } }}
                 >
-                    Come watch Football with us! Every game Monday, Thursday,
-                    and Sunday!
+                    {sports}
                 </Typography>
             </HomeLayout>
         </>
