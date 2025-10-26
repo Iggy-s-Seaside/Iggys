@@ -29,7 +29,7 @@ function Hours() {
                     Noon till Midnight Monday-Saturday
                     {/* code back in during football season */}
                     <br />
-                    9:45am - 12am Sunday
+                    9:45am - Midnight Sunday
                 </Typography>
             </HomeLayout>
         </>
