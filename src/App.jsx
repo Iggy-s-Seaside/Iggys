@@ -26,7 +26,7 @@ const router = createBrowserRouter(
             <Route path="contact" element={<Contact />} />
             <Route path="about" element={<About />} />
             <Route path="happy_hour" element={<HappyHour />} />
-            <Route path="events" element={<Events />} />
+            {/* <Route path="events" element={<Events />} /> */}
         </Route>
     )
 );
