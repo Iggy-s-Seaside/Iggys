@@ -5,6 +5,7 @@ import { getHappyHour } from '../services/happy_hour';
 import AppetizerCard from '../components/AppetizerCard';
 import StyledDividerLine from '../styled/StyledDividerLine';
 import WingsCard from '../components/WingsCard';
+import FishTacoCard from '../components/FishTacoCard';
 
 function HappyHour() {
     // useEffect getHappyHour()
@@ -59,6 +60,8 @@ function HappyHour() {
                         Appetizers
                     </StyledTypography>
                     <WingsCard />
+                    <StyledDividerLine />
+                    <FishTacoCard />
                     <StyledDividerLine />
                     {Hh.map((data) => typeLoop('app', data))}
                 </Box>
