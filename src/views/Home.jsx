@@ -22,7 +22,7 @@ function Home() {
             <DividerCard />
             {/* change to lottery card */}
             {/* <DividerCard cardText={sports} /> */}
-            <Weekends />
+            {/* <Weekends /> */}
             {/* <MuiCarousel /> */}
             {/* <Footer /> */}
         </>
