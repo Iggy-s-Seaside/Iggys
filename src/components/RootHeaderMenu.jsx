@@ -116,18 +116,18 @@ function RootHeaderMenu() {
                                     </Typography>
                                 </MenuItem>
                             </StyledMenuLink>
-                            <StyledMenuLink to="/events">
+                            {/* <StyledMenuLink to="/events">
                                 <MenuItem
                                     sx={{ bgcolor: 'primary.alt' }}
                                     onClick={popupState.close}
                                 >
-                                    {/* <Typography>
+                                    <Typography>
                                         <StyledMenuLink to="/events">
                                             Events
                                         </StyledMenuLink>
-                                    </Typography> */}
+                                    </Typography>
                                 </MenuItem>
-                            </StyledMenuLink>
+                            </StyledMenuLink> */}
                         </Menu>
                     </>
                 )}
