@@ -28,9 +28,9 @@ function RootHeaderLinks() {
             <Typography sx={{ m: '50px 15px' }}>
                 <StyledLink to="/about">About</StyledLink>
             </Typography>
-            <Typography sx={{ m: '50px 15px' }}>
+            {/* <Typography sx={{ m: '50px 15px' }}>
                 <StyledLink to="/events">Events</StyledLink>
-            </Typography>
+            </Typography> */}
         </>
     );
 }

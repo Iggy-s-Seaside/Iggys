@@ -13,7 +13,7 @@ import Contact from './views/Contact';
 import About from './views/About';
 import HappyHour from './views/HappyHour';
 import Na from './views/Na';
-import Events from './views/Events';
+// import Events from './views/Events';
 
 const router = createBrowserRouter(
     createRoutesFromElements(
