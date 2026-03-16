@@ -1,0 +1,62 @@
+const SUPABASE_STORAGE = 'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images';
+
+export const images = {
+  // Hero / Background
+  backgroundImage: `${SUPABASE_STORAGE}/IMG_8238.jpg`,
+  nightOutside: `${SUPABASE_STORAGE}/IMG_8318.jpg`,
+  iggyBuilding: `${SUPABASE_STORAGE}/iggybuilding.jpg`,
+
+  // Interior shots (professional - Kaitlin Green)
+  wallInside: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-7.jpg`,
+  barTop: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-11.jpg`,
+  mural: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-15.jpg`,
+  tapOutside: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-19.jpg`,
+  jellyFish: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-39.jpg`,
+
+  // Event / DJ
+  djFlyer: `${SUPABASE_STORAGE}/dj.jpg`,
+  djNight: `${SUPABASE_STORAGE}/djnight.jpeg`,
+  showUp: `${SUPABASE_STORAGE}/show_up.jpg`,
+
+  // Slay nights
+  slayClose: `${SUPABASE_STORAGE}/Slay_close.jpg`,
+  slayWide: `${SUPABASE_STORAGE}/Slay_wide.jpg`,
+  slayVid: `${SUPABASE_STORAGE}/Slay_vid.mp4`,
+
+  // Food & drinks
+  wineCrab: `${SUPABASE_STORAGE}/wineCrab.JPG`,
+  cat: `${SUPABASE_STORAGE}/cat.jpg`,
+  iggysFamily: `${SUPABASE_STORAGE}/Iggys-fam.jpg`,
+
+  // Additional
+  wallInside2: `${SUPABASE_STORAGE}/wall%20inside%202.jpg`,
+  wallInsideOrig: `${SUPABASE_STORAGE}/wall%20inside.jpg`,
+  tapsOutside: `${SUPABASE_STORAGE}/taps%20outside.jpg`,
+
+  // SVG vectors
+  drinksVector: `${SUPABASE_STORAGE}/drinks%20converted.svg`,
+  martiniVector: `${SUPABASE_STORAGE}/martini%20converted.svg`,
+  drinks2: `${SUPABASE_STORAGE}/drinks2.svg`,
+};
+
+// Drink photos (cocktail carousel)
+export const drinkImages = [
+  `${SUPABASE_STORAGE}/DRINK_6604.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6605.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6607.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6609.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6614.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6615.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6617.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6619.jpg`,
+];
+
+// Additional drink photos (extras)
+export const drinkImagesExtra = [
+  `${SUPABASE_STORAGE}/DRINK_4043.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6608.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6612.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6613.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6616.jpg`,
+  `${SUPABASE_STORAGE}/DRINK_6618.jpg`,
+];
