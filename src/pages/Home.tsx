@@ -149,15 +149,12 @@ export default function Home() {
   return (
     <main>
       {/* ─── Hero Section ─── */}
-      <section className="relative min-h-screen overflow-hidden flex items-end">
+      <section className="relative min-h-[85vh] md:min-h-screen overflow-hidden flex items-end">
         {/* Background image with parallax */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 bg-cover bg-bottom md:bg-center md:bg-fixed"
           style={{
             backgroundImage: 'url(/images/real_bar.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed',
             willChange: 'transform',
           }}
         />
