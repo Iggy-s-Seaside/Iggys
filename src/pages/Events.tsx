@@ -8,6 +8,7 @@ import {
     Wine,
     UtensilsCrossed,
     Sun,
+    Instagram,
 } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
@@ -196,6 +197,7 @@ export default function Events() {
                                     rel="noopener noreferrer"
                                     className="btn-outline text-sm"
                                 >
+                                    <Instagram className="w-4 h-4" />
                                     Follow us for event announcements
                                 </a>
                             </div>
