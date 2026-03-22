@@ -3,7 +3,6 @@ import { drinkImages, drinkImagesExtra } from '../../data/images';
 const allPhotos = [...drinkImages, ...drinkImagesExtra];
 
 export default function DrinkCarousel() {
-  // Duplicate for seamless looping
   const photos = [...allPhotos, ...allPhotos];
 
   return (
@@ -28,6 +27,11 @@ export default function DrinkCarousel() {
           </div>
         ))}
       </div>
+
+      {/* Mobile swipe hint */}
+      <p className="text-center text-text-dim text-xs mt-3 md:hidden">
+        Swipe to explore our drinks
+      </p>
     </div>
   );
 }

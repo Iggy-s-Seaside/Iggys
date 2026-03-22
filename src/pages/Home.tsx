@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Wine,
@@ -12,7 +13,41 @@ import {
 import SectionHeader from '../components/layout/SectionHeader';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials, useCocktails } from '../hooks/useMenuData';
-import { images } from '../data/images';
+import { images, drinkImages } from '../data/images';
+
+function useHappyHourStatus() {
+  const [status, setStatus] = useState(() => getHappyHourStatus());
+
+  useEffect(() => {
+    const interval = setInterval(() => setStatus(getHappyHourStatus()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return status;
+}
+
+function getHappyHourStatus(): { label: string; isActive: boolean } {
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const totalMinutes = hour * 60 + minute;
+
+  const start = 15 * 60; // 3:00 PM
+  const end = 17 * 60;   // 5:00 PM
+
+  if (totalMinutes >= start && totalMinutes < end) {
+    return { label: 'Happy Hour is happening now!', isActive: true };
+  }
+
+  if (totalMinutes < start) {
+    const diff = start - totalMinutes;
+    if (diff <= 60) {
+      return { label: `Happy Hour starts in ${diff} min`, isActive: false };
+    }
+  }
+
+  return { label: '3pm \u2013 5pm \u00b7 Every Single Day', isActive: false };
+}
 
 const features = [
   {
@@ -95,8 +130,7 @@ export default function Home() {
   const seafoodAnim = useScrollAnimation();
   const ctaAnim = useScrollAnimation();
   const beersAnim = useScrollAnimation();
-  const merchAnim = useScrollAnimation();
-
+  const happyHour = useHappyHourStatus();
   const { data: events } = useEvents();
   const { data: specials } = useSpecials();
   const { data: allCocktails } = useCocktails();
@@ -184,7 +218,7 @@ export default function Home() {
               <span className="w-px h-3 bg-white/20" />
               <span>Happy Hour 3&ndash;5pm</span>
               <span className="w-px h-3 bg-white/20" />
-              <span>200 S Franklin St</span>
+              <a href="https://maps.google.com/?q=200+S+Franklin+St,+Seaside,+OR+97138" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">200 S Franklin St</a>
             </p>
           </div>
         </div>
@@ -199,11 +233,11 @@ export default function Home() {
       <section className="bg-surface py-6 border-y border-white/5">
         <div className="section-container">
           <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
-            <span className="text-primary uppercase text-xs font-bold tracking-widest">
-              Happy Hour Daily
+            <span className={`uppercase text-xs font-bold tracking-widest ${happyHour.isActive ? 'text-accent' : 'text-primary'}`}>
+              {happyHour.isActive ? 'Happy Hour Now' : 'Happy Hour Daily'}
             </span>
-            <span className="text-text-muted text-sm">
-              3pm &ndash; 5pm &middot; Every Single Day
+            <span className={`text-sm ${happyHour.isActive ? 'text-accent font-semibold' : 'text-text-muted'}`}>
+              {happyHour.label}
             </span>
             <span className="hidden md:block w-px h-6 bg-white/10" />
             <div className="flex flex-wrap gap-2">
@@ -386,7 +420,7 @@ export default function Home() {
             {/* Right: Image */}
             <div>
               <img
-                src="https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images/DRINK_6614.jpg"
+                src={drinkImages[4]}
                 alt="Handcrafted cocktails at Iggy's"
                 className="rounded-2xl shadow-2xl w-full"
               />
@@ -523,28 +557,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── Merch Teaser ─── */}
-      <section className="section-padding">
-        <div
-          ref={merchAnim.ref}
-          className={`section-container transition-all duration-700 ${
-            merchAnim.isVisible
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="glass-card p-10 md:p-14 text-center">
-            <SectionHeader
-              eyebrow="Take a piece home"
-              title="Iggy's Merch"
-              subtitle="Tees, hoodies, hats, and more — coming soon to the online shop. Ask your bartender about what's available now."
-            />
-            <Link to="/shop" className="btn-outline text-sm mt-8">
-              Visit the Shop
-            </Link>
-          </div>
-        </div>
-      </section>
     </main>
   );
 }

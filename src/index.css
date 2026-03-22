@@ -74,7 +74,7 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-background font-semibold rounded-full transition-all duration-300 hover:bg-primary-hover hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-background font-semibold rounded-full transition-all duration-300 hover:bg-primary-hover hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98];
   }
 
   .btn-primary-lg {
@@ -82,7 +82,7 @@
   }
 
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 border border-white/20 text-white font-semibold rounded-full transition-all duration-300 hover:bg-white/10 hover:border-white/40 hover:-translate-y-0.5;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 border border-white/20 text-white font-semibold rounded-full transition-all duration-300 hover:bg-white/10 hover:border-white/40 hover:-translate-y-0.5 active:scale-[0.98];
   }
 
   .btn-outline-lg {
@@ -90,7 +90,7 @@
   }
 
   .btn-accent {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-accent text-background font-semibold rounded-full transition-all duration-300 hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-accent text-background font-semibold rounded-full transition-all duration-300 hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5 active:scale-[0.98];
   }
 
   .scrollbar-hide {
@@ -114,5 +114,35 @@
     100% {
       transform: translateX(-50%);
     }
+  }
+
+  /* Ambient gradient for solid-dark sections */
+  .section-glow {
+    position: relative;
+  }
+  .section-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(45, 212, 191, 0.03) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 50%, rgba(245, 158, 11, 0.02) 0%, transparent 60%);
+    pointer-events: none;
+  }
+}
+
+/* Reduced motion: disable all animations and transitions for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .carousel-track {
+    animation: none !important;
   }
 }

@@ -3,21 +3,18 @@ import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
 import { nonAlcoholicData } from '../data/nonAlcoholic';
 
-const ACCENT_STYLES: Record<string, { border: string; dot: string; price: string }> = {
+const ACCENT_STYLES: Record<string, { border: string; dot: string }> = {
   primary: {
     border: 'border-l-primary/40',
     dot: 'bg-primary',
-    price: 'text-primary',
   },
   accent: {
     border: 'border-l-accent/40',
     dot: 'bg-accent',
-    price: 'text-accent',
   },
   amber: {
     border: 'border-l-amber-500/40',
     dot: 'bg-amber-500',
-    price: 'text-amber-400',
   },
 };
 
@@ -61,7 +58,7 @@ export default function NonAlcoholic() {
                           </p>
                         )}
                       </div>
-                      <span className={`${styles.price} font-bold text-lg shrink-0`}>
+                      <span className="text-primary font-bold text-lg shrink-0">
                         {item.price}
                       </span>
                     </div>
@@ -81,7 +78,7 @@ export default function NonAlcoholic() {
             <Link to="/cocktails" className="btn-primary">
               Check out our cocktail menu
             </Link>
-            <Link to="/beers" className="btn-secondary">
+            <Link to="/beers" className="btn-outline">
               Or our beer selection
             </Link>
           </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Star } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
 import BeerCard from '../components/menu/BeerCard';
@@ -39,6 +40,9 @@ export default function Beers() {
     }
   });
 
+  const featuredBeer = onTapData[0];
+  const remainingOnTap = onTapData.slice(1);
+
   return (
     <div>
       <PageHeader
@@ -48,7 +52,7 @@ export default function Beers() {
       />
 
       {/* On Tap */}
-      <section className="section-padding">
+      <section className="section-padding section-glow">
         <div className="section-container">
           <SectionHeader eyebrow="On Tap" title="Fresh from the taps" />
 
@@ -56,18 +60,52 @@ export default function Beers() {
             {onTapLoading ? (
               <LoadingSkeleton count={6} />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {onTapData.map((item) => (
-                  <BeerCard
-                    key={item.id}
-                    name={item.name}
-                    brewery={item.brewery}
-                    type={item.type}
-                    abv={item.abv}
-                    price={item.price?.trim()}
-                    isOnTap={true}
-                  />
-                ))}
+              <div className="animate-fade-in">
+                {/* Featured beer — staff pick hero */}
+                {featuredBeer && (
+                  <div className="glass-card border-l-4 border-l-accent p-6 md:p-8 mb-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border border-accent/20 mb-3">
+                          <Star className="w-3 h-3" />
+                          Staff Pick
+                        </span>
+                        <h3 className="font-heading text-2xl font-bold text-white">
+                          {featuredBeer.name}
+                        </h3>
+                        <p className="text-primary/70 text-sm mt-1">{featuredBeer.brewery}</p>
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="bg-white/10 text-text-muted text-xs px-2 py-1 rounded-full">
+                            {featuredBeer.type}
+                          </span>
+                          {featuredBeer.abv && (
+                            <span className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">
+                              {featuredBeer.abv}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-primary font-bold text-2xl md:text-3xl shrink-0">
+                        {featuredBeer.price?.trim()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Remaining on-tap beers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {remainingOnTap.map((item) => (
+                    <BeerCard
+                      key={item.id}
+                      name={item.name}
+                      brewery={item.brewery}
+                      type={item.type}
+                      abv={item.abv}
+                      price={item.price?.trim()}
+                      isOnTap={true}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@ import { MapPin, Clock, Sparkles, Mail, Phone } from 'lucide-react';
 import { images } from '../data/images';
 
 const infoRows = [
-  { icon: MapPin, text: '200 S Franklin St, Seaside, OR 97138' },
+  { icon: MapPin, text: '200 S Franklin St, Seaside, OR 97138', href: 'https://maps.google.com/?q=200+S+Franklin+St,+Seaside,+OR+97138' },
   { icon: Clock, text: '7 Days / 12pm – 12am' },
   { icon: Sparkles, text: 'Happy Hour: Daily 3pm – 5pm' },
   { icon: Phone, text: '(503) 738-0672', href: 'tel:+15037380672' },
@@ -129,7 +129,7 @@ export default function Contact() {
                 <iframe
                   title="Iggy's location on Google Maps"
                   src={mapsUrl}
-                  className="w-full h-64 rounded-xl border-0 mt-6"
+                  className="w-full h-48 md:h-64 rounded-xl border-0 mt-6"
                   loading="lazy"
                   allowFullScreen
                 />
@@ -229,7 +229,7 @@ export default function Contact() {
 
                   {/* Error message */}
                   {error && (
-                    <p className="text-red-400 text-sm">{error}</p>
+                    <p className="text-amber-400 text-sm">{error}</p>
                   )}
 
                   {/* Submit */}

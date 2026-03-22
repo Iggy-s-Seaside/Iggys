@@ -186,10 +186,18 @@ export default function Events() {
                                 <h3 className="font-heading text-xl text-white mb-2">
                                     No upcoming events
                                 </h3>
-                                <p className="text-text-muted">
+                                <p className="text-text-muted mb-6">
                                     Check back soon — we're always planning
                                     something fun.
                                 </p>
+                                <a
+                                    href="https://www.instagram.com/iggysseaside/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-outline text-sm"
+                                >
+                                    Follow us for event announcements
+                                </a>
                             </div>
                         )}
                     </div>
@@ -222,10 +230,13 @@ export default function Events() {
                                 <h3 className="font-heading text-xl text-white mb-2">
                                     No current specials
                                 </h3>
-                                <p className="text-text-muted">
+                                <p className="text-text-muted mb-6">
                                     Our regular menu is always available. Happy
                                     hour is daily 3-5pm!
                                 </p>
+                                <Link to="/happy-hour" className="btn-primary text-sm">
+                                    View Happy Hour Deals
+                                </Link>
                             </div>
                         )}
                     </div>

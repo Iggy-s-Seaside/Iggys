@@ -31,7 +31,7 @@ export default function HappyHour() {
       </div>
 
       {/* Happy Hour Drinks */}
-      <section className="section-padding">
+      <section className="section-padding section-glow">
         <div className="section-container">
           <SectionHeader eyebrow="Drinks" title="Happy hour drinks" />
 

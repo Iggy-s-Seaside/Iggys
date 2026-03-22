@@ -30,7 +30,7 @@ const HappyHourCard: React.FC<HappyHourCardProps> = ({
       )}
 
       <div className="min-w-0">
-        <h3 className="font-semibold text-white">{name}</h3>
+        <h3 className="font-heading font-semibold text-white">{name}</h3>
         <p className="text-text-muted text-sm">{description}</p>
         <p className="text-accent font-bold text-lg mt-1">{price}</p>
       </div>

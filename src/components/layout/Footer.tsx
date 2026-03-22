@@ -113,57 +113,24 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Col 2: Menu */}
-            <div>
-              <h4 className="text-xs font-bold tracking-widest uppercase text-primary/80 mb-4">
-                Menu
-              </h4>
-              <ul className="space-y-2.5">
-                {menuLinks.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.to}
-                      className="text-sm text-white/40 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Col 3: Visit */}
-            <div>
-              <h4 className="text-xs font-bold tracking-widest uppercase text-primary/80 mb-4">
-                Visit
-              </h4>
-              <ul className="space-y-2.5">
-                {visitLinks.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.to}
-                      className="text-sm text-white/40 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Col 4: Info */}
-            <div>
+            {/* Col 2: Find Us — shown first on mobile for walk-in visitors */}
+            <div className="order-first sm:order-last">
               <h4 className="text-xs font-bold tracking-widest uppercase text-primary/80 mb-4">
                 Find Us
               </h4>
               <ul className="space-y-3">
                 <li className="flex items-start gap-2.5">
                   <MapPin className="w-4 h-4 text-primary/60 mt-0.5 shrink-0" />
-                  <span className="text-sm text-white/40">
+                  <a
+                    href="https://maps.google.com/?q=200+S+Franklin+St,+Seaside,+OR+97138"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-white/40 hover:text-primary transition-colors"
+                  >
                     200 S Franklin St
                     <br />
                     Seaside, OR 97138
-                  </span>
+                  </a>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Clock className="w-4 h-4 text-primary/60 shrink-0" />
@@ -189,6 +156,44 @@ export default function Footer() {
                     iggysbarevents@gmail.com
                   </a>
                 </li>
+              </ul>
+            </div>
+
+            {/* Col 3: Menu */}
+            <div>
+              <h4 className="text-xs font-bold tracking-widest uppercase text-primary/80 mb-4">
+                Menu
+              </h4>
+              <ul className="space-y-2.5">
+                {menuLinks.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      to={link.to}
+                      className="text-sm text-white/40 hover:text-white transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Col 4: Visit */}
+            <div>
+              <h4 className="text-xs font-bold tracking-widest uppercase text-primary/80 mb-4">
+                Visit
+              </h4>
+              <ul className="space-y-2.5">
+                {visitLinks.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      to={link.to}
+                      className="text-sm text-white/40 hover:text-white transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
