@@ -90,11 +90,11 @@ export function MassPriceChange({ open, onClose, tables, onComplete }: MassPrice
       const nameCol = schema.columns.find((c) => c.key === 'name' || c.key === 'title');
       const { data: rows } = await supabase
         .from(tableName)
-        .select(`id, price${nameCol ? `, ${nameCol.key}` : ''}`);
+        .select('*');
 
       if (!rows) continue;
 
-      for (const row of rows) {
+      for (const row of rows as Record<string, unknown>[]) {
         const price = String(row.price ?? '');
         if (!price || price === 'Market Price') continue;
 
@@ -286,7 +286,7 @@ export function MassPriceChange({ open, onClose, tables, onComplete }: MassPrice
               {preview.length} item{preview.length !== 1 ? 's' : ''} will be updated:
             </p>
             <div className="max-h-60 overflow-y-auto border border-border rounded-lg divide-y divide-border">
-              {preview.map((item, i) => (
+              {preview.map((item) => (
                 <div key={`${item.table}-${item.id}`} className="px-3 py-2 flex items-center justify-between text-sm">
                   <div className="min-w-0 flex-1">
                     <p className="text-text-primary truncate">{item.name}</p>

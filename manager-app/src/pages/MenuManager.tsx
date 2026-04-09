@@ -36,10 +36,10 @@ export function MenuManager() {
       for (const col of dynamicCols) {
         const { data: rows } = await supabase
           .from(col.dynamicOptionsTable!)
-          .select(`id, ${col.dynamicOptionsLabel!}`)
+          .select('*')
           .order(col.dynamicOptionsLabel!);
         if (rows) {
-          results[col.key] = rows.map((r: Record<string, unknown>) => ({
+          results[col.key] = (rows as Record<string, unknown>[]).map((r) => ({
             id: r.id as number,
             label: String(r[col.dynamicOptionsLabel!] ?? ''),
           }));
