@@ -108,12 +108,12 @@ const FEATURED_COCKTAILS: { name: string; shortDesc: string; dbMatch: string }[]
 ];
 
 const seafoodItems = [
-  { name: 'Crab Cakes', price: '$22' },
-  { name: 'Oysters', price: '$19' },
-  { name: 'Coconut Prawns', price: '$19' },
-  { name: 'Steamer Clams', price: '$23' },
-  { name: 'Calamari', price: '$17' },
-  { name: 'Combination', price: '$23' },
+  { name: 'Crab Cakes', price: '$23' },
+  { name: 'Oysters', price: '$20' },
+  { name: 'Coconut Prawns', price: '$20' },
+  { name: 'Steamer Clams', price: '$24' },
+  { name: 'Calamari', price: '$18' },
+  { name: 'Combination', price: '$24' },
 ];
 
 const draftBeers = [
