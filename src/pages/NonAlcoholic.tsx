@@ -42,7 +42,7 @@ export default function NonAlcoholic() {
                 {category.items.map((item) => (
                   <div
                     key={item.name}
-                    className={`glass-card-hover p-5 border-l-2 ${styles.border}`}
+                    className={`glass-card-hover p-6 border-l-2 ${styles.border}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

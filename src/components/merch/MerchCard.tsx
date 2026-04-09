@@ -29,7 +29,7 @@ export default function MerchCard({ product }: MerchCardProps) {
         />
       </div>
 
-      <div className="p-5">
+      <div className="p-6">
         <h3 className="font-heading text-lg font-semibold">{product.name}</h3>
         <p className="text-primary text-xl font-bold">${product.price}</p>
         <p className="text-text-muted text-sm">{product.description}</p>

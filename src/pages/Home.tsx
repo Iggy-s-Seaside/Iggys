@@ -325,7 +325,7 @@ export default function Home() {
                       <div key={event.id} className="glass-card-hover p-4 flex gap-4">
                         {/* Date badge */}
                         <div className="shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-primary/10 border border-primary/20">
-                          <span className="text-primary text-[10px] font-bold uppercase">{month}</span>
+                          <span className="text-primary text-2xs font-bold uppercase">{month}</span>
                           <span className="text-white text-lg font-bold leading-none">{day}</span>
                         </div>
                         <div className="min-w-0">
@@ -536,7 +536,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {draftBeers.map((beer) => (
-              <div key={beer.name} className="glass-card-hover p-5">
+              <div key={beer.name} className="glass-card-hover p-6">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs uppercase tracking-wider text-primary font-semibold">
                     {beer.style}

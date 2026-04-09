@@ -131,34 +131,32 @@ export default function Food() {
       <div className="sticky top-16 lg:top-20 z-40 bg-background/90 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="section-container py-3">
           {/* Dinner / Lunch toggle */}
-          <div className="flex items-center justify-between gap-4 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex bg-white/[0.06] rounded-full p-0.5">
-                <button
-                  onClick={() => setMenuMode('lunch')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    menuMode === 'lunch'
-                      ? 'bg-accent text-background'
-                      : 'text-text-muted hover:text-white'
-                  }`}
-                >
-                  Lunch
-                </button>
-                <button
-                  onClick={() => setMenuMode('dinner')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    menuMode === 'dinner'
-                      ? 'bg-primary text-background'
-                      : 'text-text-muted hover:text-white'
-                  }`}
-                >
-                  Dinner
-                </button>
-              </div>
-              <span className="text-text-muted text-xs">
-                {menuMode === 'lunch' ? 'Served until 4pm' : 'Full menu until 9pm · Limited after 9pm'}
-              </span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-3">
+            <div className="flex bg-white/[0.06] rounded-full p-0.5">
+              <button
+                onClick={() => setMenuMode('lunch')}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  menuMode === 'lunch'
+                    ? 'bg-accent text-background'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                Lunch
+              </button>
+              <button
+                onClick={() => setMenuMode('dinner')}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  menuMode === 'dinner'
+                    ? 'bg-primary text-background'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                Dinner
+              </button>
             </div>
+            <span className="text-text-muted text-xs">
+              {menuMode === 'lunch' ? 'Served until 4pm' : 'Full menu until 9pm · Limited after 9pm'}
+            </span>
           </div>
 
           {/* Category pills */}

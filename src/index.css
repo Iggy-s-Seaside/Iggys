@@ -16,6 +16,19 @@
     min-height: 100vh;
   }
 
+  /* Subtle grain texture — hides gradient banding and makes flat colors feel physical */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+  }
+
   #root {
     min-height: 100vh;
   }
@@ -47,8 +60,12 @@
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300 hover:bg-white/[0.07] hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5;
+    @apply glass-card hover:bg-white/[0.07] hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5;
+    transition: all 300ms cubic-bezier(0.33, 1, 0.68, 1); /* ease-out on hover-in */
     will-change: transform;
+  }
+  .glass-card-hover:not(:hover) {
+    transition: all 400ms cubic-bezier(0.65, 0, 0.35, 1); /* ease-in-out on hover-out (slower settle) */
   }
 
   .gradient-text {
@@ -74,7 +91,11 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-background font-semibold rounded-full transition-all duration-300 hover:bg-primary-hover hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-background font-semibold rounded-full hover:bg-primary-hover hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97];
+    transition: all 300ms cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  .btn-primary:active {
+    transition: all 100ms cubic-bezier(0.32, 0, 0.67, 0); /* fast ease-in on press — the "break force" */
   }
 
   .btn-primary-lg {
@@ -82,7 +103,11 @@
   }
 
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 border border-white/20 text-white font-semibold rounded-full transition-all duration-300 hover:bg-white/10 hover:border-white/40 hover:-translate-y-0.5 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 border border-white/20 text-white font-semibold rounded-full hover:bg-white/10 hover:border-white/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97];
+    transition: all 300ms cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  .btn-outline:active {
+    transition: all 100ms cubic-bezier(0.32, 0, 0.67, 0);
   }
 
   .btn-outline-lg {
@@ -90,7 +115,11 @@
   }
 
   .btn-accent {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-accent text-background font-semibold rounded-full transition-all duration-300 hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-accent text-background font-semibold rounded-full hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97];
+    transition: all 300ms cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  .btn-accent:active {
+    transition: all 100ms cubic-bezier(0.32, 0, 0.67, 0);
   }
 
   .scrollbar-hide {

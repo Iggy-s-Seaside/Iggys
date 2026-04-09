@@ -33,6 +33,9 @@ export default {
           hover: 'rgba(255, 255, 255, 0.08)',
         },
       },
+      fontSize: {
+        '2xs': '0.625rem',
+      },
       fontFamily: {
         display: ['Lobster', 'cursive'],
         heading: ['"Playfair Display"', 'Georgia', 'serif'],

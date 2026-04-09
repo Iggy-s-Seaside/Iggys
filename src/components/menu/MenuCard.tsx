@@ -26,7 +26,7 @@ const MenuCard: React.FC<MenuCardProps> = ({
   return (
     <div
       ref={ref}
-      className={`glass-card-hover relative p-5 ${
+      className={`glass-card-hover relative p-6 ${
         isVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-6'
       }`}
     >
@@ -37,7 +37,7 @@ const MenuCard: React.FC<MenuCardProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           {badge && (
             <span
-              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${badgeClasses}`}
+              className={`text-2xs font-bold uppercase px-2 py-0.5 rounded-full ${badgeClasses}`}
             >
               {badge}
             </span>

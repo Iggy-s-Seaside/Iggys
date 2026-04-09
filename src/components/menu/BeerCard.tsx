@@ -23,7 +23,7 @@ const BeerCard: React.FC<BeerCardProps> = ({
   return (
     <div
       ref={ref}
-      className={`glass-card-hover relative p-5 ${
+      className={`glass-card-hover relative p-6 ${
         isOnTap ? 'border-l-2 border-l-primary/40' : ''
       } ${isVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-6'}`}
     >

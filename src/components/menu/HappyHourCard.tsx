@@ -19,7 +19,7 @@ const HappyHourCard: React.FC<HappyHourCardProps> = ({
   return (
     <div
       ref={ref}
-      className={`glass-card-hover p-5 flex items-start gap-4 ${
+      className={`glass-card-hover p-6 flex items-start gap-4 ${
         isVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-6'
       }`}
     >
