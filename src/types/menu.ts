@@ -75,3 +75,33 @@ export interface Special {
   image_url: string | null;
   active: boolean;
 }
+
+export interface FoodCategory {
+  id: number;
+  created_at: string;
+  title: string;
+  eyebrow: string;
+  note: string | null;
+  sort_order: number;
+  menu_type: 'dinner' | 'lunch' | 'both';
+}
+
+export interface FoodItem {
+  id: number;
+  created_at: string;
+  category_id: number;
+  name: string;
+  description: string | null;
+  price: string | null;
+  sort_order: number;
+  menu_item_options?: FoodItemOption[];
+}
+
+export interface FoodItemOption {
+  id: number;
+  created_at: string;
+  item_id: number;
+  label: string;
+  price: string;
+  sort_order: number;
+}

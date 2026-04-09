@@ -1,23 +1,49 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/layout/PageHeader';
 import MenuCard from '../components/menu/MenuCard';
 import OptionMenuCard from '../components/menu/OptionMenuCard';
-import { doogersMenu } from '../data/doogersMenu';
+import { useFoodMenu } from '../hooks/useMenuData';
 
-const categoryNames = doogersMenu.map((c) => c.title);
+type MenuMode = 'dinner' | 'lunch';
+
+function getDefaultMode(): MenuMode {
+  const hour = new Date().getHours();
+  // Before 4pm (16:00) → lunch, after → dinner
+  return hour < 16 ? 'lunch' : 'dinner';
+}
 
 export default function Food() {
-  const [activeCategory, setActiveCategory] = useState(categoryNames[0]);
+  const { data: allCategories, loading, error } = useFoodMenu();
+  const [menuMode, setMenuMode] = useState<MenuMode>(getDefaultMode);
+
+  // Filter categories based on mode
+  const categories = useMemo(() => {
+    return allCategories.filter(
+      (c) => c.menu_type === menuMode || c.menu_type === 'both'
+    );
+  }, [allCategories, menuMode]);
+
+  const categoryNames = useMemo(() => categories.map((c) => c.title), [categories]);
+
+  const [activeCategory, setActiveCategory] = useState('');
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const navRef = useRef<HTMLDivElement>(null);
   const isScrolling = useRef(false);
+
+  // Reset active category when mode changes
+  useEffect(() => {
+    if (categoryNames.length > 0) {
+      setActiveCategory(categoryNames[0]);
+      sectionRefs.current = {};
+      window.scrollTo({ top: 0 });
+    }
+  }, [menuMode, categoryNames]);
 
   const scrollToCategory = useCallback((name: string) => {
     isScrolling.current = true;
     setActiveCategory(name);
 
-    // Scroll the nav pill into view horizontally (without affecting window scroll)
     if (navRef.current) {
       const btn = navRef.current.querySelector(`[data-category="${name}"]`) as HTMLElement | null;
       if (btn) {
@@ -27,7 +53,6 @@ export default function Food() {
       }
     }
 
-    // Scroll the page to the section
     requestAnimationFrame(() => {
       const el = sectionRefs.current[name];
       if (el) {
@@ -57,12 +82,42 @@ export default function Food() {
         }
       }
     }
-  }, [activeCategory]);
+  }, [activeCategory, categoryNames]);
 
   useEffect(() => {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="From Dooger's Kitchen"
+          title="Food Menu"
+          subtitle="Served from Dooger's Seafood & Grill, a Seaside institution since 1983 — right here at the bar"
+        />
+        <div className="section-container py-20 text-center">
+          <div className="animate-pulse text-text-muted">Loading menu...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="From Dooger's Kitchen"
+          title="Food Menu"
+          subtitle="Served from Dooger's Seafood & Grill, a Seaside institution since 1983 — right here at the bar"
+        />
+        <div className="section-container py-20 text-center">
+          <p className="text-red-400">Failed to load menu. Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -72,14 +127,38 @@ export default function Food() {
         subtitle="Served from Dooger's Seafood & Grill, a Seaside institution since 1983 — right here at the bar"
       />
 
-      {/* Limited Menu Notice + Category Nav */}
+      {/* Menu Mode Toggle + Category Nav */}
       <div className="sticky top-16 lg:top-20 z-40 bg-background/90 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="section-container py-3">
-          {/* Limited menu badge */}
+          {/* Dinner / Lunch toggle */}
           <div className="flex items-center justify-between gap-4 mb-3">
-            <span className="text-accent text-sm font-medium">
-              Full menu until 9pm &middot; Limited menu after 9pm
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex bg-white/[0.06] rounded-full p-0.5">
+                <button
+                  onClick={() => setMenuMode('lunch')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    menuMode === 'lunch'
+                      ? 'bg-accent text-background'
+                      : 'text-text-muted hover:text-white'
+                  }`}
+                >
+                  Lunch
+                </button>
+                <button
+                  onClick={() => setMenuMode('dinner')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    menuMode === 'dinner'
+                      ? 'bg-primary text-background'
+                      : 'text-text-muted hover:text-white'
+                  }`}
+                >
+                  Dinner
+                </button>
+              </div>
+              <span className="text-text-muted text-xs">
+                {menuMode === 'lunch' ? 'Served until 4pm' : 'Full menu until 9pm · Limited after 9pm'}
+              </span>
+            </div>
           </div>
 
           {/* Category pills */}
@@ -106,7 +185,7 @@ export default function Food() {
       </div>
 
       {/* Menu Sections */}
-      {doogersMenu.map((category) => (
+      {categories.map((category) => (
         <section
           key={category.title}
           ref={(el) => { sectionRefs.current[category.title] = el; }}
