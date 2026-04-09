@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:dev--iggy-s-manager.netlify.app)",
+      "WebFetch(domain:iggy-s-manager.netlify.app)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(npx supabase:*)",
+      "Bash(supabase functions:*)"
+    ]
+  }
+}

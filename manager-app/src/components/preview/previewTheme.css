@@ -1,0 +1,71 @@
+.site-preview {
+  background: #0a0f0f;
+  color: #f0f5f5;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.5;
+}
+
+.site-preview .preview-glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+
+.site-preview .preview-glass-card-hover {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+}
+
+.site-preview .preview-glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(45, 212, 191, 0.2);
+}
+
+.site-preview .preview-heading {
+  font-family: 'Playfair Display', serif;
+}
+
+.site-preview .preview-text-muted {
+  color: #94a3b8;
+}
+
+.site-preview .preview-text-primary-color {
+  color: #2dd4bf;
+}
+
+.site-preview .preview-text-accent {
+  color: #f59e0b;
+}
+
+.site-preview .preview-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.site-preview .preview-badge-teal {
+  background: rgba(45, 212, 191, 0.1);
+  color: #2dd4bf;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+}
+
+.site-preview .preview-badge-amber {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.site-preview .preview-badge-purple {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a78bfa;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
