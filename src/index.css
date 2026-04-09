@@ -11,6 +11,10 @@
     box-sizing: border-box;
   }
 
+  html, body {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-text-primary font-body antialiased;
     min-height: 100vh;

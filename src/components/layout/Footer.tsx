@@ -62,7 +62,7 @@ export default function Footer() {
       </div>
 
       {/* Main footer */}
-      <div className="bg-[#080c0c]">
+      <div className="bg-[#080c0c] relative overflow-hidden">
         {/* Subtle background glows */}
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-primary/[0.02] rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/[0.015] rounded-full blur-3xl pointer-events-none" />
