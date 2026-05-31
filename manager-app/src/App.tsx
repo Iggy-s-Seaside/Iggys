@@ -11,6 +11,12 @@ import { MenuManager } from './pages/MenuManager';
 import { MediaLibraryPage } from './pages/MediaLibrary';
 import { Inventory } from './pages/Inventory';
 import { Messages } from './pages/Messages';
+import { Parties } from './pages/Parties';
+import { PartyProfile } from './pages/PartyProfile';
+import { Calendar } from './pages/Calendar';
+import { Packages } from './pages/Packages';
+import { Todos } from './pages/Todos';
+import { Invoices } from './pages/Invoices';
 
 export default function App() {
   return (
@@ -35,6 +41,12 @@ export default function App() {
         <Route path="/media" element={<MediaLibraryPage />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/messages" element={<Messages />} />
+        <Route path="/parties" element={<Parties />} />
+        <Route path="/parties/:id" element={<PartyProfile />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/todos" element={<Todos />} />
+        <Route path="/invoices" element={<Invoices />} />
+        <Route path="/packages" element={<Packages />} />
       </Route>
     </Routes>
   );

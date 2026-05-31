@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -8,10 +8,15 @@ import { useUnreadCount } from '../../hooks/useMessages';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/messages', icon: MessageSquare, label: 'Messages', badge: true },
+  { to: '/parties', icon: PartyPopper, label: 'Parties' },
+  { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
+  { to: '/todos', icon: ListChecks, label: 'To-Do' },
+  { to: '/invoices', icon: Receipt, label: 'Invoices' },
   { to: '/events', icon: Calendar, label: 'Events' },
   { to: '/specials', icon: Sparkles, label: 'Specials' },
   { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
   { to: '/inventory', icon: Package, label: 'Inventory' },
+  { to: '/packages', icon: Tags, label: 'Packages' },
   { to: '/media', icon: FolderOpen, label: 'Media' },
 ];
 

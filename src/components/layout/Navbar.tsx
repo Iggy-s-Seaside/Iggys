@@ -80,7 +80,7 @@ export default function Navbar() {
               </button>
 
               <Link
-                to="/contact"
+                to="/book"
                 className="hidden md:inline-flex btn-primary text-sm px-4 py-2"
               >
                 Book Event
@@ -165,7 +165,7 @@ export default function Navbar() {
             <div className="w-12 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent my-4" />
 
             <Link
-              to="/contact"
+              to="/book"
               onClick={() => setMobileOpen(false)}
               className="btn-primary px-8 py-3 text-base"
             >

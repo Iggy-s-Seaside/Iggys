@@ -492,3 +492,158 @@ export interface Order {
   scanned_by: string;
   status: 'pending' | 'confirmed' | 'cancelled';
 }
+
+// ── Private Events / Parties ──
+
+export const PARTY_STATUSES = ['inquiry', 'confirmed', 'cancelled'] as const;
+export type PartyStatus = (typeof PARTY_STATUSES)[number];
+
+export const PARTY_STATUS_LABELS: Record<PartyStatus, string> = {
+  inquiry: 'Request',
+  confirmed: 'Confirmed',
+  cancelled: 'Cancelled',
+};
+
+export const PARTY_SOURCE_LABELS: Record<string, string> = {
+  website: 'Website',
+  email: 'Email',
+  phone: 'Phone',
+  in_person: 'In person',
+  manual: 'Added manually',
+};
+
+export const FOOD_SERVICE_TYPES = [
+  'Order as you go',
+  'Buffet',
+  'Limited menu',
+  'Appetizers on arrival',
+  'No food service',
+] as const;
+
+export interface Contact {
+  id: number;
+  created_at: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  tags: string[] | null;
+  marketing_opt_in: boolean;
+  notes: string | null;
+  last_event_date: string | null;
+}
+
+export interface Party {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  status: PartyStatus;
+  contact_id: number | null;
+  contact_name: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  company: string | null;
+  title: string | null;
+  event_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  setup_time: string | null;
+  guest_count: number | null;
+  space_name: string | null;
+  food_service_type: string | null;
+  food_notes: string | null;
+  drink_notes: string | null;
+  special_requests: string | null;
+  internal_notes: string | null;
+  follow_up_notes: string | null;
+  last_contacted_at: string | null;
+  follow_up_date: string | null;
+  room_rate: number | null;
+  room_hours: number | null;
+  food_total: number | null;
+  drink_total: number | null;
+  gratuity_rate: number | null;
+  google_calendar_event_id: string | null;
+  confirmation_sent_at: string | null;
+  cancelled_at: string | null;
+  source: string | null;
+  // joined when loaded via PartyProfile
+  party_packages?: PartyPackage[];
+}
+
+// ── Packages (party offerings catalog) ──
+
+export const PACKAGE_CATEGORIES = ['food', 'drink', 'room', 'addon', 'other'] as const;
+export type PackageCategory = (typeof PACKAGE_CATEGORIES)[number];
+
+export const PACKAGE_UNITS = ['flat', 'per_person', 'per_hour'] as const;
+export type PackageUnit = (typeof PACKAGE_UNITS)[number];
+
+export const PACKAGE_UNIT_LABELS: Record<PackageUnit, string> = {
+  flat: 'flat',
+  per_person: 'per person',
+  per_hour: 'per hour',
+};
+
+export interface Package {
+  id: number;
+  created_at: string;
+  name: string;
+  description: string | null;
+  category: PackageCategory;
+  price: number;
+  unit: PackageUnit;
+  active: boolean;
+  sort_order: number;
+}
+
+export interface PartyPackage {
+  id: number;
+  created_at: string;
+  party_id: number;
+  package_id: number | null;
+  name: string;
+  category: PackageCategory;
+  unit: PackageUnit;
+  quantity: number;
+  unit_price: number;
+  notes: string | null;
+}
+
+// ── Todos (owner ↔ manager board) ──
+
+export const TODO_PRIORITIES = ['low', 'normal', 'high'] as const;
+export type TodoPriority = (typeof TODO_PRIORITIES)[number];
+
+export interface Todo {
+  id: number;
+  created_at: string;
+  title: string;
+  details: string | null;
+  done: boolean;
+  priority: TodoPriority;
+  due_date: string | null;
+  created_by: string | null;
+  completed_at: string | null;
+}
+
+// ── Message Templates (prewritten responses) ──
+
+export const TEMPLATE_CATEGORIES = ['follow_up', 'confirmation', 'cancellation', 'general'] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+
+export const TEMPLATE_CATEGORY_LABELS: Record<TemplateCategory, string> = {
+  follow_up: 'Follow-up',
+  confirmation: 'Confirmation',
+  cancellation: 'Cancellation',
+  general: 'General',
+};
+
+export interface MessageTemplate {
+  id: number;
+  created_at: string;
+  name: string;
+  category: TemplateCategory;
+  subject: string | null;
+  body: string;
+}

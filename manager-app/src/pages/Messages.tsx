@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
-  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning
+  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { supabase } from '../lib/supabase';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
+import { TemplatePicker } from '../components/messages/TemplatePicker';
+import { TemplateManager } from '../components/messages/TemplateManager';
 
 type StatusFilter = 'all' | 'unread' | 'read' | 'replied' | 'archived';
 
@@ -25,6 +27,7 @@ export function Messages() {
   const [notes, setNotes] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let result = messages;
@@ -179,18 +182,25 @@ export function Messages() {
             </span>
           )}
         </div>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-muted">{selectedIds.size} selected</span>
-            <button onClick={() => handleBulkAction('read')} className="btn-ghost text-xs py-1 px-2">
-              <Check size={14} /> Mark Read
-            </button>
-            <button onClick={() => handleBulkAction('archive')} className="btn-ghost text-xs py-1 px-2">
-              <Archive size={14} /> Archive
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <>
+              <span className="text-xs text-text-muted">{selectedIds.size} selected</span>
+              <button onClick={() => handleBulkAction('read')} className="btn-ghost text-xs py-1 px-2">
+                <Check size={14} /> Mark Read
+              </button>
+              <button onClick={() => handleBulkAction('archive')} className="btn-ghost text-xs py-1 px-2">
+                <Archive size={14} /> Archive
+              </button>
+            </>
+          )}
+          <button onClick={() => setTemplatesOpen(true)} className="btn-ghost text-xs py-1 px-2">
+            <FileText size={14} /> Templates
+          </button>
+        </div>
       </div>
+
+      <TemplateManager open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
 
       <div className="flex flex-1 min-h-0">
         {/* Message List */}
@@ -346,10 +356,16 @@ export function Messages() {
                 {/* Reply Form */}
                 {selected.status !== 'archived' && (
                   <div className="card p-5">
-                    <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-                      <Reply size={14} />
-                      {selected.status === 'replied' ? 'Send Another Reply' : 'Reply'}
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                        <Reply size={14} />
+                        {selected.status === 'replied' ? 'Send Another Reply' : 'Reply'}
+                      </h3>
+                      <TemplatePicker
+                        onPick={(body) => setReplyText((prev) => (prev ? `${prev}\n\n${body}` : body))}
+                        fillContext={{ contact_name: selected.name }}
+                      />
+                    </div>
                     <textarea
                       className="input-field min-h-[100px] resize-y mb-3"
                       placeholder={`Reply to ${selected.name}...`}

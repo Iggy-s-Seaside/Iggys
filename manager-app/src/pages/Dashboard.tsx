@@ -4,9 +4,12 @@ import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageS
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useInventoryItems, getLowStockItems } from '../hooks/useInventory';
 import { useMessages } from '../hooks/useMessages';
+import { useTodos } from '../hooks/useTodos';
 import { QuickPostModal } from '../components/editor/QuickPostModal';
 import { LowStockWidget } from '../components/inventory/LowStockWidget';
 import { MessageWidget } from '../components/messages/MessageWidget';
+import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
+import { TodoWidget } from '../components/todos/TodoWidget';
 import type { IggyEvent, Special } from '../types';
 import { format, parseISO, isFuture } from 'date-fns';
 
@@ -16,6 +19,7 @@ export function Dashboard() {
   const { items: inventoryItems } = useInventoryItems();
   const lowStockItems = getLowStockItems(inventoryItems);
   const { messages, loading: messagesLoading } = useMessages();
+  const { todos, loading: todosLoading, toggle: toggleTodo } = useTodos();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
 
@@ -51,6 +55,9 @@ export function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Needs your attention — parties surfaced first */}
+      <PartiesTodayWidget />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
@@ -153,9 +160,10 @@ export function Dashboard() {
       <LowStockWidget items={lowStockItems} />
       </div>
 
-      {/* Messages Widget */}
-      <div className="mb-6">
+      {/* Messages + To-Do Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <MessageWidget messages={messages} loading={messagesLoading} />
+        <TodoWidget todos={todos} loading={todosLoading} onToggle={toggleTodo} />
       </div>
     </div>
   );
