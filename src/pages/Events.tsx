@@ -13,8 +13,10 @@ import {
 import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
 import LoadingSkeleton from '../components/menu/LoadingSkeleton';
+import EventsCalendar from '../components/events/EventsCalendar';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials } from '../hooks/useMenuData';
+import { usePublicCalendar } from '../hooks/usePublicCalendar';
 import type { IggyEvent, Special } from '../types/menu';
 
 function formatDate(dateStr: string) {
@@ -154,6 +156,11 @@ function SpecialCard({ special }: { special: Special }) {
 export default function Events() {
     const { data: events, loading: eventsLoading } = useEvents();
     const { data: specials, loading: specialsLoading } = useSpecials();
+    const {
+        eventsByDay,
+        reservedByDay,
+        loading: calendarLoading,
+    } = usePublicCalendar();
 
     const activeEvents = events.filter((e) => e.active);
     const activeSpecials = specials.filter((s) => s.active);
@@ -165,6 +172,21 @@ export default function Events() {
                 title="Events & Specials"
                 subtitle="Live music, seasonal drinks, and more — there's always something going on at Iggy's"
             />
+
+            {/* Calendar */}
+            <section className="section-padding">
+                <div className="section-container">
+                    <SectionHeader eyebrow="Calendar" title="What's on" />
+
+                    <div className="mt-8">
+                        <EventsCalendar
+                            eventsByDay={eventsByDay}
+                            reservedByDay={reservedByDay}
+                            loading={calendarLoading}
+                        />
+                    </div>
+                </div>
+            </section>
 
             {/* Upcoming Events */}
             <section className="section-padding">

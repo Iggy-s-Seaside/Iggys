@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@floating-ui/react": "^0.27.19",
     "@stripe/stripe-js": "^8.9.0",
     "@supabase/supabase-js": "^2.99.1",
     "lucide-react": "^0.577.0",

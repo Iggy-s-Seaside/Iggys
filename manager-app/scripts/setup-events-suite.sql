@@ -36,12 +36,17 @@ CREATE TABLE IF NOT EXISTS parties (
   company TEXT,
   -- event
   title TEXT,                                       -- calendar event title
+  is_private BOOLEAN NOT NULL DEFAULT true,         -- private party vs. public/internal event
   event_date DATE,
   start_time TEXT,                                  -- "5:30 PM" (matches events.time style)
   end_time TEXT,
+  start_min INT,                                    -- minutes-from-midnight (sort/overlap/grid)
+  end_min INT,                                      -- minutes-from-midnight; > 1440 = after midnight
+  all_day BOOLEAN NOT NULL DEFAULT false,           -- spans the whole event_date; start_min/end_min ignored
   setup_time TEXT,
   guest_count INT,
   space_name TEXT,
+  space TEXT,                                       -- upstairs | downstairs | whole; null === whole for conflicts
   -- details (drive the recap email)
   food_service_type TEXT,
   food_notes TEXT,

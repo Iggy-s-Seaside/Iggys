@@ -52,18 +52,35 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Only CONFIRMED events block a date. No names, no details — just the dates.
+    // Only CONFIRMED, PRIVATE (exclusive) events block the venue. No names, no details —
+    // just the dates and time windows so the booking form can show availability.
     const { data, error } = await admin
       .from("parties")
-      .select("event_date")
+      .select("event_date,start_min,end_min,all_day,space")
       .eq("status", "confirmed")
+      .eq("is_private", true)
       .not("event_date", "is", null)
       .gte("event_date", fromKey)
       .lte("event_date", toKey);
     if (error) throw new Error(error.message);
 
-    const taken = Array.from(new Set((data || []).map((r: { event_date: string }) => r.event_date))).sort();
-    return json({ taken, from: fromKey, to: toKey });
+    type Row = { event_date: string; start_min: number | null; end_min: number | null; all_day: boolean | null; space: string | null };
+    const rows = (data || []) as Row[];
+
+    const windows = rows.map((r) => ({
+      date: r.event_date,
+      start_min: r.start_min,
+      end_min: r.end_min,
+      all_day: r.all_day === true,
+      space: r.space,
+    }));
+
+    // taken = distinct dates fully blocked (whole-day block or legacy null-time rows).
+    const taken = Array.from(
+      new Set(rows.filter((r) => r.all_day === true || r.start_min == null).map((r) => r.event_date))
+    ).sort();
+
+    return json({ windows, taken, from: fromKey, to: toKey });
   } catch (error) {
     console.error("availability error:", error);
     return json({ error: "Could not load availability" }, 500);

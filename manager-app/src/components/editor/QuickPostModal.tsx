@@ -3,6 +3,7 @@ import { Camera, Save, Loader2, X, ArrowRight, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { useSupabaseCRUD } from '../../hooks/useSupabaseCRUD';
+import Select from '../ui/Select';
 import type { Special } from '../../types';
 
 interface QuickPostModalProps {
@@ -297,15 +298,16 @@ export function QuickPostModal({ open, onClose, onSaved }: QuickPostModalProps) 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">Type</label>
-                  <select
-                    className="input-field"
+                  <Select<'drink' | 'food' | 'seasonal'>
+                    variant="manager"
                     value={saveForm.type}
-                    onChange={(e) => setSaveForm(f => ({ ...f, type: e.target.value as 'drink' | 'food' | 'seasonal' }))}
-                  >
-                    <option value="drink">Drink</option>
-                    <option value="food">Food</option>
-                    <option value="seasonal">Seasonal</option>
-                  </select>
+                    onChange={(v) => setSaveForm(f => ({ ...f, type: v }))}
+                    options={[
+                      { value: 'drink', label: 'Drink' },
+                      { value: 'food', label: 'Food' },
+                      { value: 'seasonal', label: 'Seasonal' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="label">Price</label>

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import emailjs from '@emailjs/browser';
 import { MapPin, Clock, Sparkles, Mail, Phone } from 'lucide-react';
 import { images } from '../data/images';
+import Select from '../components/ui/Select';
 
 const infoRows = [
   { icon: MapPin, text: '200 S Franklin St, Seaside, OR 97138', href: 'https://maps.google.com/?q=200+S+Franklin+St,+Seaside,+OR+97138' },
@@ -13,11 +14,9 @@ const infoRows = [
 
 const subjectOptions = [
   'General Inquiry',
-  'Private Event',
-  'Book a Private Event',
   'Feedback',
   'Other',
-];
+].map((opt) => ({ value: opt, label: opt }));
 
 const inputClasses =
   'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-text-dim focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition';
@@ -194,21 +193,20 @@ export default function Contact() {
 
                   {/* Subject */}
                   <div>
-                    <label className="text-sm text-text-muted mb-1 block">
+                    <label htmlFor="contact-subject" className="text-sm text-text-muted mb-1 block">
                       Subject
                     </label>
-                    <select
-                      name="subject"
+                    <Select
+                      id="contact-subject"
+                      variant="glass"
+                      label="Subject"
+                      placeholder="Select a subject"
+                      options={subjectOptions}
                       value={formData.subject}
-                      onChange={handleChange}
-                      className={inputClasses}
-                    >
-                      {subjectOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, subject: value }))
+                      }
+                    />
                   </div>
 
                   {/* Message */}

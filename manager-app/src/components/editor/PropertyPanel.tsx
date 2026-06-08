@@ -1,5 +1,6 @@
 import { useState, memo } from 'react';
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Trash2, ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
+import Select from '../ui/Select';
 import type { TextLayer } from '../../types';
 import { BRAND_COLORS, DEFAULT_IMAGE_FILTERS } from '../../types';
 import { FontPicker } from './FontPicker';
@@ -313,30 +314,34 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs text-text-muted">Weight</label>
-                  <select
-                    className="input-field text-[13px] w-full rounded-lg"
+                  <Select<number>
+                    variant="manager"
+                    className="text-[13px] rounded-lg"
                     value={layer.fontWeight || 400}
-                    onChange={(e) => onUpdate({ fontWeight: Number(e.target.value) })}
-                  >
-                    <option value={300}>Light (300)</option>
-                    <option value={400}>Regular (400)</option>
-                    <option value={500}>Medium (500)</option>
-                    <option value={600}>Semi-bold (600)</option>
-                    <option value={700}>Bold (700)</option>
-                  </select>
+                    onChange={(v) => onUpdate({ fontWeight: v })}
+                    options={[
+                      { value: 300, label: 'Light (300)' },
+                      { value: 400, label: 'Regular (400)' },
+                      { value: 500, label: 'Medium (500)' },
+                      { value: 600, label: 'Semi-bold (600)' },
+                      { value: 700, label: 'Bold (700)' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-text-muted">Transform</label>
-                  <select
-                    className="input-field text-[13px] w-full rounded-lg"
+                  <Select<NonNullable<TextLayer['textTransform']>>
+                    variant="manager"
+                    className="text-[13px] rounded-lg"
                     value={layer.textTransform || 'none'}
-                    onChange={(e) => onUpdate({ textTransform: e.target.value as TextLayer['textTransform'] })}
-                  >
-                    <option value="none">None</option>
-                    <option value="uppercase">UPPERCASE</option>
-                    <option value="lowercase">lowercase</option>
-                    <option value="capitalize">Capitalize</option>
-                  </select>
+                    onChange={(v) => onUpdate({ textTransform: v })}
+                    options={[
+                      { value: 'none', label: 'None' },
+                      { value: 'uppercase', label: 'UPPERCASE' },
+                      { value: 'lowercase', label: 'lowercase' },
+                      { value: 'capitalize', label: 'Capitalize' },
+                    ]}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">

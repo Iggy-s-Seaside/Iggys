@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Loader2, DollarSign } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { Modal, ConfirmDialog } from '../components/ui/Modal';
+import Select from '../components/ui/Select';
 import { MENU_SCHEMAS, type ColumnConfig } from '../types';
 import { supabase } from '../lib/supabase';
 import { MassPriceChange } from '../components/menu/MassPriceChange';
@@ -253,29 +254,21 @@ export function MenuManager() {
                   required={col.required}
                 />
               ) : col.dynamicOptionsTable ? (
-                <select
-                  className="input-field"
-                  value={formData[col.key] ?? ''}
-                  onChange={(e) => setFormData((f) => ({ ...f, [col.key]: e.target.value }))}
-                  required={col.required}
-                >
-                  <option value="">Select {col.label}...</option>
-                  {(dynamicOptions[col.key] || []).map((opt) => (
-                    <option key={opt.id} value={String(opt.id)}>{opt.label}</option>
-                  ))}
-                </select>
+                <Select<string>
+                  variant="manager"
+                  value={formData[col.key] || null}
+                  onChange={(v) => setFormData((f) => ({ ...f, [col.key]: v }))}
+                  options={(dynamicOptions[col.key] || []).map((opt) => ({ value: String(opt.id), label: opt.label }))}
+                  placeholder={`Select ${col.label}...`}
+                />
               ) : col.type === 'select' ? (
-                <select
-                  className="input-field"
-                  value={formData[col.key] ?? ''}
-                  onChange={(e) => setFormData((f) => ({ ...f, [col.key]: e.target.value }))}
-                  required={col.required}
-                >
-                  <option value="">Select...</option>
-                  {col.options?.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
+                <Select<string>
+                  variant="manager"
+                  value={formData[col.key] || null}
+                  onChange={(v) => setFormData((f) => ({ ...f, [col.key]: v }))}
+                  options={(col.options ?? []).map((opt) => ({ value: opt, label: opt }))}
+                  placeholder="Select..."
+                />
               ) : (
                 <input
                   className="input-field"

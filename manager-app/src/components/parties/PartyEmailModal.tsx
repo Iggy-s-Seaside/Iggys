@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '../ui/Modal';
+import Select from '../ui/Select';
 import { useMessageTemplates } from '../../hooks/useMessageTemplates';
 import { fillTemplate } from '../../utils/fillTemplate';
 import { sendPartyEmail } from '../../lib/partyActions';
@@ -64,12 +65,16 @@ export function PartyEmailModal({ open, onClose, party, category, heading, onSen
         {(options.length > 0 || fallback) && (
           <div>
             <label className="label">Template</label>
-            <select className="input-field" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-              {fallback && <option value="default">Default</option>}
-              {options.map((t) => (
-                <option key={t.id} value={String(t.id)}>{t.name}</option>
-              ))}
-            </select>
+            <Select<string>
+              variant="manager"
+              leadingIcon={FileText}
+              value={templateId}
+              onChange={setTemplateId}
+              options={[
+                ...(fallback ? [{ value: 'default', label: 'Default' }] : []),
+                ...options.map((t) => ({ value: String(t.id), label: t.name })),
+              ]}
+            />
           </div>
         )}
         <div>

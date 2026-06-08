@@ -15,6 +15,7 @@ import { PartyEmailModal } from '../components/parties/PartyEmailModal';
 import { PartyForm } from '../components/parties/PartyForm';
 import { Modal } from '../components/ui/Modal';
 import { syncPartyCalendar } from '../lib/partyActions';
+import { formatRange, spaceLabel, type Space } from '../lib/timeWindows';
 import { PARTY_STATUS_LABELS, type PartyStatus } from '../types';
 
 const STATUS_BADGE: Record<PartyStatus, string> = {
@@ -128,6 +129,10 @@ export function PartyProfile() {
 
   const title = party.title?.trim() || party.contact_name;
   const timeRange = [party.start_time, party.end_time].filter(Boolean).join(' – ');
+  const hasStructuredTime = party.all_day || party.start_min != null;
+  const timeDisplay = hasStructuredTime
+    ? formatRange(party.start_min, party.end_min, party.all_day)
+    : (timeRange || null);
 
   return (
     <div className="max-w-3xl">
@@ -219,10 +224,11 @@ export function PartyProfile() {
           <h3 className="text-sm font-semibold text-text-primary mb-3">Event details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field icon={Clock} label="Date" value={fmtDate(party.event_date)} />
-            <Field icon={Clock} label="Time" value={timeRange || null} />
+            <Field icon={Clock} label="Time" value={timeDisplay} />
+            <Field icon={Users} label="Booking type" value={party.is_private ? 'Private (exclusive)' : 'General (coexisting)'} />
             <Field icon={Clock} label="Setup" value={party.setup_time} />
             <Field icon={Users} label="Guests" value={party.guest_count != null ? String(party.guest_count) : null} />
-            <Field icon={MapPin} label="Space" value={party.space_name} />
+            <Field icon={MapPin} label="Space" value={[spaceLabel(party.space as Space | null), party.space_name].filter(Boolean).join(' — ')} />
             <Field icon={Utensils} label="Food service" value={party.food_service_type} />
           </div>
           {(party.food_notes || party.drink_notes || party.special_requests) && (

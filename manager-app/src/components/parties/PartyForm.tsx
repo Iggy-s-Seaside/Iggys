@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import Select from '../ui/Select';
+import TimeSelect from '../ui/TimeSelect';
 import { findOrCreateContact } from '../../hooks/useContacts';
+import { timeText, SPACES, type Space } from '../../lib/timeWindows';
 import { FOOD_SERVICE_TYPES, type Party } from '../../types';
+
+const FOOD_SERVICE_OPTIONS = [
+  { value: '', label: 'No preference' },
+  ...FOOD_SERVICE_TYPES.map((t) => ({ value: t, label: t })),
+];
 
 interface PartyFormProps {
   open: boolean;
@@ -18,11 +26,16 @@ const empty = {
   contact_phone: '',
   company: '',
   title: '',
+  is_private: true,
+  all_day: false,
   event_date: '',
+  start_min: null as number | null,
+  end_min: null as number | null,
   start_time: '',
   end_time: '',
   setup_time: '',
   guest_count: '',
+  space: 'upstairs' as Space,
   space_name: '',
   food_service_type: '',
   food_notes: '',
@@ -43,11 +56,16 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
         contact_phone: party.contact_phone ?? '',
         company: party.company ?? '',
         title: party.title ?? '',
+        is_private: party.is_private ?? true,
+        all_day: party.all_day ?? false,
         event_date: party.event_date ?? '',
+        start_min: party.start_min ?? null,
+        end_min: party.end_min ?? null,
         start_time: party.start_time ?? '',
         end_time: party.end_time ?? '',
         setup_time: party.setup_time ?? '',
         guest_count: party.guest_count != null ? String(party.guest_count) : '',
+        space: (party.space as Space) ?? 'upstairs',
         space_name: party.space_name ?? '',
         food_service_type: party.food_service_type ?? '',
         food_notes: party.food_notes ?? '',
@@ -75,6 +93,9 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
       company: form.company.trim() || null,
     });
 
+    const startMin = form.all_day ? null : form.start_min;
+    const endMin = form.all_day ? null : form.end_min;
+
     const payload: Partial<Party> = {
       contact_id: contactId,
       contact_name: form.contact_name.trim(),
@@ -82,11 +103,16 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
       contact_phone: form.contact_phone.trim() || null,
       company: form.company.trim() || null,
       title: form.title.trim() || null,
+      is_private: form.is_private,
+      all_day: form.all_day,
       event_date: form.event_date || null,
-      start_time: form.start_time.trim() || null,
-      end_time: form.end_time.trim() || null,
+      start_min: startMin,
+      end_min: endMin,
+      start_time: form.all_day ? '' : timeText(startMin),
+      end_time: form.all_day ? '' : timeText(endMin),
       setup_time: form.setup_time.trim() || null,
       guest_count: form.guest_count ? Number(form.guest_count) : null,
+      space: form.space,
       space_name: form.space_name.trim() || null,
       food_service_type: form.food_service_type || null,
       food_notes: form.food_notes.trim() || null,
@@ -133,6 +159,40 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
           <input className="input-field" value={form.title}
             onChange={(e) => setField('title', e.target.value)} placeholder="Educator Appreciation Night" />
         </div>
+
+        {/* Type & buyout */}
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="label">Type</label>
+            <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+              <button type="button" onClick={() => setField('is_private', true)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  form.is_private ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}>
+                Private
+              </button>
+              <button type="button" onClick={() => setField('is_private', false)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  !form.is_private ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}>
+                General
+              </button>
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer pb-1.5">
+            <button type="button" role="switch" aria-checked={form.all_day}
+              onClick={() => setField('all_day', !form.all_day)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                form.all_day ? 'bg-teal-500' : 'bg-white/10'
+              }`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                form.all_day ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+            <span className="text-sm text-slate-300">Full buyout (all day)</span>
+          </label>
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <label className="label">Date</label>
@@ -146,16 +206,16 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
           </div>
           <div>
             <label className="label">Start</label>
-            <input className="input-field" value={form.start_time}
-              onChange={(e) => setField('start_time', e.target.value)} placeholder="5:30 PM" />
+            <TimeSelect variant="manager" value={form.start_min} disabled={form.all_day}
+              onChange={(v) => setField('start_min', v)} />
           </div>
           <div>
             <label className="label">End</label>
-            <input className="input-field" value={form.end_time}
-              onChange={(e) => setField('end_time', e.target.value)} placeholder="8:00 PM" />
+            <TimeSelect variant="manager" value={form.end_min} minValue={form.start_min} disabled={form.all_day}
+              onChange={(v) => setField('end_min', v)} />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div>
             <label className="label">Guest count</label>
             <input type="number" min="0" className="input-field" value={form.guest_count}
@@ -163,6 +223,16 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
           </div>
           <div>
             <label className="label">Space</label>
+            <Select<Space>
+              variant="manager"
+              placeholder="Select…"
+              value={form.space}
+              options={SPACES}
+              onChange={(v) => setField('space', v)}
+            />
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <label className="label">Space note</label>
             <input className="input-field" value={form.space_name}
               onChange={(e) => setField('space_name', e.target.value)} placeholder="Upstairs satellite bar" />
           </div>
@@ -171,11 +241,13 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
         {/* Service details */}
         <div>
           <label className="label">Food service</label>
-          <select className="input-field" value={form.food_service_type}
-            onChange={(e) => setField('food_service_type', e.target.value)}>
-            <option value="">Select…</option>
-            {FOOD_SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <Select<string>
+            variant="manager"
+            placeholder="Select…"
+            value={form.food_service_type || null}
+            options={FOOD_SERVICE_OPTIONS}
+            onChange={(v) => setField('food_service_type', v)}
+          />
         </div>
         <div>
           <label className="label">Food notes</label>

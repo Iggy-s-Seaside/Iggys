@@ -18,6 +18,7 @@ import { MobileFontPicker } from '../components/editor/MobileFontPicker';
 import { MobileBlendPicker } from '../components/editor/MobileBlendPicker';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { Modal, ConfirmDialog } from '../components/ui/Modal';
+import Select from '../components/ui/Select';
 import { useEditorState } from '../hooks/useEditorState';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
@@ -1583,16 +1584,17 @@ export function SpecialEditor() {
           </div>
           <div>
             <label className="label">Category</label>
-            <select
-              className="input-field"
+            <Select<string>
+              variant="manager"
               value={templateForm.category}
-              onChange={(e) => setTemplateForm((f) => ({ ...f, category: e.target.value }))}
-            >
-              <option value="drink">Drink</option>
-              <option value="food">Food</option>
-              <option value="event">Event</option>
-              <option value="seasonal">Seasonal</option>
-            </select>
+              onChange={(v) => setTemplateForm((f) => ({ ...f, category: v }))}
+              options={[
+                { value: 'drink', label: 'Drink' },
+                { value: 'food', label: 'Food' },
+                { value: 'event', label: 'Event' },
+                { value: 'seasonal', label: 'Seasonal' },
+              ]}
+            />
           </div>
           <p className="text-[13px] text-text-muted">Saves your current canvas layout as a reusable starting point.</p>
           <button
@@ -1631,15 +1633,16 @@ export function SpecialEditor() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Type</label>
-              <select
-                className="input-field"
+              <Select<'drink' | 'food' | 'seasonal'>
+                variant="manager"
                 value={saveForm.type}
-                onChange={(e) => setSaveForm((f) => ({ ...f, type: e.target.value as 'drink' | 'food' | 'seasonal' }))}
-              >
-                <option value="drink">Drink</option>
-                <option value="food">Food</option>
-                <option value="seasonal">Seasonal</option>
-              </select>
+                onChange={(v) => setSaveForm((f) => ({ ...f, type: v }))}
+                options={[
+                  { value: 'drink', label: 'Drink' },
+                  { value: 'food', label: 'Food' },
+                  { value: 'seasonal', label: 'Seasonal' },
+                ]}
+              />
             </div>
             <div>
               <label className="label">Price</label>

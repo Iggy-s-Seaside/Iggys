@@ -11,10 +11,14 @@ CREATE TABLE IF NOT EXISTS events (
   description text NOT NULL,
   date date NOT NULL,
   time text NOT NULL,
+  start_min int,                                    -- minutes-from-midnight (sort/overlap/grid)
+  end_min int,                                      -- minutes-from-midnight; > 1440 = after midnight
+  all_day boolean NOT NULL DEFAULT false,           -- spans the whole date; start_min/end_min ignored
   image_url text,
   is_recurring boolean DEFAULT false,
   recurring_day text,
   category text,
+  space text,                                       -- upstairs | downstairs | whole; null === whole for conflicts
   active boolean DEFAULT true
 );
 

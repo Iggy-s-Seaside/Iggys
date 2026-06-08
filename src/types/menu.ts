@@ -63,6 +63,10 @@ export interface IggyEvent {
   is_recurring: boolean;
   recurring_day: string | null;
   active: boolean;
+  start_min: number | null;
+  end_min: number | null;
+  all_day: boolean;
+  space: string | null;
 }
 
 export interface Special {

@@ -3,7 +3,10 @@ import { Plus, Trash2, CheckSquare, Square, Loader2, Flag } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { useTodos } from '../hooks/useTodos';
 import { useAuth } from '../context/AuthContext';
+import Select from '../components/ui/Select';
 import { TODO_PRIORITIES, type Todo, type TodoPriority } from '../types';
+
+const PRIORITY_LABELS: Record<TodoPriority, string> = { low: 'Low', normal: 'Normal', high: 'High' };
 
 const PRIORITY_STYLE: Record<TodoPriority, string> = {
   high: 'text-danger',
@@ -69,9 +72,13 @@ export function Todos() {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="label">Priority</label>
-            <select className="input-field" value={priority} onChange={(e) => setPriority(e.target.value as TodoPriority)}>
-              {TODO_PRIORITIES.map((p) => <option key={p} value={p} className="capitalize">{p}</option>)}
-            </select>
+            <Select<TodoPriority>
+              variant="manager"
+              leadingIcon={Flag}
+              value={priority}
+              onChange={setPriority}
+              options={TODO_PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+            />
           </div>
           <div>
             <label className="label">Due</label>

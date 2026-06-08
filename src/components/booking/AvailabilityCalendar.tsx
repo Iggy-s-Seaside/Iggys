@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 interface AvailabilityCalendarProps {
   /** Set of 'YYYY-MM-DD' dates that are already taken (confirmed events). */
   taken: Set<string>;
+  /** Set of 'YYYY-MM-DD' dates that are busy but still bookable (sharing OK). Informational only. */
+  busyDays?: Set<string>;
   /** Currently selected 'YYYY-MM-DD' or null. */
   value: string | null;
   onChange: (date: string) => void;
@@ -14,7 +16,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const keyOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-export default function AvailabilityCalendar({ taken, value, onChange, loading }: AvailabilityCalendarProps) {
+export default function AvailabilityCalendar({ taken, busyDays, value, onChange, loading }: AvailabilityCalendarProps) {
   const now = new Date();
   const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
 
@@ -72,6 +74,7 @@ export default function AvailabilityCalendar({ taken, value, onChange, loading }
           const k = keyOf(view.y, view.m, day);
           const isPast = k < todayKey;
           const isTaken = taken.has(k);
+          const isBusy = !isTaken && (busyDays?.has(k) ?? false);
           const disabled = isPast || isTaken;
           const selected = value === k;
           return (
@@ -80,7 +83,7 @@ export default function AvailabilityCalendar({ taken, value, onChange, loading }
               type="button"
               disabled={disabled}
               onClick={() => onChange(k)}
-              aria-label={`${k}${isTaken ? ' (unavailable)' : ''}`}
+              aria-label={`${k}${isTaken ? ' (unavailable)' : isBusy ? ' (busy, sharing OK)' : ''}`}
               className={`relative h-11 rounded-lg text-sm font-medium transition ${
                 selected
                   ? 'bg-primary text-background font-bold'
@@ -92,7 +95,7 @@ export default function AvailabilityCalendar({ taken, value, onChange, loading }
               }`}
             >
               {day}
-              {isTaken && !selected && (
+              {(isTaken || isBusy) && !selected && (
                 <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent/70" />
               )}
             </button>
@@ -104,6 +107,9 @@ export default function AvailabilityCalendar({ taken, value, onChange, loading }
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-primary" /> Selected</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-white/15" /> Available</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-accent/70" /> Taken</span>
+        {busyDays && busyDays.size > 0 && (
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-accent/40" /> Busy (sharing OK)</span>
+        )}
       </div>
     </div>
   );

@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { ArrowLeft, Loader2, Eye } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ImageDropzone } from '../components/ui/ImageDropzone';
 import PreviewPanel from '../components/preview/PreviewPanel';
 import { AddToCalendarButton } from '../components/events/AddToCalendarButton';
+import Select from '../components/ui/Select';
+import TimeSelect from '../components/ui/TimeSelect';
 import { EVENT_CATEGORIES, type IggyEvent } from '../types';
+import { formatRange, SPACES, type Space } from '../lib/timeWindows';
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function EventForm() {
   const { id } = useParams();
@@ -18,8 +24,12 @@ export function EventForm() {
     description: '',
     date: '',
     time: '',
+    start_min: null as number | null,
+    end_min: null as number | null,
+    all_day: false,
     category: '',
     image_url: null as string | null,
+    space: 'downstairs' as Space,
     is_recurring: false,
     recurring_day: '',
     active: true,
@@ -36,8 +46,12 @@ export function EventForm() {
           description: event.description,
           date: event.date,
           time: event.time,
+          start_min: event.start_min ?? null,
+          end_min: event.end_min ?? null,
+          all_day: event.all_day ?? false,
           category: event.category ?? '',
           image_url: event.image_url,
+          space: (event.space as Space) ?? 'downstairs',
           is_recurring: event.is_recurring,
           recurring_day: event.recurring_day ?? '',
           active: event.active,
@@ -51,14 +65,24 @@ export function EventForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.all_day && form.start_min === null) {
+      toast.error('Pick a start time for the event.');
+      return;
+    }
     setSaving(true);
+    const start_min = form.all_day ? null : form.start_min;
+    const end_min = form.all_day ? null : form.end_min;
     const payload = {
       title: form.title,
       description: form.description,
       date: form.date,
-      time: form.time,
+      time: formatRange(start_min, end_min, form.all_day),
+      start_min,
+      end_min,
+      all_day: form.all_day,
       category: form.category || null,
       image_url: form.image_url,
+      space: form.space,
       is_recurring: form.is_recurring,
       recurring_day: form.is_recurring ? form.recurring_day : null,
       active: form.active,
@@ -73,8 +97,17 @@ export function EventForm() {
   };
 
   // Build the event object for preview / calendar
+  const previewTime =
+    form.all_day || form.start_min !== null
+      ? formatRange(
+          form.all_day ? null : form.start_min,
+          form.all_day ? null : form.end_min,
+          form.all_day,
+        )
+      : '';
   const currentEvent: Partial<IggyEvent> = {
     ...form,
+    time: previewTime,
     category: form.category || null,
     recurring_day: form.is_recurring ? form.recurring_day : null,
     ...(isEdit && id ? { id: Number(id) } : {}),
@@ -95,7 +128,7 @@ export function EventForm() {
           <ArrowLeft size={18} /> Back to Events
         </button>
         <div className="flex gap-2">
-          {isEdit && form.date && form.time && (
+          {isEdit && form.date && previewTime && (
             <AddToCalendarButton event={currentEvent as IggyEvent} />
           )}
           <button
@@ -147,30 +180,66 @@ export function EventForm() {
                 required
               />
             </div>
-            <div>
-              <label className="label">Time *</label>
-              <input
-                className="input-field"
-                value={form.time}
-                onChange={(e) => setField('time', e.target.value)}
-                placeholder="8:00 PM"
-                required
-              />
+            <div className="flex items-end gap-3 pb-2">
+              <button
+                type="button"
+                onClick={() => setField('all_day', !form.all_day)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  form.all_day ? 'bg-primary' : 'bg-surface-active'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${
+                  form.all_day ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+              <span className="text-sm text-text-secondary">All day</span>
             </div>
           </div>
 
+          {!form.all_day && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Start *</label>
+                <TimeSelect
+                  variant="manager"
+                  value={form.start_min}
+                  onChange={(v) => setField('start_min', v)}
+                  placeholder="Select time..."
+                />
+              </div>
+              <div>
+                <label className="label">End</label>
+                <TimeSelect
+                  variant="manager"
+                  value={form.end_min}
+                  onChange={(v) => setField('end_min', v)}
+                  minValue={form.start_min}
+                  placeholder="Select time..."
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="label">Category</label>
-            <select
-              className="input-field"
-              value={form.category}
-              onChange={(e) => setField('category', e.target.value)}
-            >
-              <option value="">Select category...</option>
-              {EVENT_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+            <Select<string>
+              variant="manager"
+              value={form.category || null}
+              onChange={(v) => setField('category', v)}
+              options={[{ value: '', label: 'Uncategorized' }, ...EVENT_CATEGORIES.map((cat) => ({ value: cat, label: cat }))]}
+              placeholder="Select category..."
+            />
+          </div>
+
+          <div>
+            <label className="label">Space</label>
+            <Select<Space>
+              variant="manager"
+              value={form.space}
+              onChange={(v) => setField('space', v)}
+              options={SPACES}
+              placeholder="Select space..."
+            />
           </div>
 
           <div>
@@ -200,16 +269,13 @@ export function EventForm() {
           {form.is_recurring && (
             <div>
               <label className="label">Recurring Day</label>
-              <select
-                className="input-field"
-                value={form.recurring_day}
-                onChange={(e) => setField('recurring_day', e.target.value)}
-              >
-                <option value="">Select day...</option>
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <Select<string>
+                variant="manager"
+                value={form.recurring_day || null}
+                onChange={(v) => setField('recurring_day', v)}
+                options={WEEKDAYS.map((d) => ({ value: d, label: d }))}
+                placeholder="Select day..."
+              />
             </div>
           )}
 

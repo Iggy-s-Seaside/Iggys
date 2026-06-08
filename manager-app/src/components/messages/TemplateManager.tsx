@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, Sparkles, ArrowLeft } from 'lucide-react';
 import { Modal, ConfirmDialog } from '../ui/Modal';
+import Select from '../ui/Select';
 import { useMessageTemplates } from '../../hooks/useMessageTemplates';
 import { PLACEHOLDER_KEYS } from '../../utils/fillTemplate';
 import {
@@ -105,10 +106,12 @@ export function TemplateManager({ open, onClose }: TemplateManagerProps) {
             </div>
             <div>
               <label className="label">Category</label>
-              <select className="input-field" value={form.category}
-                onChange={(e) => setField('category', e.target.value as TemplateCategory)}>
-                {TEMPLATE_CATEGORIES.map((c) => <option key={c} value={c}>{TEMPLATE_CATEGORY_LABELS[c]}</option>)}
-              </select>
+              <Select<TemplateCategory>
+                variant="manager"
+                value={form.category}
+                onChange={(v) => setField('category', v)}
+                options={TEMPLATE_CATEGORIES.map((c) => ({ value: c, label: TEMPLATE_CATEGORY_LABELS[c] }))}
+              />
             </div>
           </div>
           <div>

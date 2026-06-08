@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Package as PackageIcon, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package as PackageIcon, Loader2, Tag } from 'lucide-react';
 import { usePackages } from '../hooks/usePackages';
 import { Modal, ConfirmDialog } from '../components/ui/Modal';
+import Select from '../components/ui/Select';
 import {
   PACKAGE_CATEGORIES, PACKAGE_UNITS, PACKAGE_UNIT_LABELS, type Package, type PackageCategory, type PackageUnit,
 } from '../types';
@@ -136,17 +137,22 @@ export function Packages() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Category</label>
-              <select className="input-field" value={form.category}
-                onChange={(e) => setField('category', e.target.value as PackageCategory)}>
-                {PACKAGE_CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
-              </select>
+              <Select<PackageCategory>
+                variant="manager"
+                leadingIcon={Tag}
+                value={form.category}
+                onChange={(v) => setField('category', v)}
+                options={PACKAGE_CATEGORIES.map((c) => ({ value: c, label: c }))}
+              />
             </div>
             <div>
               <label className="label">Unit</label>
-              <select className="input-field" value={form.unit}
-                onChange={(e) => setField('unit', e.target.value as PackageUnit)}>
-                {PACKAGE_UNITS.map((u) => <option key={u} value={u}>{PACKAGE_UNIT_LABELS[u]}</option>)}
-              </select>
+              <Select<PackageUnit>
+                variant="manager"
+                value={form.unit}
+                onChange={(v) => setField('unit', v)}
+                options={PACKAGE_UNITS.map((u) => ({ value: u, label: PACKAGE_UNIT_LABELS[u] }))}
+              />
             </div>
             <div>
               <label className="label">Price ($)</label>

@@ -68,6 +68,10 @@ export interface IggyEvent {
   recurring_day: string | null;
   category: string | null;
   active: boolean;
+  start_min: number | null;
+  end_min: number | null;
+  all_day: boolean;
+  space: string | null;
 }
 
 export interface Special {
@@ -544,12 +548,17 @@ export interface Party {
   contact_phone: string | null;
   company: string | null;
   title: string | null;
+  is_private: boolean;
   event_date: string | null;
   start_time: string | null;
   end_time: string | null;
+  start_min: number | null;
+  end_min: number | null;
+  all_day: boolean;
   setup_time: string | null;
   guest_count: number | null;
   space_name: string | null;
+  space: string | null;
   food_service_type: string | null;
   food_notes: string | null;
   drink_notes: string | null;

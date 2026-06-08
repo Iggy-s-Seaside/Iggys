@@ -119,9 +119,25 @@ serve(async (req: Request) => {
     const company = clean(body.company, 120);
     const eventDate = clean(body.event_date, 10);
     const startTime = clean(body.start_time, 20);
+    const endTime = clean(body.end_time, 20);
     const notes = clean(body.notes, 4000);
     const guestCount = Number.isFinite(Number(body.guest_count)) && Number(body.guest_count) > 0
       ? Math.floor(Number(body.guest_count))
+      : null;
+
+    // Time window (integer minutes from midnight; after-midnight uses end_min > 1440).
+    const toMin = (v: unknown): number | null => {
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 0 && n <= 1600 ? n : null;
+    };
+    const isPrivate = body.is_private !== false;
+    const startMin = toMin(body.start_min);
+    const endMin = toMin(body.end_min);
+    const allDay = body.all_day === true;
+
+    // Physical space requested: only the three known values, else null (legacy = whole).
+    const space = body.space === "upstairs" || body.space === "downstairs" || body.space === "whole"
+      ? body.space
       : null;
 
     const { data: party, error: pErr } = await admin
@@ -137,7 +153,13 @@ serve(async (req: Request) => {
         title: partyType ? `${partyType} — ${name}` : null,
         event_date: eventDate,
         start_time: startTime,
+        end_time: endTime,
         guest_count: guestCount,
+        is_private: isPrivate,
+        start_min: startMin,
+        end_min: endMin,
+        all_day: allDay,
+        space,
         food_service_type: clean(body.food_service_type, 60),
         special_requests: notes,
       })
@@ -168,6 +190,21 @@ serve(async (req: Request) => {
 
     // Best-effort owner heads-up (never blocks the request)
     try {
+      const minToLabel = (min: number): string => {
+        const m = ((min % 1440) + 1440) % 1440;
+        const h24 = Math.floor(m / 60);
+        const mm = m % 60;
+        const period = h24 < 12 ? "AM" : "PM";
+        const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+        return `${h12}:${String(mm).padStart(2, "0")} ${period}`;
+      };
+      const timeLine =
+        allDay || startMin == null
+          ? "All day"
+          : endMin == null
+            ? minToLabel(startMin)
+            : `${minToLabel(startMin)} – ${minToLabel(endMin)}`;
+
       const lines = [
         "New event request from the website:",
         "",
@@ -176,9 +213,10 @@ serve(async (req: Request) => {
         `Email: ${email || "—"}`,
         `Phone: ${phone || "—"}`,
         `Date: ${eventDate || "not specified"}`,
-        startTime ? `Time: ${startTime}` : "",
+        `Type: ${isPrivate ? "Private (exclusive)" : "General (coexisting)"}`,
+        `Time: ${timeLine}`,
         `Guests: ${guestCount ?? "—"}`,
-        `Type: ${partyType || "—"}`,
+        `Party: ${partyType || "—"}`,
         packageNames.length ? `Packages: ${packageNames.join(", ")}` : "",
         notes ? `Notes: ${notes}` : "",
         "",

@@ -19,6 +19,7 @@ import {
 } from '../hooks/useInventory';
 import { useAuth } from '../context/AuthContext';
 import { useOrderScanner } from '../hooks/useOrderScanner';
+import Select from '../components/ui/Select';
 import { QuickAdjust } from '../components/inventory/QuickAdjust';
 import { InventoryLogDrawer } from '../components/inventory/InventoryLogDrawer';
 import { ScanOrderButton } from '../components/inventory/ScanOrderButton';
@@ -92,30 +93,22 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Category</label>
-              <select
-                className="input-field"
-                value={form.category_id ?? ''}
-                onChange={(e) =>
-                  setForm({ ...form, category_id: e.target.value ? Number(e.target.value) : null })
-                }
-              >
-                <option value="">None</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <Select<number>
+                variant="manager"
+                value={form.category_id}
+                onChange={(v) => setForm({ ...form, category_id: v === -1 ? null : v })}
+                options={[{ value: -1, label: 'None' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+                placeholder="None"
+              />
             </div>
             <div>
               <label className="label">Unit</label>
-              <select
-                className="input-field"
+              <Select<string>
+                variant="manager"
                 value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value })}
-              >
-                {INVENTORY_UNITS.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
+                onChange={(v) => setForm({ ...form, unit: v })}
+                options={INVENTORY_UNITS.map((u) => ({ value: u, label: u }))}
+              />
             </div>
           </div>
 

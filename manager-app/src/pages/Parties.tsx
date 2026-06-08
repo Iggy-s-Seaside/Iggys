@@ -149,6 +149,11 @@ export function Parties() {
                       {PARTY_SOURCE_LABELS[p.source] ?? p.source}
                     </span>
                   )}
+                  {p.is_private === false && (
+                    <span className="text-[10px] uppercase tracking-wide text-text-muted border border-border rounded px-1.5 py-0.5 shrink-0">
+                      General
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-xs text-text-muted">
                   {p.title?.trim() && <span>{p.contact_name}</span>}

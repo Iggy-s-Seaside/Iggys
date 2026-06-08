@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, Package as PackageIcon } from 'lucide-react';
+import Select from '../ui/Select';
 import { usePackages } from '../../hooks/usePackages';
 import { lineAmount } from '../../utils/invoice';
 import { PACKAGE_UNIT_LABELS, type Package, type PartyPackage } from '../../types';
@@ -79,14 +80,16 @@ export function PackagePicker({ items, guestCount, roomHours, onAdd, onUpdateLin
       <div className="flex items-end gap-2 mt-4">
         <div className="flex-1">
           <label className="label">Add package</label>
-          <select className="input-field" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-            <option value="">Select a package…</option>
-            {active.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — {fmt(p.price)} {PACKAGE_UNIT_LABELS[p.unit]}
-              </option>
-            ))}
-          </select>
+          <Select<string>
+            variant="manager"
+            value={selectedId || null}
+            onChange={setSelectedId}
+            options={active.map((p) => ({
+              value: String(p.id),
+              label: `${p.name} — ${fmt(p.price)} ${PACKAGE_UNIT_LABELS[p.unit]}`,
+            }))}
+            placeholder="Select a package…"
+          />
         </div>
         <div className="w-20">
           <label className="label">Qty</label>

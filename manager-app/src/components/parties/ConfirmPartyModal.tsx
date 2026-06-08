@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Send, CalendarCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, Send, CalendarCheck, AlertTriangle, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '../ui/Modal';
+import Select from '../ui/Select';
 import { useMessageTemplates } from '../../hooks/useMessageTemplates';
 import { fillTemplate } from '../../utils/fillTemplate';
 import { sendPartyEmail, syncPartyCalendar } from '../../lib/partyActions';
@@ -75,6 +76,10 @@ export function ConfirmPartyModal({ open, onClose, party, onConfirmed }: Confirm
       recurring_day: null,
       category: 'Private Party',
       active: true,
+      start_min: null,
+      end_min: null,
+      all_day: false,
+      space: party.space,
     };
     window.open(generateGoogleCalendarUrl(pseudo), '_blank', 'noopener');
   };
@@ -142,12 +147,16 @@ export function ConfirmPartyModal({ open, onClose, party, onConfirmed }: Confirm
 
         <div>
           <label className="label">Template</label>
-          <select className="input-field" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            <option value="default">Default recap</option>
-            {confirmationTemplates.map((t) => (
-              <option key={t.id} value={String(t.id)}>{t.name}</option>
-            ))}
-          </select>
+          <Select<string>
+            variant="manager"
+            leadingIcon={FileText}
+            value={templateId}
+            onChange={setTemplateId}
+            options={[
+              { value: 'default', label: 'Default recap' },
+              ...confirmationTemplates.map((t) => ({ value: String(t.id), label: t.name })),
+            ]}
+          />
         </div>
 
         <div>
