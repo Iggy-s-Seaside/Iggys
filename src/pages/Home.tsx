@@ -223,9 +223,13 @@ export default function Home() {
 
                         {/* CTA buttons */}
                         <div className="flex flex-wrap gap-4 mt-8">
+                            <Link to="/food" className="btn-primary-lg">
+                                <UtensilsCrossed className="w-5 h-5" />
+                                Food Menu
+                            </Link>
                             <Link to="/cocktails" className="btn-primary-lg">
                                 <Wine className="w-5 h-5" />
-                                View Our Menu
+                                Cocktail Menu
                             </Link>
                             <Link to="/happy-hour" className="btn-outline-lg">
                                 <Sparkles className="w-5 h-5" />
