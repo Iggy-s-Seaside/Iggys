@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Plus } from 'lucide-react';
+import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus } from 'lucide-react';
 import { useUnreadCount } from '../../hooks/useMessages';
+import { useNewInsightCount } from '../../hooks/useLuna';
 
 interface BottomNavProps {
   onQuickAdd: () => void;
@@ -33,10 +34,11 @@ function Tab({ to, icon: Icon, label, end, badge }: {
 /** Thumb-reachable bottom navigation for mobile, with a center Quick-Add button. */
 export function BottomNav({ onQuickAdd }: BottomNavProps) {
   const unread = useUnreadCount();
+  const newInsights = useNewInsightCount();
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
-      <div className="grid grid-cols-5 items-center">
+      <div className="grid grid-cols-6 items-center">
         <Tab to="/" icon={LayoutDashboard} label="Home" end />
         <Tab to="/parties" icon={PartyPopper} label="Parties" />
         <div className="flex justify-center">
@@ -48,6 +50,7 @@ export function BottomNav({ onQuickAdd }: BottomNavProps) {
             <Plus size={26} />
           </button>
         </div>
+        <Tab to="/luna" icon={Moon} label="Luna" badge={newInsights} />
         <Tab to="/calendar" icon={CalendarDays} label="Calendar" />
         <Tab to="/messages" icon={MessageSquare} label="Inbox" badge={unread} />
       </div>

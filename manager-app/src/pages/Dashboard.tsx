@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare } from 'lucide-react';
+import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useInventoryItems, getLowStockItems } from '../hooks/useInventory';
 import { useMessages } from '../hooks/useMessages';
 import { useTodos } from '../hooks/useTodos';
+import { useLunaInsights } from '../hooks/useLuna';
 import { QuickPostModal } from '../components/editor/QuickPostModal';
 import { LowStockWidget } from '../components/inventory/LowStockWidget';
 import { MessageWidget } from '../components/messages/MessageWidget';
@@ -20,8 +21,11 @@ export function Dashboard() {
   const lowStockItems = getLowStockItems(inventoryItems);
   const { messages, loading: messagesLoading } = useMessages();
   const { todos, loading: todosLoading, toggle: toggleTodo } = useTodos();
+  const { insights } = useLunaInsights();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
+  const newInsights = insights.filter((i) => i.status === 'new');
+  const latestInsight = newInsights[0] ?? null;
 
   const activeEvents = events.filter((e) => e.active);
   const activeSpecials = specials.filter((s) => s.active);
@@ -75,6 +79,37 @@ export function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Luna */}
+      <Link
+        to="/luna"
+        className="card-hover p-5 mb-8 flex items-center gap-4 group active:scale-[0.99] transition-transform"
+      >
+        <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 group-hover:bg-purple-100 dark:group-hover:bg-purple-500/20 transition-colors shrink-0 self-start">
+          <Moon size={20} className="text-purple-600 dark:text-purple-400" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-text-primary">Luna</p>
+            {newInsights.length > 0 && (
+              <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {newInsights.length} new
+              </span>
+            )}
+          </div>
+          {latestInsight ? (
+            <>
+              <p className="text-sm font-medium text-text-primary mt-1 truncate">{latestInsight.title}</p>
+              <p className="text-xs text-text-muted mt-0.5 line-clamp-2">{latestInsight.body}</p>
+            </>
+          ) : (
+            <p className="text-xs text-text-muted mt-1">
+              Ask Luna anything about the bar — sales, inventory, parties, ideas.
+            </p>
+          )}
+        </div>
+        <ChevronRight size={18} className="text-text-muted shrink-0 group-hover:text-text-primary transition-colors" />
+      </Link>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">

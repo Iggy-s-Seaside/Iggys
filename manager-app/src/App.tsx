@@ -17,6 +17,7 @@ import { Calendar } from './pages/Calendar';
 import { Packages } from './pages/Packages';
 import { Todos } from './pages/Todos';
 import { Invoices } from './pages/Invoices';
+import { Luna } from './pages/Luna';
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/todos" element={<Todos />} />
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/packages" element={<Packages />} />
+        <Route path="/luna" element={<Luna />} />
       </Route>
     </Routes>
   );

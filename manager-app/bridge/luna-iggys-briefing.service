@@ -1,0 +1,13 @@
+# One-shot morning briefing: gathers dashboard context, asks Luna, writes a
+# 'briefing' row into luna_insights. Triggered by luna-iggys-briefing.timer.
+
+[Unit]
+Description=Luna morning briefing for Iggy's dashboard (oneshot)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=bradley
+EnvironmentFile=/home/bradley/.local-agent/luna-iggys-bridge.env
+ExecStart=/usr/bin/python3 /home/bradley/projects/iggys-bridge/luna_iggys_bridge.py --briefing

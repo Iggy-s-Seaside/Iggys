@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useUnreadCount } from '../../hooks/useMessages';
+import { useNewInsightCount } from '../../hooks/useLuna';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/messages', icon: MessageSquare, label: 'Messages', badge: true },
+  { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna' },
+  { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages' },
   { to: '/parties', icon: PartyPopper, label: 'Parties' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/todos', icon: ListChecks, label: 'To-Do' },
@@ -25,6 +27,7 @@ export function Sidebar() {
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const unreadCount = useUnreadCount();
+  const newInsightCount = useNewInsightCount();
 
   const navContent = (
     <div className="flex flex-col h-full">
@@ -37,29 +40,33 @@ export function Sidebar() {
 
       {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ to, icon: Icon, label, badge }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-primary-50 text-primary-dark border-l-3 border-primary'
-                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-              }`
-            }
-          >
-            <Icon size={18} />
-            {label}
-            {badge && unreadCount > 0 && (
-              <span className="ml-auto bg-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                {unreadCount}
-              </span>
-            )}
-          </NavLink>
-        ))}
+        {navItems.map(({ to, icon: Icon, label, badge }) => {
+          const badgeCount =
+            badge === 'messages' ? unreadCount : badge === 'luna' ? newInsightCount : 0;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary-50 text-primary-dark border-l-3 border-primary'
+                    : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                }`
+              }
+            >
+              <Icon size={18} />
+              {label}
+              {badgeCount > 0 && (
+                <span className="ml-auto bg-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Theme Toggle + User & Sign Out */}

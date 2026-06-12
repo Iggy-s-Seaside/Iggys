@@ -1,0 +1,15 @@
+# Fires luna-iggys-briefing.service daily at 07:00 in the BOX'S LOCAL
+# TIMEZONE (systemd OnCalendar has no inline-timezone syntax that is portable
+# here). Make sure PC1 is set to Pacific time:
+#   timedatectl set-timezone America/Los_Angeles
+# Persistent=true catches up a missed run after a reboot/downtime.
+
+[Unit]
+Description=Daily 07:00 Luna morning briefing for Iggy's dashboard
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

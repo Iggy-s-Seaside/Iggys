@@ -1,0 +1,24 @@
+# Luna <-> Iggy's bridge daemon (poll loop answering luna_messages).
+# Install: sudo cp luna-iggys-bridge.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now luna-iggys-bridge
+
+[Unit]
+Description=Luna <-> Iggy's dashboard bridge daemon
+Wants=network-online.target
+After=network-online.target
+# A broken config (missing env file / bad DSN) exits immediately; stop the
+# restart loop after 5 tries in 5 minutes instead of hammering forever.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+User=bradley
+EnvironmentFile=/home/bradley/.local-agent/luna-iggys-bridge.env
+ExecStart=/usr/bin/python3 /home/bradley/projects/iggys-bridge/luna_iggys_bridge.py
+Restart=always
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

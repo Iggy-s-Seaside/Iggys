@@ -656,3 +656,39 @@ export interface MessageTemplate {
   subject: string | null;
   body: string;
 }
+
+// ── Luna (AI assistant) ──
+
+export const LUNA_MESSAGE_STATUSES = ['pending', 'processing', 'answered', 'error'] as const;
+export type LunaMessageStatus = (typeof LUNA_MESSAGE_STATUSES)[number];
+
+export interface LunaMessage {
+  id: number;
+  created_at: string;
+  role: 'user' | 'luna';
+  content: string;
+  status: LunaMessageStatus;
+  reply_to: number | null;
+  author_email: string | null;
+  error: string | null;
+}
+
+export const LUNA_INSIGHT_KINDS = ['briefing', 'alert', 'suggestion', 'note'] as const;
+export type LunaInsightKind = (typeof LUNA_INSIGHT_KINDS)[number];
+
+export const LUNA_INSIGHT_KIND_LABELS: Record<LunaInsightKind, string> = {
+  briefing: 'Briefing',
+  alert: 'Alert',
+  suggestion: 'Suggestion',
+  note: 'Note',
+};
+
+export interface LunaInsight {
+  id: number;
+  created_at: string;
+  kind: LunaInsightKind;
+  title: string;
+  body: string;
+  status: 'new' | 'seen' | 'dismissed';
+  data: Record<string, unknown> | null;
+}
