@@ -12,3 +12,5 @@ dist
 .playwright-mcp/
 .claude/settings.local.json
 events-page.png
+__pycache__/
+*.pyc
