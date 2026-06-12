@@ -6,3 +6,9 @@ dist
 
 # Local Netlify folder
 .netlify
+
+# Local tooling scratch
+.serena/
+.playwright-mcp/
+.claude/settings.local.json
+events-page.png

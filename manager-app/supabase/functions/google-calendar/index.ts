@@ -23,7 +23,7 @@ const CAL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("Origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".netlify.app") ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

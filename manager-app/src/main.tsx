@@ -8,24 +8,25 @@ import App from './App';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <App />
-          <Toaster
-            position="bottom-center"
-            containerStyle={{ bottom: 80 }}
-            toastOptions={{
-              duration: 3000,
-              className: '!bg-surface !text-text-primary !border !border-border !shadow-card',
-              style: {
-                fontSize: '14px',
-              },
-            }}
-          />
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
-  </StrictMode>
+    <StrictMode>
+        <BrowserRouter>
+            <ThemeProvider>
+                <AuthProvider>
+                    <App />
+                    <Toaster
+                        position="bottom-center"
+                        containerStyle={{ bottom: 80 }}
+                        toastOptions={{
+                            duration: 3000,
+                            className:
+                                '!bg-surface !text-text-primary !border !border-border !shadow-card',
+                            style: {
+                                fontSize: '14px',
+                            },
+                        }}
+                    />
+                </AuthProvider>
+            </ThemeProvider>
+        </BrowserRouter>
+    </StrictMode>,
 );
