@@ -38,3 +38,13 @@ CREATE POLICY "Auth read" ON messages
 -- Only authenticated users (managers) can update messages
 CREATE POLICY "Auth update" ON messages
   FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+-- ── Gmail inbox sync (added 2026-06-12) ──────────────────────────────
+-- Mirror real Gmail inbox mail into this table so it shows in the dashboard
+-- Inbox. Deduped by Gmail message id; `source` distinguishes website vs gmail.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS gmail_id TEXT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'contact_form';
+-- Real UNIQUE constraint (not a partial index) so PostgREST upsert
+-- on_conflict=gmail_id works. Nullable column → multiple NULLs allowed.
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_gmail_id_unique;
+ALTER TABLE messages ADD CONSTRAINT messages_gmail_id_unique UNIQUE (gmail_id);

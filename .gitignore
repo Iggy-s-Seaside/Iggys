@@ -14,3 +14,5 @@ dist
 events-page.png
 __pycache__/
 *.pyc
+manager-app/supabase/.temp/
+*.jpeg

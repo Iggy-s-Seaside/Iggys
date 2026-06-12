@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar as CalIcon, Loader2, AlertTriangle, MapPin, PartyPopper, RefreshCw } from 'lucide-react';
+import { Calendar as CalIcon, Loader2, AlertTriangle, MapPin, PartyPopper, RefreshCw, Globe } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { listCalendarEvents, type CalendarEvent } from '../lib/partyActions';
 import { useParties } from '../hooks/useParties';
+import { PromoteEventModal } from '../components/calendar/PromoteEventModal';
 import { PARTY_STATUS_LABELS, type PartyStatus } from '../types';
 
 const STATUS_BADGE: Record<PartyStatus, string> = {
@@ -32,6 +33,7 @@ export function Calendar() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [calLoading, setCalLoading] = useState(true);
   const [calError, setCalError] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState<CalendarEvent | null>(null);
 
   const loadEvents = async () => {
     setCalLoading(true);
@@ -116,9 +118,9 @@ export function Calendar() {
                   </p>
                   <div className="space-y-2">
                     {dayEvents.map((ev) => (
-                      <div key={ev.id} className="flex items-start gap-3">
+                      <div key={ev.id} className="flex items-start gap-3 group">
                         <div className="w-1 self-stretch rounded-full bg-primary/40 shrink-0" />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-text-primary">{ev.summary}</p>
                           <p className="text-xs text-text-muted">{eventTime(ev)}</p>
                           {ev.location && (
@@ -127,6 +129,13 @@ export function Calendar() {
                             </p>
                           )}
                         </div>
+                        <button
+                          onClick={() => setPromoting(ev)}
+                          title="Add to the public events page"
+                          className="shrink-0 self-center flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover px-2 py-1 rounded-lg hover:bg-primary/5 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                        >
+                          <Globe size={13} /> <span className="hidden sm:inline">Add to public</span>
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -167,6 +176,14 @@ export function Calendar() {
           </div>
         )}
       </div>
+
+      {promoting && (
+        <PromoteEventModal
+          event={promoting}
+          onClose={() => setPromoting(null)}
+          onPromoted={() => { /* public events page reads from Supabase on next load */ }}
+        />
+      )}
     </div>
   );
 }

@@ -468,6 +468,10 @@ export interface Message {
   reply_text: string | null;
   replied_by: string | null;
   notes: string | null;
+  /** 'contact_form' (website) or 'gmail' (synced from the inbox). */
+  source?: string | null;
+  /** Gmail message id when source='gmail'; dedupe key. */
+  gmail_id?: string | null;
 }
 
 export const MESSAGE_STATUSES = ['unread', 'read', 'replied', 'archived'] as const;

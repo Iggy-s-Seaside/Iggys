@@ -65,3 +65,19 @@ export async function listCalendarEvents(timeMin: string, timeMax: string): Prom
   if (data?.error) throw new Error(data.error);
   return (data?.events ?? []) as CalendarEvent[];
 }
+
+/** Pull new Gmail inbox mail into the Messages table. Returns how many were synced. */
+export async function syncGmailInbox(): Promise<{ synced: number; scanned: number }> {
+  await requireSession();
+  const { data, error } = await supabase.functions.invoke('gmail-sync', { body: {} });
+  if (error) {
+    let message = error.message;
+    try {
+      const ctx = await (error as { context?: Response }).context?.json();
+      if (ctx?.error) message = ctx.error;
+    } catch { /* keep generic */ }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data as { synced: number; scanned: number };
+}

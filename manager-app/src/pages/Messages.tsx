@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
-  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText
+  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { supabase } from '../lib/supabase';
+import { syncGmailInbox } from '../lib/partyActions';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
@@ -13,11 +14,54 @@ import { TemplateManager } from '../components/messages/TemplateManager';
 
 type StatusFilter = 'all' | 'unread' | 'read' | 'replied' | 'archived';
 
+// Throttle Gmail auto-sync across page remounts (module-level, not per-mount).
+let lastAutoSync = 0;
+const AUTO_SYNC_MS = 5 * 60 * 1000;
+
 export function Messages() {
   const {
-    messages, loading, markAsRead, markAsReplied,
+    messages, loading, refresh, markAsRead, markAsReplied,
     archiveMessage, updateNotes, bulkMarkRead, bulkArchive
   } = useMessages();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncGmail = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const r = await syncGmailInbox();
+      lastAutoSync = Date.now();
+      toast.success(
+        r.synced > 0
+          ? `${r.synced} new email${r.synced === 1 ? '' : 's'} pulled from Gmail`
+          : 'Inbox is up to date'
+      );
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Gmail sync failed');
+    }
+    setSyncing(false);
+  };
+
+  // Silent background sync while the inbox is open (throttled, no toast).
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await syncGmailInbox();
+        if (!cancelled) await refresh();
+      } catch { /* silent — manual button surfaces errors */ }
+    };
+    if (Date.now() - lastAutoSync > AUTO_SYNC_MS) {
+      lastAutoSync = Date.now();
+      run();
+    }
+    const iv = setInterval(() => {
+      lastAutoSync = Date.now();
+      run();
+    }, AUTO_SYNC_MS);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [refresh]);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -194,6 +238,14 @@ export function Messages() {
               </button>
             </>
           )}
+          <button
+            onClick={handleSyncGmail}
+            disabled={syncing}
+            title="Pull new emails from the Gmail inbox"
+            className="btn-ghost text-xs py-1 px-2"
+          >
+            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync Gmail
+          </button>
           <button onClick={() => setTemplatesOpen(true)} className="btn-ghost text-xs py-1 px-2">
             <FileText size={14} /> Templates
           </button>
@@ -305,6 +357,11 @@ export function Messages() {
                         <User size={13} /> {selected.name}
                       </span>
                       <span className="text-sm text-text-muted">{selected.email}</span>
+                      {selected.source === 'gmail' && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded">
+                          via Gmail
+                        </span>
+                      )}
                       {selected.phone && (
                         <span className="flex items-center gap-1 text-sm text-text-muted">
                           <Phone size={13} /> {selected.phone}
