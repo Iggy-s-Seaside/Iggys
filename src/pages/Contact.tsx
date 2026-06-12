@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import emailjs from '@emailjs/browser';
 import { MapPin, Clock, Sparkles, Mail, Phone } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { images } from '../data/images';
 import Select from '../components/ui/Select';
 
@@ -29,6 +29,8 @@ export default function Contact() {
     subject: 'General Inquiry',
     message: '',
   });
+  // Honeypot — humans never see or fill this; bots do.
+  const [companyWebsite, setCompanyWebsite] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -47,12 +49,12 @@ export default function Contact() {
     setError('');
 
     try {
-      await emailjs.send(
-        import.meta.env.VITE_EMAIL_SERVICE_ID,
-        import.meta.env.VITE_EMAIL_TEMPLATE_ID,
-        formData,
-        import.meta.env.VITE_EMAIL_PUBLIC_KEY
+      const { data, error: invokeErr } = await supabase.functions.invoke(
+        'submit-contact-message',
+        { body: { ...formData, company_website: companyWebsite } }
       );
+      if (invokeErr) throw new Error('Something went wrong. Please try again or call us.');
+      if (data?.error) throw new Error(data.error);
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
@@ -144,6 +146,17 @@ export default function Contact() {
                 </h2>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Honeypot — hidden from humans, bots fill it and get dropped */}
+                  <input
+                    type="text"
+                    name="company_website"
+                    value={companyWebsite}
+                    onChange={(e) => setCompanyWebsite(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    className="absolute -left-[9999px] h-0 w-0 opacity-0"
+                  />
                   {/* Name + Email row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
