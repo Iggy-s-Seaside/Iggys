@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -20,6 +20,7 @@ const navItems = [
   { to: '/inventory', icon: Package, label: 'Inventory' },
   { to: '/packages', icon: Tags, label: 'Packages' },
   { to: '/media', icon: FolderOpen, label: 'Media' },
+  { to: '/team', icon: Users, label: 'Team' },
 ];
 
 export function Sidebar() {
