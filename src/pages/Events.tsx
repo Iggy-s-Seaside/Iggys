@@ -118,37 +118,48 @@ function SpecialCard({ special }: { special: Special }) {
     return (
         <div
             ref={ref}
-            className={`glass-card-hover p-6 ${
+            className={`glass-card-hover overflow-hidden ${
                 isVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-6'
             }`}
         >
-            <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                    <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center border ${colorClass}`}
-                    >
-                        <Icon className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h3 className="font-heading text-lg font-semibold text-white">
-                            {special.title}
-                        </h3>
-                        <span
-                            className={`text-xs font-semibold uppercase tracking-wider ${colorClass.split(' ')[1]}`}
+            {/* Designed graphic from the Specials maker, when present */}
+            {special.image_url && (
+                <img
+                    src={special.image_url}
+                    alt={special.title}
+                    className="w-full h-48 object-cover"
+                    loading="lazy"
+                />
+            )}
+            <div className="p-6">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                        <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center border ${colorClass}`}
                         >
-                            {special.type}
-                        </span>
+                            <Icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="font-heading text-lg font-semibold text-white">
+                                {special.title}
+                            </h3>
+                            <span
+                                className={`text-xs font-semibold uppercase tracking-wider ${colorClass.split(' ')[1]}`}
+                            >
+                                {special.type}
+                            </span>
+                        </div>
                     </div>
+                    {special.price && (
+                        <span className="text-primary font-bold text-lg shrink-0">
+                            {special.price}
+                        </span>
+                    )}
                 </div>
-                {special.price && (
-                    <span className="text-primary font-bold text-lg shrink-0">
-                        {special.price}
-                    </span>
-                )}
+                <p className="text-text-muted text-sm leading-relaxed">
+                    {special.description}
+                </p>
             </div>
-            <p className="text-text-muted text-sm leading-relaxed">
-                {special.description}
-            </p>
         </div>
     );
 }
