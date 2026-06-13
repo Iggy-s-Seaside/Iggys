@@ -578,6 +578,7 @@ export interface Party {
   drink_notes: string | null;
   special_requests: string | null;
   internal_notes: string | null;
+  run_of_show: { time: string; label: string }[] | null;
   follow_up_notes: string | null;
   last_contacted_at: string | null;
   follow_up_date: string | null;

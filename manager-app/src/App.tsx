@@ -15,6 +15,9 @@ import { Inventory } from './pages/Inventory';
 import { Messages } from './pages/Messages';
 import { Parties } from './pages/Parties';
 import { PartyProfile } from './pages/PartyProfile';
+import { PartyBEO } from './pages/PartyBEO';
+import { Pipeline } from './pages/Pipeline';
+import { SocialQueue } from './pages/SocialQueue';
 import { Calendar } from './pages/Calendar';
 import { Packages } from './pages/Packages';
 import { Todos } from './pages/Todos';
@@ -48,6 +51,9 @@ export default function App() {
         <Route path="/messages" element={<Messages />} />
         <Route path="/parties" element={<Parties />} />
         <Route path="/parties/:id" element={<PartyProfile />} />
+        <Route path="/parties/:id/beo" element={<PartyBEO />} />
+        <Route path="/pipeline" element={<Pipeline />} />
+        <Route path="/social" element={<SocialQueue />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/todos" element={<Todos />} />
         <Route path="/invoices" element={<Invoices />} />

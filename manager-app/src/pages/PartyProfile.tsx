@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, CheckCircle2, XCircle, RotateCcw, Pencil, Send,
-  CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine,
+  CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine, FileText,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -11,6 +11,7 @@ import { usePartyPackages } from '../hooks/usePackages';
 import { PackagePicker } from '../components/packages/PackagePicker';
 import { InvoicePanel } from '../components/parties/InvoicePanel';
 import { DepositPanel } from '../components/parties/DepositPanel';
+import { ProposalPanel } from '../components/parties/ProposalPanel';
 import { ConfirmPartyModal } from '../components/parties/ConfirmPartyModal';
 import { PartyEmailModal } from '../components/parties/PartyEmailModal';
 import { PartyForm } from '../components/parties/PartyForm';
@@ -154,9 +155,14 @@ export function PartyProfile() {
             </p>
           )}
         </div>
-        <button onClick={() => setEditOpen(true)} className="btn-secondary text-sm shrink-0">
-          <Pencil size={15} /> Edit
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => navigate(`/parties/${party.id}/beo`)} className="btn-secondary text-sm">
+            <FileText size={15} /> View BEO
+          </button>
+          <button onClick={() => setEditOpen(true)} className="btn-secondary text-sm">
+            <Pencil size={15} /> Edit
+          </button>
+        </div>
       </div>
 
       {/* Status action bar */}
@@ -283,6 +289,9 @@ export function PartyProfile() {
 
         {/* Deposit & payment */}
         <DepositPanel party={party} lines={items} onSave={update} />
+
+        {/* Proposal */}
+        <ProposalPanel party={party} />
 
         {/* Internal notes */}
         <div className="card p-5">

@@ -11,6 +11,7 @@ import Events from './pages/Events';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import BookEvent from './pages/BookEvent';
+import ProposalView from './pages/ProposalView';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/book" element={<BookEvent />} />
+        <Route path="/p/:token" element={<ProposalView />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

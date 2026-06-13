@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit } from 'lucide-react';
+import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit, Share2 } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { CreateSocialPostModal } from '../components/social/CreateSocialPostModal';
 import { getAllDrafts, clearDraftByKey } from '../hooks/useDraftPersistence';
 import { getSpecialLifecycle, SPECIAL_LIFECYCLE_LABELS } from '../utils/specialsWindow';
 import type { Special, DraftState } from '../types';
@@ -10,6 +11,7 @@ import type { Special, DraftState } from '../types';
 export function Specials() {
   const { data: specials, loading, update, remove } = useSupabaseCRUD<Special>('specials');
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [socialFor, setSocialFor] = useState<number | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [drafts, setDrafts] = useState<DraftState[]>([]);
 
@@ -182,6 +184,9 @@ export function Specials() {
                     {special.active ? 'Active' : 'Inactive'}
                   </button>
                   <div className="flex gap-1">
+                    <button onClick={() => setSocialFor(special.id)} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                      <Share2 size={14} />
+                    </button>
                     <Link to={`/specials/editor/${special.id}`} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
                       <Edit2 size={14} />
                     </Link>
@@ -203,6 +208,12 @@ export function Specials() {
         title="Delete Special"
         message="Are you sure you want to delete this special?"
         confirmLabel="Delete"
+      />
+
+      <CreateSocialPostModal
+        open={socialFor !== null}
+        onClose={() => setSocialFor(null)}
+        preset={socialFor !== null ? { kind: 'special', id: socialFor } : null}
       />
     </div>
   );
