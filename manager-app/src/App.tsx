@@ -24,6 +24,10 @@ import { Todos } from './pages/Todos';
 import { Invoices } from './pages/Invoices';
 import { Luna } from './pages/Luna';
 import { Team } from './pages/Team';
+import { Shift } from './pages/Shift';
+import { Checks } from './pages/Checks';
+import { ShiftLog } from './pages/ShiftLog';
+import { CloseOut } from './pages/CloseOut';
 
 export default function App() {
   return (
@@ -37,6 +41,10 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/shift" element={<Shift />} />
+        <Route path="/shift/checks" element={<Checks />} />
+        <Route path="/shift/log" element={<ShiftLog />} />
+        <Route path="/shift/close" element={<CloseOut />} />
         <Route path="/run-sheet" element={<RunSheet />} />
         <Route path="/events" element={<Events />} />
         <Route path="/events/new" element={<EventForm />} />

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight } from 'lucide-react';
+import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight, ClipboardCheck } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useInventoryItems, getLowStockItems } from '../hooks/useInventory';
 import { useMessages } from '../hooks/useMessages';
 import { useTodos } from '../hooks/useTodos';
 import { useLunaInsights } from '../hooks/useLuna';
+import { useShift } from '../hooks/useShift';
 import { QuickPostModal } from '../components/editor/QuickPostModal';
 import { LowStockWidget } from '../components/inventory/LowStockWidget';
 import { MessageWidget } from '../components/messages/MessageWidget';
@@ -23,6 +24,7 @@ export function Dashboard() {
   const { messages, loading: messagesLoading } = useMessages();
   const { todos, loading: todosLoading, toggle: toggleTodo } = useTodos();
   const { insights } = useLunaInsights();
+  const { current: openShift } = useShift();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
   const newInsights = insights.filter((i) => i.status === 'new');
@@ -60,6 +62,30 @@ export function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Bar open/closed status — links to the Shift cockpit */}
+      <Link
+        to="/shift"
+        className="card-hover p-4 mb-6 flex items-center gap-3 group active:scale-[0.99] transition-transform"
+      >
+        <div className={`p-2.5 rounded-lg shrink-0 ${openShift ? 'bg-green-50 dark:bg-green-500/10' : 'bg-surface-hover'}`}>
+          <ClipboardCheck size={20} className={openShift ? 'text-green-600 dark:text-green-400' : 'text-text-muted'} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-text-primary">Shift</p>
+            <span className={openShift ? 'badge-success' : 'badge'}>
+              {openShift ? 'Bar is OPEN' : 'Bar is closed'}
+            </span>
+          </div>
+          <p className="text-xs text-text-muted mt-0.5">
+            {openShift
+              ? 'Run line checks, log the floor, close out the night.'
+              : 'Open the bar to start checks, the log, and close-out.'}
+          </p>
+        </div>
+        <ChevronRight size={18} className="text-text-muted shrink-0 group-hover:text-text-primary transition-colors" />
+      </Link>
 
       {/* Today's Pulse — the 5-second state of the bar + weather */}
       <TodaysPulse

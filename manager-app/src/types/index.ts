@@ -855,3 +855,147 @@ export interface GiftCardTransaction {
   note: string | null;
   performed_by: string | null;
 }
+
+// ── Shift Cockpit (Wave 3) ──
+// The shift spine: one shift_sessions row is one open->close bar shift. Every
+// other shift reading (checklists, line checks, the log, the cash close) carries
+// a nullable shift_id pointing back here. See scripts/add-shift-*.sql.
+
+export const SHIFT_STATUSES = ['open', 'closed'] as const;
+export type ShiftStatus = (typeof SHIFT_STATUSES)[number];
+
+/** One open->close bar shift. NOTE: opened_at is the clock — there is no created_at. */
+export interface ShiftSession {
+  id: number;
+  opened_at: string;
+  opened_by: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+  status: ShiftStatus;
+  notes: string | null;
+}
+
+// ── Checklists (opening / closing / safety, photo-proof items) ──
+
+export const CHECKLIST_KINDS = ['opening', 'closing', 'safety'] as const;
+export type ChecklistKind = (typeof CHECKLIST_KINDS)[number];
+
+export interface ChecklistTemplate {
+  id: number;
+  created_at: string;
+  name: string;
+  kind: ChecklistKind;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface ChecklistTemplateItem {
+  id: number;
+  created_at: string;
+  template_id: number;
+  label: string;
+  requires_photo: boolean;
+  sort_order: number;
+}
+
+/** One walk-through of a checklist template during a shift. */
+export interface ChecklistRun {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  template_id: number;
+  completed_by: string | null;
+  completed_at: string | null;
+}
+
+export interface ChecklistRunItem {
+  id: number;
+  created_at: string;
+  run_id: number;
+  item_id: number;
+  checked: boolean;
+  photo_url: string | null;
+  note: string | null;
+  checked_at: string | null;
+}
+
+// ── Line check (numeric readings against a safe range) ──
+
+export interface LineCheckTemplate {
+  id: number;
+  created_at: string;
+  name: string;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface LineCheckTemplateItem {
+  id: number;
+  created_at: string;
+  template_id: number;
+  label: string;
+  unit: string | null;
+  min_value: number | null;
+  max_value: number | null;
+  sort_order: number;
+}
+
+export interface LineCheckRun {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  completed_by: string | null;
+}
+
+export interface LineCheckReading {
+  id: number;
+  created_at: string;
+  run_id: number;
+  item_id: number;
+  value: number | null;
+  in_range: boolean | null;
+  note: string | null;
+}
+
+// ── Shift Log / mod journal (tagged, searchable floor record) ──
+
+export const SHIFT_LOG_TAGS = ['86', 'incident', 'vip', 'maintenance', 'note'] as const;
+export type ShiftLogTag = (typeof SHIFT_LOG_TAGS)[number];
+
+export interface ShiftLogEntry {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  author: string | null;
+  tag: ShiftLogTag;
+  body: string;
+  item_ref: string | null;
+  photo_url: string | null;
+  resolved: boolean;
+}
+
+// ── Close-out (cash reconciliation + End-of-Night report) ──
+
+/** One till count at close: counted - expected = over/short (all in cents). */
+export interface CashCount {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  counted_by: string | null;
+  expected_cents: number;
+  counted_cents: number;
+  over_short_cents: number;            // counted - expected: + = over, - = short
+  denominations: Record<string, number>; // { cents_denom: count }
+  note: string | null;
+}
+
+/** One composed End-of-Night report per close (server-composed, emailed). */
+export interface EonReport {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  generated_by: string | null;
+  summary: string;
+  metrics: Record<string, unknown>;
+  emailed_at: string | null;
+}
