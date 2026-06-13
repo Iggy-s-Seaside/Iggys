@@ -83,6 +83,8 @@ export interface Special {
   price: string | null;
   image_url: string | null;
   active: boolean;
+  starts_at: string | null;
+  expires_at: string | null;
 }
 
 // ── Canvas Editor types ──
@@ -211,6 +213,8 @@ export interface DraftState {
     description: string;
     type: 'drink' | 'food' | 'seasonal';
     price: string;
+    starts_at: string;
+    expires_at: string;
   };
   updatedAt: string;
   specialId?: number;
@@ -543,6 +547,10 @@ export interface Contact {
   last_event_date: string | null;
 }
 
+export const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = { unpaid: 'Owed', partial: 'Partial', paid: 'Paid' };
+
 export interface Party {
   id: number;
   created_at: string;
@@ -578,6 +586,13 @@ export interface Party {
   food_total: number | null;
   drink_total: number | null;
   gratuity_rate: number | null;
+  deposit_amount: number | null;
+  amount_paid: number | null;
+  balance_due: number | null;
+  payment_status: PaymentStatus | null;
+  paid_at: string | null;
+  deposit_due_date: string | null;
+  payment_intent_id: string | null;
   google_calendar_event_id: string | null;
   confirmation_sent_at: string | null;
   cancelled_at: string | null;
@@ -697,4 +712,145 @@ export interface LunaInsight {
   body: string;
   status: 'new' | 'seen' | 'dismissed';
   data: Record<string, unknown> | null;
+}
+
+// ── Luna insight actions (the `data` JSONB contract) ──
+// Luna writes a finished draft + a one-tap action into luna_insights.data; the
+// app renders a deep-link + Approve button and the human always triggers the act.
+// Luna's own write surface stays least-privilege (she only touches the two Luna
+// tables) — the app performs the real action under the manager's session.
+
+export type InsightActionType =
+  | 'navigate'      // just route to the relevant record
+  | 'party_email'   // drafted follow-up/confirmation → PartyProfile
+  | 'draft_special' // drafted special copy/layers → SpecialEditor
+  | 'draft_po'      // drafted reorder → Inventory
+  | 'draft_reply'   // drafted inbox reply → Messages
+  | 'review_reply'  // drafted review reply → Reputation (future)
+  | 'add_todo';     // suggested task → Todos
+
+export interface InsightAction {
+  type: InsightActionType;
+  label?: string;                    // button label override
+  deep_link?: string;                // route to open, e.g. "/parties/12"
+  draft?: string;                    // ready-to-use text (email body, caption, PO, reply)
+  payload?: Record<string, unknown>; // structured fields to pre-fill the target flow
+}
+
+export interface InsightData {
+  deep_link?: string;
+  sources?: string[];                // ["parties#12", "Tito's (inventory)"]
+  action?: InsightAction;
+  [key: string]: unknown;
+}
+
+export const INSIGHT_ACTION_DEFAULT_LABELS: Record<InsightActionType, string> = {
+  navigate: 'Open',
+  party_email: 'Review & send',
+  draft_special: 'Open in Specials',
+  draft_po: 'Review reorder',
+  draft_reply: 'Review reply',
+  review_reply: 'Review reply',
+  add_todo: 'Add to-do',
+};
+
+/** Safely read the typed action/sources off an insight's free-form `data` JSONB. */
+export function parseInsightData(data: Record<string, unknown> | null | undefined): InsightData {
+  return (data && typeof data === 'object' ? data : {}) as InsightData;
+}
+
+/** Router-state shape a target page can read to pre-fill a Luna-drafted action. */
+export interface LunaActionState {
+  lunaDraft?: string;
+  lunaPayload?: Record<string, unknown>;
+  fromInsight?: number;
+}
+
+// ── Commerce / Stripe checkout rail ──
+// Backs the merch storefront, private-party deposits, and gift cards through one
+// Stripe Checkout rail. See scripts/add-commerce-tables.sql for the source schema.
+
+/** Catalog row the website storefront sells. Price is the trusted server-side source. */
+export interface MerchProductRow {
+  id: string;                  // stable slug ("iggys-tee")
+  created_at: string;
+  name: string;
+  description: string | null;
+  price: number;               // USD; ×100 for Stripe unit_amount
+  image: string | null;
+  sizes: string[];
+  sku: string | null;
+  inventory: number | null;    // null = unlimited / not tracked
+  active: boolean;
+  sort_order: number;
+}
+
+export const ORDER_STATUSES = ['paid', 'refunded', 'partially_refunded'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/** One completed Stripe Checkout for merch. Written by the stripe-webhook function. */
+export interface CustomerOrder {
+  id: number;
+  created_at: string;
+  stripe_session_id: string | null;
+  stripe_event_id: string | null;
+  payment_intent_id: string | null;
+  customer_email: string | null;
+  customer_name: string | null;
+  amount_total: number;
+  currency: string;
+  status: OrderStatus;
+  amount_refunded: number;
+  shipping: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  // joined when loaded with line items
+  order_items?: OrderItem[];
+}
+
+/** Line item for a customer_order (price snapshot at purchase). */
+export interface OrderItem {
+  id: number;
+  created_at: string;
+  order_id: number;
+  product_id: string | null;
+  name: string;
+  size: string | null;
+  quantity: number;
+  unit_price: number;
+}
+
+export const GIFT_CARD_STATUSES = ['pending', 'active', 'redeemed', 'void'] as const;
+export type GiftCardStatus = (typeof GIFT_CARD_STATUSES)[number];
+
+/** A sold gift card, activated on payment. Balance decremented via transactions. */
+export interface GiftCard {
+  id: number;
+  created_at: string;
+  code: string;
+  initial_amount: number;
+  balance: number;
+  currency: string;
+  status: GiftCardStatus;
+  purchaser_email: string | null;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  message: string | null;
+  stripe_session_id: string | null;
+  payment_intent_id: string | null;
+  activated_at: string | null;
+}
+
+export const GIFT_CARD_TX_TYPES = ['activate', 'redeem', 'adjust', 'refund'] as const;
+export type GiftCardTransactionType = (typeof GIFT_CARD_TX_TYPES)[number];
+
+/** Ledger of gift-card activations/redemptions/adjustments. */
+export interface GiftCardTransaction {
+  id: number;
+  created_at: string;
+  gift_card_id: number;
+  type: GiftCardTransactionType;
+  amount: number;          // positive adds, negative spends
+  balance_after: number;
+  note: string | null;
+  performed_by: string | null;
 }

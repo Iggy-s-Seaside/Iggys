@@ -3,6 +3,8 @@ import { DashboardLayout } from './components/layout/DashboardLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { RunSheet } from './pages/RunSheet';
+import { Reports } from './pages/Reports';
 import { Events } from './pages/Events';
 import { EventForm } from './pages/EventForm';
 import { Specials } from './pages/Specials';
@@ -32,6 +34,7 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/run-sheet" element={<RunSheet />} />
         <Route path="/events" element={<Events />} />
         <Route path="/events/new" element={<EventForm />} />
         <Route path="/events/:id/edit" element={<EventForm />} />
@@ -48,6 +51,7 @@ export default function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/todos" element={<Todos />} />
         <Route path="/invoices" element={<Invoices />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/luna" element={<Luna />} />
         <Route path="/team" element={<Team />} />

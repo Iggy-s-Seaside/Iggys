@@ -78,6 +78,8 @@ export interface Special {
   price: string | null;
   image_url: string | null;
   active: boolean;
+  starts_at: string | null;
+  expires_at: string | null;
 }
 
 export interface FoodCategory {

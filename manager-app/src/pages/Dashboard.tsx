@@ -11,6 +11,7 @@ import { LowStockWidget } from '../components/inventory/LowStockWidget';
 import { MessageWidget } from '../components/messages/MessageWidget';
 import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
+import { TodaysPulse } from '../components/dashboard/TodaysPulse';
 import type { IggyEvent, Special } from '../types';
 import { format, parseISO, isFuture } from 'date-fns';
 
@@ -59,6 +60,14 @@ export function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Today's Pulse — the 5-second state of the bar + weather */}
+      <TodaysPulse
+        events={events}
+        activeSpecials={activeSpecials}
+        lowStockCount={lowStockItems.length}
+        unreadCount={unreadMessages.length}
+      />
 
       {/* Needs your attention — parties surfaced first */}
       <PartiesTodayWidget />

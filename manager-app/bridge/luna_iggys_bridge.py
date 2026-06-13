@@ -79,6 +79,33 @@ def plainify(text: str) -> str:
     return _MD_HEADER.sub("", _MD_BOLD.sub(r"\1", text))
 
 
+# Optional trailing "ACTION: {json}" line Luna may emit on a proactive insight
+# so the dashboard can render a one-tap approve-card (luna_insights.data JSONB).
+_ACTION_RE = re.compile(r"(?im)^[ \t]*ACTION:[ \t]*(\{.*\})[ \t]*$")
+
+
+def extract_action(text: str):
+    """Pull an optional trailing 'ACTION: {json}' line off a Luna insight.
+    Returns (clean_body, data_dict_or_None). The ACTION line is ALWAYS stripped
+    from the body; data is set only when the JSON parses to a non-empty dict, so
+    a malformed action never reaches the dashboard (the card just won't render)."""
+    if not text:
+        return text, None
+    last = None
+    for last in _ACTION_RE.finditer(text):
+        pass  # keep only the final match
+    if not last:
+        return text, None
+    body = (text[: last.start()] + text[last.end():]).strip()
+    try:
+        obj = json.loads(last.group(1))
+        if isinstance(obj, dict) and obj:
+            return body, obj
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return body, None
+
+
 # --------------------------------------------------------------------------
 # Postgres
 # --------------------------------------------------------------------------
@@ -144,7 +171,8 @@ def gather_context(conn) -> dict:
     today = date.today()
     horizon = today + timedelta(days=CONTEXT_DAYS)
     ctx = {"today": today, "events": [], "recurring": [], "parties": [],
-           "new_messages": None}
+           "new_messages": None, "low_stock": [], "specials": [],
+           "happy_hour": [], "todos": [], "followups": []}
 
     rows = _query(
         conn,
@@ -223,6 +251,94 @@ def gather_context(conn) -> dict:
     if rows:
         ctx["new_messages"] = rows[0][0]
 
+    # Low / at-par inventory — the biggest gap (worst first), with supplier.
+    rows = _query(
+        conn,
+        """
+        SELECT name, current_quantity, par_level, unit, supplier
+        FROM inventory_items
+        WHERE active = true AND current_quantity <= par_level
+        ORDER BY (par_level - current_quantity) DESC
+        LIMIT 15
+        """,
+    )
+    for r in rows or []:
+        name, qty, par, unit, supplier = r
+        line = f"{name}: {qty}/{par} {unit or ''}".rstrip()
+        if supplier:
+            line += f" (supplier: {supplier})"
+        ctx["low_stock"].append(trunc(line, MAX_LINE_CHARS))
+
+    # Active specials running now (so she can push them / write captions).
+    rows = _query(
+        conn,
+        """
+        SELECT title, type, price FROM specials
+        WHERE active = true
+        ORDER BY created_at DESC
+        LIMIT 12
+        """,
+    )
+    for r in rows or []:
+        title, stype, price = r
+        line = title + (f" [{stype}]" if stype else "") + (f" - {price}" if price else "")
+        ctx["specials"].append(trunc(line, MAX_LINE_CHARS))
+
+    # Happy-hour menu (DB-driven — she must never invent a price).
+    rows = _query(
+        conn,
+        """
+        SELECT name, price, type FROM happy_hour
+        ORDER BY type, name
+        LIMIT 20
+        """,
+    )
+    for r in rows or []:
+        name, price, htype = r
+        ctx["happy_hour"].append(
+            trunc(name + (f" - {price}" if price else "") + (f" ({htype})" if htype else ""),
+                  MAX_LINE_CHARS))
+
+    # Open owner<->manager to-dos (high priority first).
+    rows = _query(
+        conn,
+        """
+        SELECT title, priority, due_date FROM todos
+        WHERE done = false
+        ORDER BY (priority = 'high') DESC, due_date NULLS LAST
+        LIMIT 12
+        """,
+    )
+    for r in rows or []:
+        title, priority, due = r
+        ctx["todos"].append(
+            trunc(title + (f" [{priority}]" if priority else "") + (f" due {due}" if due else ""),
+                  MAX_LINE_CHARS))
+
+    # Party leads whose follow-up is due — the revenue she should chase.
+    rows = _query(
+        conn,
+        """
+        SELECT event_date, follow_up_date, contact_name, title, guest_count, space
+        FROM parties
+        WHERE lower(coalesce(status, '')) = 'inquiry'
+          AND follow_up_date IS NOT NULL AND follow_up_date <= %s
+        ORDER BY follow_up_date
+        LIMIT 10
+        """,
+        (today,),
+    )
+    for r in rows or []:
+        ed, fd, contact, title, guests, space = r
+        bits = [f"follow-up due {fd}", title or contact or "(lead)"]
+        if ed:
+            bits.append(f"event {ed}")
+        if guests is not None:
+            bits.append(f"{guests} guests")
+        if space:
+            bits.append(str(space))
+        ctx["followups"].append(trunc(" | ".join(bits), MAX_LINE_CHARS))
+
     # End the read snapshot cleanly (important behind a session pooler).
     try:
         conn.rollback()
@@ -253,6 +369,26 @@ def context_block(ctx: dict) -> str:
     if ctx["new_messages"] is not None:
         lines.append(f"\nUnread contact-form messages: {ctx['new_messages']}")
 
+    if ctx["followups"]:
+        lines.append("\nParty leads with a follow-up due (chase these):")
+        lines += [f"- {p}" for p in ctx["followups"]]
+
+    if ctx["low_stock"]:
+        lines.append("\nInventory at or below par (worst gap first):")
+        lines += [f"- {i}" for i in ctx["low_stock"]]
+
+    if ctx["specials"]:
+        lines.append("\nActive specials running now:")
+        lines += [f"- {s}" for s in ctx["specials"]]
+
+    if ctx["happy_hour"]:
+        lines.append("\nHappy-hour menu (live prices — never invent one):")
+        lines += [f"- {h}" for h in ctx["happy_hour"]]
+
+    if ctx["todos"]:
+        lines.append("\nOpen to-dos:")
+        lines += [f"- {t}" for t in ctx["todos"]]
+
     return "\n".join(lines)
 
 
@@ -260,16 +396,88 @@ def context_block(ctx: dict) -> str:
 # Prompts
 # --------------------------------------------------------------------------
 
+# Durable Iggy's expertise — prepended to EVERY prompt. The bridge uses a fresh
+# Luna session per question (her rolling-session compaction garbles multi-turn),
+# so durable knowledge must live HERE, not in chat history. Keep in sync with
+# docs/LUNA-KNOWLEDGE-PACK.md and docs/LUNA-SYSTEM-PROMPT.md.
+KNOWLEDGE_PACK = (
+    "IGGY'S KNOWLEDGE PACK v1 (durable - treat as ground truth, never contradict):\n"
+    "VENUE: Iggy's Bar, 200 S Franklin St, Seaside, Oregon 97138, (503) 738-0672. "
+    "Sending identity iggysbarevents@gmail.com. A seaside coast bar/restaurant with "
+    "stacked private-event spaces: an UPSTAIRS satellite bar, a DOWNSTAIRS room, or the "
+    "WHOLE space. Bradley is the manager; he reports to the OWNER.\n"
+    "WEATHER FIRST (the biggest demand driver on the coast): sunny weekends run hot; cold, "
+    "rain, and wind run quiet. A slow night that lines up with bad weather is WEATHER, not a "
+    "problem - don't alarm. A slow or open night with GOOD weather and no event is a real, "
+    "fillable opportunity - surface it. Always attribute; never just report a number.\n"
+    "SEASON: summer Fri/Sat, holiday weekends, and any night with an event or a large "
+    "upstairs/downstairs party run hot; deep-winter weekdays run quiet. Flex pars and "
+    "staffing expectations accordingly.\n"
+    "MONEY (use this math exactly, never approximate): grand total = room_rate*room_hours + "
+    "food_total + drink_total + gratuity + add-ons. Gratuity = gratuity_rate*(food_total + "
+    "drink_total) ONLY - never on room or add-ons. House defaults: room_rate $200, room_hours "
+    "2-3, gratuity_rate 0.18. Package lines price as flat, per_person (* guest_count), or "
+    "per_hour (* room_hours).\n"
+    "EVENTS: categories DJ Night, Live Music, Karaoke, Trivia Night, Themed Night, Private "
+    "Party, Holiday Party; one-off or recurring weekly.\n"
+    "PARTIES lifecycle: inquiry -> confirmed -> cancelled. Watch event_date, follow_up_date, "
+    "last_contacted_at, confirmation_sent_at. A confirmed party approaching with no "
+    "confirmation sent or no deposit tracked is a risk worth flagging.\n"
+    "INVENTORY: low = active AND current_quantity <= par_level. Cross-check for a recent order "
+    "before alarming. Usage well above an item's own trailing rate is an over-pour/spill/theft "
+    "signal worth an eyes-on - a possibility, not an accusation. 2026 target bands: pour cost "
+    "18-24%, COGS 28-32%, prime 55-65%, labor under 30%.\n"
+    "MENU & HAPPY HOUR are DB-driven - use live rows, never invent a price or a drink.\n"
+    "TWO VOICES: to BRADLEY (chat, alerts) be terse and operational - the answer, the source, "
+    "the one next step. To the OWNER (briefings, recaps) be clean, confident, numbers-first, "
+    "built to present upward - no jargon, no hedging, no apology. For guest-facing drafts use "
+    "Bradley's voice: warm, coastal-casual, first-name, specific to the event, one clear ask, "
+    "never salesy, never promising a comp he didn't authorize.\n"
+    "GUARDRAILS: plain text only. Never invent facts/prices/comps. Honor marketing_opt_in "
+    "before outreach. Escalate legal/health/dram-shop to human-only. Never gate reviews by "
+    "sentiment. End a data-grounded answer with a short 'Sources:' line naming the rows used.\n"
+    "GLOSSARY: 'the back room'/'upstairs' -> space='upstairs'; 'the DJ night' -> "
+    "events.category='DJ Night'; 'the 40-top' -> a party with guest_count about 40."
+)
+
+QUESTION_PREAMBLE = (
+    "You are Luna, the AI operations expert embedded in the Iggy's Seaside bar manager "
+    "dashboard (Seaside, Oregon). You run on Bradley's home-lab and reach the dashboard "
+    "through a bridge. You are NOT a generic chatbot - you are a calibrated expert on THIS "
+    "bar whose job is to make the manager feel like he never has to remember, hunt, or open "
+    "six screens. He often runs Iggy's from his phone behind the bar. Answer the question "
+    "directly: concise, concrete, grounded in the KNOWLEDGE PACK and CONTEXT below. Reply "
+    "with the answer itself only - no acknowledgment of these instructions, plain text, no "
+    "markdown (no ** or # markers; simple dashes for lists). When your answer rests on data, "
+    "end with a short 'Sources:' line naming the rows (a party, an item, a count)."
+)
+
+BRIEFING_PREAMBLE = (
+    "You are Luna, the AI operations expert for Iggy's Seaside bar (Seaside, Oregon), writing "
+    "a proactive briefing the manager and owner read on their phone. Be the expert who tells "
+    "them what they have not noticed yet. Cover, tightly: what is coming up that matters, what "
+    "genuinely needs attention (a cold high-value lead, low stock with no order, a confirmed "
+    "party with no confirmation sent), and end with exactly ONE concrete 'needs your call "
+    "today' - the single highest-leverage move, not a list. WEATHER-attribute any quiet read. "
+    "Silence is a feature: only raise what is actually off. Plain text, no markdown, no "
+    "preamble, no sign-off.\n"
+    "If - and only if - one specific action would clearly help, you MAY end your message with "
+    "a final separate line starting with 'ACTION:' then a compact one-line JSON object with "
+    "optional keys: deep_link (a dashboard route such as /parties/12, /inventory, /messages, "
+    "/specials) and action {type, label, draft} where type is one of party_email, draft_po, "
+    "draft_reply, draft_special, add_todo and draft is the ready-to-use text. Omit the ACTION "
+    "line entirely when nothing crisp applies; never put JSON anywhere but that final line."
+)
+
+
 def build_question_prompt(ctx: dict, author_email, content: str,
                           history=None) -> str:
     parts = [
-        "You are Luna answering inside the Iggy's Seaside bar manager "
-        "dashboard (Seaside, Oregon). A manager asked the question below. "
-        "Be concise, concrete, and helpful. Reply with the answer itself "
-        "only - no acknowledgment of these instructions, and no markdown "
-        "syntax (no ** or # markers; plain text and simple dashes only).",
+        QUESTION_PREAMBLE,
         "",
-        "CONTEXT:",
+        KNOWLEDGE_PACK,
+        "",
+        "CURRENT CONTEXT (live from the dashboard database):",
         context_block(ctx),
     ]
     if history:
@@ -286,17 +494,14 @@ def build_question_prompt(ctx: dict, author_email, content: str,
 
 
 def build_briefing_prompt(ctx: dict) -> str:
-    return (
-        "You are Luna, the AI assistant for Iggy's Seaside bar (Seaside, "
-        "Oregon). Write a crisp morning briefing for the bar owner. Cover: "
-        "1) what's coming up (events and parties worth knowing about), "
-        "2) what needs attention (unread messages, gaps, anything odd), "
-        "3) exactly one concrete suggestion for today. Short and scannable; "
-        "no preamble, no sign-off, and no markdown syntax (no ** or # "
-        "markers; plain text and simple dashes only).\n\n"
-        "CONTEXT:\n"
-        f"{context_block(ctx)}"
-    )
+    return "\n".join([
+        BRIEFING_PREAMBLE,
+        "",
+        KNOWLEDGE_PACK,
+        "",
+        "CURRENT CONTEXT (live from the dashboard database):",
+        context_block(ctx),
+    ])
 
 
 # --------------------------------------------------------------------------
@@ -645,17 +850,19 @@ def run_briefing() -> int:
         log(f"briefing: asking Luna ({len(prompt)} chars)")
         reply = plainify(
             ask_luna(prompt, session_tag=f"briefing-{date.today().isoformat()}"))
+        body, data = extract_action(reply)
         title = f"Morning briefing - {date.today().strftime('%b %d')}"
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO luna_insights (kind, title, body, status)
-                VALUES ('briefing', %s, %s, 'new')
+                INSERT INTO luna_insights (kind, title, body, status, data)
+                VALUES ('briefing', %s, %s, 'new', %s::jsonb)
                 """,
-                (title, reply),
+                (title, body, json.dumps(data) if data else None),
             )
         conn.commit()
-        log(f"briefing: inserted '{title}' ({len(reply)} chars)")
+        log(f"briefing: inserted '{title}' ({len(body)} chars"
+            + (", +action card" if data else "") + ")")
         return 0
     except Exception as e:
         log(f"briefing FAILED: {e}")

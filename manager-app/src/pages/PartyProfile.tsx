@@ -10,6 +10,7 @@ import { useParty } from '../hooks/useParties';
 import { usePartyPackages } from '../hooks/usePackages';
 import { PackagePicker } from '../components/packages/PackagePicker';
 import { InvoicePanel } from '../components/parties/InvoicePanel';
+import { DepositPanel } from '../components/parties/DepositPanel';
 import { ConfirmPartyModal } from '../components/parties/ConfirmPartyModal';
 import { PartyEmailModal } from '../components/parties/PartyEmailModal';
 import { PartyForm } from '../components/parties/PartyForm';
@@ -279,6 +280,9 @@ export function PartyProfile() {
 
         {/* Invoice */}
         <InvoicePanel party={party} lines={items} onSave={update} />
+
+        {/* Deposit & payment */}
+        <DepositPanel party={party} lines={items} onSave={update} />
 
         {/* Internal notes */}
         <div className="card p-5">

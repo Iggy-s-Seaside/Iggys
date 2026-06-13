@@ -83,7 +83,7 @@ async function resolveStateMediaRefs(state: EditorState): Promise<EditorState> {
 export function useDraftPersistence(
   specialId: string | undefined,
   state: EditorState,
-  saveForm: { title: string; description: string; type: 'drink' | 'food' | 'seasonal'; price: string }
+  saveForm: DraftState['saveForm']
 ) {
   const draftKey = `${DRAFT_PREFIX}${specialId || 'new'}`;
   const lastSavedRef = useRef<string>('');

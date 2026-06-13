@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   Moon, Send, RefreshCw, Eye, X, Loader2, MessageCircle, Lightbulb, WifiOff,
+  ArrowRight, Copy, FileText,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLunaMessages, useLunaInsights } from '../hooks/useLuna';
 import { useCoarsePointer } from '../hooks/useCoarsePointer';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import type { LunaInsight, LunaInsightKind, LunaMessage } from '../types';
-import { LUNA_INSIGHT_KIND_LABELS } from '../types';
+import type { LunaInsight, LunaInsightKind, LunaMessage, LunaActionState } from '../types';
+import { LUNA_INSIGHT_KIND_LABELS, INSIGHT_ACTION_DEFAULT_LABELS, parseInsightData } from '../types';
 
 type LunaTab = 'chat' | 'insights';
 
@@ -127,8 +130,44 @@ function InsightCard({
   onSeen: (id: number) => void;
   onDismiss: (id: number) => void;
 }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
+  const [showDraft, setShowDraft] = useState(false);
   const isLong = insight.body.length > 160 || insight.body.split('\n').length > 3;
+
+  // Luna writes an optional one-tap action + drafted text + sources into `data`.
+  const d = parseInsightData(insight.data);
+  const action = d.action;
+  const deepLink = action?.deep_link ?? d.deep_link;
+  const draft = action?.draft;
+  const sources = Array.isArray(d.sources)
+    ? d.sources.filter((s): s is string => typeof s === 'string')
+    : [];
+  const actionLabel = action ? action.label || INSIGHT_ACTION_DEFAULT_LABELS[action.type] : null;
+
+  // The human always triggers. Tapping marks the insight seen and routes to the
+  // relevant record, carrying Luna's draft so the target page can pre-fill it.
+  const runAction = () => {
+    onSeen(insight.id);
+    if (deepLink) {
+      const state: LunaActionState = {
+        lunaDraft: draft,
+        lunaPayload: action?.payload,
+        fromInsight: insight.id,
+      };
+      navigate(deepLink, { state });
+    }
+  };
+
+  const copyDraft = async () => {
+    if (!draft) return;
+    try {
+      await navigator.clipboard.writeText(draft);
+      toast.success('Draft copied');
+    } catch {
+      toast.error('Could not copy');
+    }
+  };
 
   return (
     <div className={`card p-4 ${insight.status === 'new' ? 'border-primary/40' : ''}`}>
@@ -176,6 +215,54 @@ function InsightCard({
         >
           {expanded ? 'Show less' : 'Show more'}
         </button>
+      )}
+
+      {/* Luna's drafted text — ready to use, never auto-sent */}
+      {draft && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowDraft((s) => !s)}
+            className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <FileText size={13} /> {showDraft ? "Hide Luna's draft" : "View Luna's draft"}
+          </button>
+          {showDraft && (
+            <div className="mt-2 rounded-lg border border-border bg-surface-hover/60 p-3">
+              <p className="text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">{draft}</p>
+              <button
+                onClick={copyDraft}
+                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
+              >
+                <Copy size={12} /> Copy
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sources — Luna grounds every data answer in real rows */}
+      {sources.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-medium text-text-muted">Sources:</span>
+          {sources.map((s, i) => (
+            <span key={i} className="text-[11px] text-text-muted bg-surface-hover rounded px-1.5 py-0.5">{s}</span>
+          ))}
+        </div>
+      )}
+
+      {/* One-tap action — the human always triggers; Luna only drafts */}
+      {(action || deepLink) && (
+        <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 flex-wrap">
+          <button
+            onClick={runAction}
+            className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5"
+          >
+            {actionLabel || 'Open'} <ArrowRight size={13} />
+          </button>
+          {action && action.type !== 'navigate' && (
+            <span className="text-[11px] text-text-muted">You review before it sends</span>
+          )}
+        </div>
       )}
     </div>
   );

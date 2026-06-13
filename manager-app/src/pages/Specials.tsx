@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit } from 'lucide-
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ConfirmDialog } from '../components/ui/Modal';
 import { getAllDrafts, clearDraftByKey } from '../hooks/useDraftPersistence';
+import { getSpecialLifecycle, SPECIAL_LIFECYCLE_LABELS } from '../utils/specialsWindow';
 import type { Special, DraftState } from '../types';
 
 export function Specials() {
@@ -22,6 +23,15 @@ export function Specials() {
       case 'food': return 'badge-accent';
       case 'seasonal': return 'badge-success';
       default: return 'badge-primary';
+    }
+  };
+
+  const lifecycleBadge = (special: Special) => {
+    switch (getSpecialLifecycle(special)) {
+      case 'live': return 'badge-success';
+      case 'scheduled': return 'badge-accent';
+      case 'expired': return 'badge-danger';
+      default: return 'badge bg-surface-hover text-text-muted';
     }
   };
 
@@ -154,7 +164,12 @@ export function Specials() {
                     <h3 className="font-semibold text-text-primary truncate">{special.title}</h3>
                     <p className="text-sm text-text-muted line-clamp-2 mt-1">{special.description}</p>
                   </div>
-                  <span className={typeBadge(special.type)}>{special.type}</span>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span className={typeBadge(special.type)}>{special.type}</span>
+                    <span className={lifecycleBadge(special)}>
+                      {SPECIAL_LIFECYCLE_LABELS[getSpecialLifecycle(special)]}
+                    </span>
+                  </div>
                 </div>
                 {special.price && <p className="text-primary font-semibold mt-2">{special.price}</p>}
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">

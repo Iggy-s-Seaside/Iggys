@@ -133,6 +133,8 @@ export function SpecialEditor() {
     description: '',
     type: 'drink' as 'drink' | 'food' | 'seasonal',
     price: '',
+    starts_at: '',
+    expires_at: '',
   });
   const [publishOptions, setPublishOptions] = useState({
     postToWebsite: true,
@@ -244,6 +246,9 @@ export function SpecialEditor() {
           description: special.description,
           type: special.type,
           price: special.price ?? '',
+          // timestamptz ISO → datetime-local value (YYYY-MM-DDTHH:mm)
+          starts_at: special.starts_at ? special.starts_at.slice(0, 16) : '',
+          expires_at: special.expires_at ? special.expires_at.slice(0, 16) : '',
         });
         if (special.image_url) {
           dispatch({ type: 'SET_BACKGROUND', url: special.image_url });
@@ -522,6 +527,8 @@ export function SpecialEditor() {
         price: saveForm.price || null,
         image_url: imageUrl,
         active: publishOptions.postToWebsite,
+        starts_at: saveForm.starts_at ? new Date(saveForm.starts_at).toISOString() : null,
+        expires_at: saveForm.expires_at ? new Date(saveForm.expires_at).toISOString() : null,
       };
 
       const ok = isEdit
@@ -1694,6 +1701,28 @@ export function SpecialEditor() {
               />
             </div>
           </div>
+          {/* Visibility window */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Starts</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={saveForm.starts_at}
+                onChange={(e) => setSaveForm((f) => ({ ...f, starts_at: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">Expires</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={saveForm.expires_at}
+                onChange={(e) => setSaveForm((f) => ({ ...f, expires_at: e.target.value }))}
+              />
+            </div>
+          </div>
+          <p className="text-[13px] text-text-muted -mt-1">Leave blank for no time limit.</p>
           {/* Publish Options */}
           <div className="border-t border-border pt-4 mt-1 space-y-3">
             <p className="text-xs font-medium text-text-muted uppercase tracking-wide">Publish To</p>

@@ -5,6 +5,7 @@ import AvailabilityCalendar from '../components/booking/AvailabilityCalendar';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
 import { formatRange, minToLabel, windowsOverlap, spaceLabel, spacesConflict, SPACES, type Space } from '../lib/calendarDates';
 import TimeSelect from '../components/ui/TimeSelect';
+import PackageEstimator from '../components/booking/PackageEstimator';
 
 interface PackageRow {
   id: number;
@@ -180,6 +181,12 @@ export default function BookEvent() {
           <p className="text-text-muted text-lg max-w-2xl mx-auto mt-4">
             Tell us a little about your event — just your name, a date, and how to reach you to start. We'll handle the rest.
           </p>
+        </div>
+      </section>
+
+      <section className="section-padding">
+        <div className="section-container max-w-3xl mx-auto">
+          <PackageEstimator />
         </div>
       </section>
 

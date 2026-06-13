@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -8,12 +8,14 @@ import { useNewInsightCount } from '../../hooks/useLuna';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/run-sheet', icon: ClipboardList, label: 'Run Sheet' },
   { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna' },
   { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages' },
   { to: '/parties', icon: PartyPopper, label: 'Parties' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/todos', icon: ListChecks, label: 'To-Do' },
   { to: '/invoices', icon: Receipt, label: 'Invoices' },
+  { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/events', icon: Calendar, label: 'Events' },
   { to: '/specials', icon: Sparkles, label: 'Specials' },
   { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
