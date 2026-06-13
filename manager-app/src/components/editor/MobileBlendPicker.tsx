@@ -37,13 +37,13 @@ export const MobileBlendPicker = memo(function MobileBlendPicker({
           <span className="text-xs font-semibold text-text-muted uppercase tracking-wider flex-1">Blend & Adjust</span>
           <button
             onClick={() => onUpdate({ blendMode: 'normal', imageFilters: { ...DEFAULT_IMAGE_FILTERS } })}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-text-muted hover:text-primary active:scale-95 transition-all"
+            className="flex items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-lg text-[10px] text-text-muted hover:text-primary active:scale-95 transition-all"
           >
             <RotateCcw size={10} /> Reset
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-surface-hover active:scale-90 transition-all"
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl hover:bg-surface-hover active:scale-90 transition-all"
           >
             <X size={16} className="text-text-muted" />
           </button>
@@ -58,7 +58,7 @@ export const MobileBlendPicker = memo(function MobileBlendPicker({
             <button
               key={mode.value}
               onClick={() => onUpdate({ blendMode: mode.value })}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 ${
+              className={`shrink-0 px-3.5 py-2.5 rounded-full text-xs font-medium transition-all active:scale-95 ${
                 currentBlend === mode.value
                   ? 'bg-primary text-white shadow-sm'
                   : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
@@ -93,7 +93,7 @@ export const MobileBlendPicker = memo(function MobileBlendPicker({
             <button
               key={id}
               onClick={() => setActiveSlider(activeSlider === id ? null : id)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all active:scale-95 ${
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-full text-[11px] font-medium transition-all active:scale-95 ${
                 activeSlider === id
                   ? 'bg-primary/15 text-primary border border-primary/30'
                   : 'bg-surface-hover/60 text-text-muted border border-transparent'
@@ -104,7 +104,7 @@ export const MobileBlendPicker = memo(function MobileBlendPicker({
           ))}
           <button
             onClick={() => setActiveSlider(activeSlider === 'overlay' ? null : 'overlay')}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all active:scale-95 ${
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-full text-[11px] font-medium transition-all active:scale-95 ${
               activeSlider === 'overlay'
                 ? 'bg-primary/15 text-primary border border-primary/30'
                 : 'bg-surface-hover/60 text-text-muted border border-transparent'
@@ -153,7 +153,7 @@ export const MobileBlendPicker = memo(function MobileBlendPicker({
                 type="color"
                 value={filters.overlayColor}
                 onChange={(e) => onUpdate({ imageFilters: { ...filters, overlayColor: e.target.value } })}
-                className="w-7 h-7 rounded-lg cursor-pointer border border-border shrink-0"
+                className="w-11 h-11 rounded-lg cursor-pointer border border-border shrink-0"
               />
               <input
                 type="range"
@@ -172,7 +172,7 @@ export const MobileBlendPicker = memo(function MobileBlendPicker({
                 <button
                   key={c}
                   onClick={() => onUpdate({ imageFilters: { ...filters, overlayColor: c, overlayOpacity: Math.max(filters.overlayOpacity, 0.2) } })}
-                  className={`w-7 h-7 rounded-full border-2 transition-all active:scale-90 ${
+                  className={`w-11 h-11 rounded-full border-2 transition-all active:scale-90 ${
                     filters.overlayColor === c ? 'border-primary scale-110' : 'border-border/50'
                   }`}
                   style={{ backgroundColor: c }}

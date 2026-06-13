@@ -15,6 +15,9 @@ interface HistoryState {
   past: EditorState[];
   present: EditorState;
   future: EditorState[];
+  /** Snapshot captured at the start of a transient drag (slider/color) — pushed to `past`
+   *  once on COMMIT_HISTORY so a whole 0→1 drag becomes a single undo step. */
+  pendingPast: EditorState | null;
 }
 
 type EditorAction =
@@ -24,7 +27,8 @@ type EditorAction =
   | { type: 'SET_IMAGE_FILTERS'; filters: Partial<ImageFilters> }
   | { type: 'RESET_IMAGE_FILTERS' }
   | { type: 'ADD_LAYER'; layer: TextLayer }
-  | { type: 'UPDATE_LAYER'; id: string; changes: Partial<TextLayer> }
+  | { type: 'UPDATE_LAYER'; id: string; changes: Partial<TextLayer>; transient?: boolean }
+  | { type: 'COMMIT_HISTORY' }
   | { type: 'REMOVE_LAYER'; id: string }
   | { type: 'SELECT_LAYER'; id: string | null }
   | { type: 'TOGGLE_LAYER_VISIBILITY'; id: string }
@@ -59,6 +63,7 @@ function editorReducer(state: HistoryState, action: EditorAction): HistoryState 
       past: state.past.slice(0, -1),
       present: previous,
       future: [state.present, ...state.future],
+      pendingPast: null,
     };
   }
 
@@ -69,6 +74,7 @@ function editorReducer(state: HistoryState, action: EditorAction): HistoryState 
       past: [...state.past, state.present],
       present: next,
       future: state.future.slice(1),
+      pendingPast: null,
     };
   }
 
@@ -80,12 +86,38 @@ function editorReducer(state: HistoryState, action: EditorAction): HistoryState 
     };
   }
 
-  // All other actions push to history
+  // Transient UPDATE_LAYER (slider/color drag): mutate `present` WITHOUT pushing `past`.
+  // Capture the pre-drag state once so COMMIT_HISTORY can fold the whole drag into a
+  // single undo step.
+  if (action.type === 'UPDATE_LAYER' && action.transient) {
+    return {
+      ...state,
+      present: applyAction(state.present, action),
+      pendingPast: state.pendingPast ?? state.present,
+      future: [],
+    };
+  }
+
+  // COMMIT_HISTORY: flush the pending drag snapshot to `past` as one entry.
+  if (action.type === 'COMMIT_HISTORY') {
+    if (!state.pendingPast) return state;
+    return {
+      ...state,
+      past: [...state.past.slice(-MAX_HISTORY), state.pendingPast],
+      pendingPast: null,
+      future: [],
+    };
+  }
+
+  // All other actions push to history. If a transient drag was in flight, its snapshot
+  // is the correct history baseline; otherwise snapshot the current present.
+  const baseline = state.pendingPast ?? state.present;
   const newPresent = applyAction(state.present, action);
   return {
-    past: [...state.past.slice(-MAX_HISTORY), state.present],
+    past: [...state.past.slice(-MAX_HISTORY), baseline],
     present: newPresent,
     future: [],
+    pendingPast: null,
   };
 }
 
@@ -163,6 +195,7 @@ export function useEditorState() {
     past: [],
     present: createInitialState(),
     future: [],
+    pendingPast: null,
   });
 
   const state = history.present;

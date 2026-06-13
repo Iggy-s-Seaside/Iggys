@@ -9,7 +9,7 @@ interface ExportProgressModalProps {
   /** The exported blob (available when done) */
   blob: Blob | null;
   /** File extension for download */
-  format: 'gif' | 'webm';
+  format: 'gif';
   /** Cancel callback */
   onCancel: () => void;
   /** Close callback (after done) */
@@ -38,7 +38,7 @@ export const ExportProgressModal = memo<ExportProgressModalProps>(({
 
   const handleSave = async () => {
     if (!blob) return;
-    const mimeType = format === 'gif' ? 'image/gif' : 'video/webm';
+    const mimeType = 'image/gif';
     const file = new File([blob], `iggy-special-${Date.now()}.${format}`, { type: mimeType });
 
     // Use Web Share API on mobile (iOS Safari ignores <a download>)

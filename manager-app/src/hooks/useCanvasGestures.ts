@@ -105,6 +105,126 @@ export function useCanvasGestures({
   const isPanningRef = useRef(false);
   const lastPanPointRef = useRef({ x: 0, y: 0 });
 
+  // ══════════════════════════════════════════════════════════════════
+  // Mobile two-finger pinch/pan refs (always declared — Rules of Hooks)
+  // ══════════════════════════════════════════════════════════════════
+  // Tracks the active touch pointers by id so we can detect a 2-finger gesture.
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  // Snapshot taken when the 2nd finger lands — the reference frame for the gesture.
+  // anchorX/anchorY are the canvas-local point under the initial pinch midpoint; keeping
+  // it under the moving midpoint is what makes the zoom feel anchored to the fingers.
+  const pinchStartRef = useRef<{
+    dist: number;
+    contentLeft: number;
+    contentTop: number;
+    anchorX: number;
+    anchorY: number;
+    zoom: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
+
+  // Mobile pinch/pan via CAPTURE-phase native listeners on the viewport.
+  // Capture phase is essential: layer elements call e.stopPropagation() on pointerdown
+  // to claim a single-finger drag, which would otherwise hide the touch from a
+  // bubble-phase handler. Capturing means we always see every touch pointer, so a
+  // second finger reliably promotes the interaction to a two-finger pinch/pan.
+  // Single-finger touches are never swallowed — we only act once two pointers are down.
+  useEffect(() => {
+    if (!isMobile) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return; // touch-only path
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // Begin pinch when exactly two fingers are down.
+      if (activePointersRef.current.size === 2) {
+        const pts = Array.from(activePointersRef.current.values());
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        // Content rect already folds in CSS left/top + current pan + scale, so the
+        // canvas-local anchor is exact without needing those values separately.
+        const rect = contentRef.current?.getBoundingClientRect();
+        const startZoom = zoomRef.current;
+        const contentLeft = rect ? rect.left : 0;
+        const contentTop = rect ? rect.top : 0;
+        pinchStartRef.current = {
+          dist: Math.hypot(dx, dy) || 1,
+          contentLeft,
+          contentTop,
+          anchorX: (midX - contentLeft) / startZoom,
+          anchorY: (midY - contentTop) / startZoom,
+          zoom: startZoom,
+          panX: panXRef.current,
+          panY: panYRef.current,
+        };
+        setIsGesturing(true);
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!activePointersRef.current.has(e.pointerId)) return;
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // Only act on a true two-finger gesture — single touches fall through to layer drag.
+      if (activePointersRef.current.size !== 2 || !pinchStartRef.current) return;
+
+      // Prevent the browser's native page zoom/scroll while we drive the canvas.
+      e.preventDefault();
+
+      const pts = Array.from(activePointersRef.current.values());
+      const dx = pts[1].x - pts[0].x;
+      const dy = pts[1].y - pts[0].y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+
+      const start = pinchStartRef.current;
+      const newZoom = clampZoom(start.zoom * (dist / start.dist));
+
+      // Solve pan so the start anchor (canvas-local) sits exactly under the CURRENT
+      // midpoint at the new zoom. content-origin-screen = contentLeft - startPan + newPan,
+      // and we want: midpoint = contentOriginScreen + newZoom * anchor.
+      // This yields both the zoom-anchor AND the two-finger pan in one step.
+      panXRef.current = start.panX + (midX - start.contentLeft) - newZoom * start.anchorX;
+      panYRef.current = start.panY + (midY - start.contentTop) - newZoom * start.anchorY;
+      zoomRef.current = newZoom;
+      applyTransform();
+    };
+
+    const onPointerEnd = (e: PointerEvent) => {
+      if (!activePointersRef.current.has(e.pointerId)) return;
+      activePointersRef.current.delete(e.pointerId);
+
+      // Once we drop below two fingers, the pinch is over — commit and reset.
+      if (activePointersRef.current.size < 2 && pinchStartRef.current) {
+        pinchStartRef.current = null;
+        setIsGesturing(false);
+        commitToState();
+      }
+    };
+
+    // Capture phase (true) + non-passive move so preventDefault works.
+    viewport.addEventListener('pointerdown', onPointerDown, { capture: true });
+    viewport.addEventListener('pointermove', onPointerMove, { capture: true, passive: false });
+    viewport.addEventListener('pointerup', onPointerEnd, { capture: true });
+    viewport.addEventListener('pointercancel', onPointerEnd, { capture: true });
+    return () => {
+      viewport.removeEventListener('pointerdown', onPointerDown, { capture: true } as EventListenerOptions);
+      viewport.removeEventListener('pointermove', onPointerMove, { capture: true } as EventListenerOptions);
+      viewport.removeEventListener('pointerup', onPointerEnd, { capture: true } as EventListenerOptions);
+      viewport.removeEventListener('pointercancel', onPointerEnd, { capture: true } as EventListenerOptions);
+      activePointersRef.current.clear();
+      pinchStartRef.current = null;
+    };
+  }, [isMobile, viewportRef, contentRef, applyTransform, commitToState]);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (isMobile) return;
     if (isEditing) return;
@@ -183,18 +303,22 @@ export function useCanvasGestures({
     return () => viewport.removeEventListener('wheel', handleWheel);
   }, [isMobile, viewportRef, applyTransform, commitToState]);
 
-  // On mobile, return empty handlers (no pan/zoom possible)
+  // On mobile, pinch/pan is driven by capture-phase native listeners (see effect above),
+  // so no React viewport handlers are needed. Single-finger touches pass straight through
+  // to layer drag.
   if (isMobile) {
     return {
+      isMobile: true,
       currentZoom,
       currentPanX,
       currentPanY,
-      isGesturing: false,
+      isGesturing,
       viewportHandlers: {},
     };
   }
 
   return {
+    isMobile: false,
     currentZoom,
     currentPanX,
     currentPanY,

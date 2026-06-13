@@ -16,7 +16,7 @@ import { VideoElement } from './VideoElement';
 import { useVideoRefs } from '../../context/VideoRefContext';
 import { SelectionOverlay } from './SelectionOverlay';
 import { ZoomIndicator } from './ZoomIndicator';
-import { exportToCanvas } from './exportToCanvas';
+import { exportToCanvas, exportToCanvasAsync } from './exportToCanvas';
 import { useCanvasGestures } from '../../hooks/useCanvasGestures';
 import { useElementInteraction } from '../../hooks/useElementInteraction';
 
@@ -33,6 +33,8 @@ interface DomCanvasProps {
 
 export interface DomCanvasHandle {
   exportImage: (format?: string, quality?: number) => string | null;
+  /** Async export — preloads ALL layer/background images so nothing renders from an uncached <img>. */
+  exportImageAsync: (format?: string, quality?: number) => Promise<string | null>;
   getVideoRefs: () => { getAll: () => Map<string, HTMLVideoElement>; seekAll: (time: number) => Promise<void>; hasVideos: () => boolean };
   getScale: () => number;
 }
@@ -53,6 +55,20 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const videoRefs = useVideoRefs();
 
+  // Read env(safe-area-inset-bottom) in pixels — JS can't read the env() var directly,
+  // so probe it via a throwaway element. Notched iPhones report ~34px here; everything else 0.
+  const safeAreaBottom = useRef<number | null>(null);
+  const getSafeAreaBottom = useCallback(() => {
+    if (safeAreaBottom.current !== null) return safeAreaBottom.current;
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;bottom:0;left:0;height:0;width:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none;';
+    document.body.appendChild(probe);
+    const val = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+    document.body.removeChild(probe);
+    safeAreaBottom.current = val;
+    return val;
+  }, []);
+
   // Calculate fit scale on mount and resize
   const lastViewportDims = useRef({ w: 0, h: 0 });
   useEffect(() => {
@@ -68,10 +84,11 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
       ) return;
       lastViewportDims.current = { w: vw, h: vh };
       const isMobile = vw < 768;
-      // On mobile: minimal padding, account for toolbar overlay (60px)
+      // On mobile: minimal padding, account for toolbar overlay (60px) + the home-bar
+      // safe-area inset (~34px on notched iPhones) so the canvas bottom isn't hidden.
       // On desktop: standard padding, fit both dimensions
       const padding = isMobile ? 8 : 16;
-      const toolbarH = isMobile ? 60 : 0;
+      const toolbarH = isMobile ? 60 + getSafeAreaBottom() : 0;
       const scaleX = (vw - padding) / state.canvasWidth;
       const scaleY = (vh - padding - toolbarH) / state.canvasHeight;
       // Fit canvas fully in the visible area (above toolbar on mobile)
@@ -83,7 +100,7 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
     const observer = new ResizeObserver(calculate);
     if (viewportRef.current) observer.observe(viewportRef.current);
     return () => observer.disconnect();
-  }, [state.canvasWidth, state.canvasHeight]);
+  }, [state.canvasWidth, state.canvasHeight, getSafeAreaBottom]);
 
   // The effective base scale (fit or manual override)
   const baseScale = zoomOverride ?? fitScale;
@@ -128,6 +145,15 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
     exportImage: (format?: string, quality?: number) => {
       try {
         const canvas = exportToCanvas(state, videoRefs.getAll());
+        const mimeType = format || 'image/png';
+        return canvas.toDataURL(mimeType, quality ?? 0.92);
+      } catch {
+        return null;
+      }
+    },
+    exportImageAsync: async (format?: string, quality?: number) => {
+      try {
+        const canvas = await exportToCanvasAsync(state, videoRefs.getAll());
         const mimeType = format || 'image/png';
         return canvas.toDataURL(mimeType, quality ?? 0.92);
       } catch {
@@ -179,16 +205,19 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
 
   // On mobile, compute centered position via CSS left/top instead of transform translate.
   // This makes it physically impossible for the canvas to fly off-screen.
-  const isMobileView = gestures.viewportHandlers.onPointerDown === undefined; // mobile returns empty handlers
+  const isMobileView = gestures.isMobile;
 
-  // Mobile: calculate centered position using viewport dimensions
+  // Mobile: calculate centered position using viewport dimensions.
+  // Center using the STABLE baseScale (fit/override) — NOT the live pinch zoom — so the
+  // CSS base position doesn't shift when the user pinches. Pinch zoom + pan live entirely
+  // in the transform (translate(panX,panY) scale(zoom)), avoiding a jump on gesture commit.
   const getMobilePosition = () => {
     if (!isMobileView || !viewportRef.current) return { left: 0, top: 4 };
     const vw = viewportRef.current.clientWidth;
     const vh = viewportRef.current.clientHeight;
-    const scaledW = state.canvasWidth * zoom;
-    const scaledH = state.canvasHeight * zoom;
-    const toolbarH = 60;
+    const scaledW = state.canvasWidth * baseScale;
+    const scaledH = state.canvasHeight * baseScale;
+    const toolbarH = 60 + getSafeAreaBottom();
     const visibleH = vh - toolbarH;
     return {
       left: Math.max(0, (vw - scaledW) / 2),
@@ -216,7 +245,8 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
                 height: state.canvasHeight,
                 left: mobilePos!.left,
                 top: mobilePos!.top,
-                transform: `scale(${zoom})`,
+                // panX/panY are a pinch-pan delta layered on top of the CSS-centered base.
+                transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
                 transformOrigin: '0 0',
               }
             : {

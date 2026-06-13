@@ -7,7 +7,10 @@ import { FontPicker } from './FontPicker';
 
 interface PropertyPanelProps {
   layer: TextLayer;
-  onUpdate: (changes: Partial<TextLayer>) => void;
+  /** `transient` updates the layer without pushing an undo step (used during slider/color drags). */
+  onUpdate: (changes: Partial<TextLayer>, transient?: boolean) => void;
+  /** Commit the in-flight transient drag as a single undo step (call on slider/color release). */
+  onCommit?: () => void;
   onDelete: () => void;
   canvasWidth?: number;
   canvasHeight?: number;
@@ -28,8 +31,10 @@ function toHex(color: string): string {
 
 import { BLEND_MODES } from './editorConstants';
 
-// Reusable slider row with label and live value
-function SliderRow({ label, value, min, max, step = 1, unit = '', onChange }: {
+// Reusable slider row with label and live value.
+// onChange fires continuously during drag (transient — no undo spam); onCommit fires
+// once on release to fold the whole drag into a single undo step.
+function SliderRow({ label, value, min, max, step = 1, unit = '', onChange, onCommit }: {
   label: string;
   value: number;
   min: number;
@@ -37,6 +42,7 @@ function SliderRow({ label, value, min, max, step = 1, unit = '', onChange }: {
   step?: number;
   unit?: string;
   onChange: (v: number) => void;
+  onCommit?: () => void;
 }) {
   const display = step < 1 ? value.toFixed(step < 0.1 ? 2 : 1) : String(Math.round(value));
   return (
@@ -52,15 +58,22 @@ function SliderRow({ label, value, min, max, step = 1, unit = '', onChange }: {
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
+        onBlur={onCommit}
         className="w-full accent-primary h-2 rounded-full"
       />
     </div>
   );
 }
 
-export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDelete, canvasWidth = 1080, canvasHeight = 1920 }: PropertyPanelProps) {
+export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onCommit, onDelete, canvasWidth = 1080, canvasHeight = 1920 }: PropertyPanelProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Transient update — mutates the layer live without pushing an undo step.
+  // Every SliderRow / color input gets `onCommit` so the whole drag becomes one undo step.
+  const onUpdateT = (changes: Partial<TextLayer>) => onUpdate(changes, true);
 
   const isImage = layer.elementType === 'image' || layer.elementType === 'video';
   const isDivider = layer.elementType === 'divider';
@@ -105,14 +118,15 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
             <input
               type="color"
               value={layer.dividerLineColor || layer.fill}
-              onChange={(e) => onUpdate({ dividerLineColor: e.target.value })}
+              onChange={(e) => onUpdateT({ dividerLineColor: e.target.value })}
+              onBlur={onCommit}
               className="w-10 h-10 rounded-lg cursor-pointer border border-border ml-auto"
             />
           </div>
-          <SliderRow label="Thickness" value={layer.dividerLineThickness ?? 1} min={1} max={10} onChange={(v) => onUpdate({ dividerLineThickness: v })} />
-          <SliderRow label="Opacity" value={layer.dividerLineOpacity ?? 0.4} min={0} max={1} step={0.05} onChange={(v) => onUpdate({ dividerLineOpacity: v })} />
-          <SliderRow label="Gap" value={layer.dividerGap ?? 16} min={0} max={60} onChange={(v) => onUpdate({ dividerGap: v })} />
-          <SliderRow label="Side Padding" value={layer.dividerPadding ?? 40} min={0} max={200} onChange={(v) => onUpdate({ dividerPadding: v })} />
+          <SliderRow onCommit={onCommit} label="Thickness" value={layer.dividerLineThickness ?? 1} min={1} max={10} onChange={(v) => onUpdateT({ dividerLineThickness: v })} />
+          <SliderRow onCommit={onCommit} label="Opacity" value={layer.dividerLineOpacity ?? 0.4} min={0} max={1} step={0.05} onChange={(v) => onUpdateT({ dividerLineOpacity: v })} />
+          <SliderRow onCommit={onCommit} label="Gap" value={layer.dividerGap ?? 16} min={0} max={60} onChange={(v) => onUpdateT({ dividerGap: v })} />
+          <SliderRow onCommit={onCommit} label="Side Padding" value={layer.dividerPadding ?? 40} min={0} max={200} onChange={(v) => onUpdateT({ dividerPadding: v })} />
         </Section>
       )}
 
@@ -126,7 +140,7 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
             />
           </div>
 
-          <SliderRow label="Size" value={layer.fontSize} min={8} max={200} unit="px" onChange={(v) => onUpdate({ fontSize: v })} />
+          <SliderRow onCommit={onCommit} label="Size" value={layer.fontSize} min={8} max={200} unit="px" onChange={(v) => onUpdateT({ fontSize: v })} />
 
           {/* Style buttons */}
           <div className="flex gap-1.5 mb-3">
@@ -139,8 +153,8 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
             <StyleButton active={layer.align === 'right'} onClick={() => onUpdate({ align: 'right' })} label="Right"><AlignRight size={14} /></StyleButton>
           </div>
 
-          <SliderRow label="Letter Spacing" value={layer.letterSpacing} min={-5} max={30} step={0.5} onChange={(v) => onUpdate({ letterSpacing: v })} />
-          <SliderRow label="Line Height" value={layer.lineHeight || 1.3} min={0.8} max={3} step={0.1} unit="x" onChange={(v) => onUpdate({ lineHeight: v })} />
+          <SliderRow onCommit={onCommit} label="Letter Spacing" value={layer.letterSpacing} min={-5} max={30} step={0.5} onChange={(v) => onUpdateT({ letterSpacing: v })} />
+          <SliderRow onCommit={onCommit} label="Line Height" value={layer.lineHeight || 1.3} min={0.8} max={3} step={0.1} unit="x" onChange={(v) => onUpdateT({ lineHeight: v })} />
         </Section>
       )}
 
@@ -153,7 +167,8 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
               <input
                 type="color"
                 value={layer.fill}
-                onChange={(e) => onUpdate({ fill: e.target.value })}
+                onChange={(e) => onUpdateT({ fill: e.target.value })}
+                onBlur={onCommit}
                 className="w-10 h-10 rounded-lg cursor-pointer border border-border"
               />
               <div className="flex gap-1.5 flex-wrap">
@@ -174,12 +189,13 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
             <input
               type="color"
               value={layer.stroke || '#000000'}
-              onChange={(e) => onUpdate({ stroke: e.target.value })}
+              onChange={(e) => onUpdateT({ stroke: e.target.value })}
+              onBlur={onCommit}
               className="w-10 h-10 rounded-lg cursor-pointer border border-border"
             />
           </div>
-          <SliderRow label="Stroke Width" value={layer.strokeWidth} min={0} max={10} step={0.5} unit="px" onChange={(v) => onUpdate({ strokeWidth: v })} />
-          <SliderRow label="Opacity" value={layer.opacity} min={0} max={1} step={0.05} onChange={(v) => onUpdate({ opacity: v })} />
+          <SliderRow onCommit={onCommit} label="Stroke Width" value={layer.strokeWidth} min={0} max={10} step={0.5} unit="px" onChange={(v) => onUpdateT({ strokeWidth: v })} />
+          <SliderRow onCommit={onCommit} label="Opacity" value={layer.opacity} min={0} max={1} step={0.05} onChange={(v) => onUpdateT({ opacity: v })} />
         </Section>
       )}
 
@@ -191,13 +207,14 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
             <input
               type="color"
               value={toHex(layer.shadowColor)}
-              onChange={(e) => onUpdate({ shadowColor: e.target.value })}
+              onChange={(e) => onUpdateT({ shadowColor: e.target.value })}
+              onBlur={onCommit}
               className="w-10 h-10 rounded-lg cursor-pointer border border-border"
             />
           </div>
-          <SliderRow label="Blur" value={layer.shadowBlur} min={0} max={30} onChange={(v) => onUpdate({ shadowBlur: v })} />
-          <SliderRow label="Offset X" value={layer.shadowOffsetX} min={-30} max={30} onChange={(v) => onUpdate({ shadowOffsetX: v })} />
-          <SliderRow label="Offset Y" value={layer.shadowOffsetY} min={-30} max={30} onChange={(v) => onUpdate({ shadowOffsetY: v })} />
+          <SliderRow onCommit={onCommit} label="Blur" value={layer.shadowBlur} min={0} max={30} onChange={(v) => onUpdateT({ shadowBlur: v })} />
+          <SliderRow onCommit={onCommit} label="Offset X" value={layer.shadowOffsetX} min={-30} max={30} onChange={(v) => onUpdateT({ shadowOffsetX: v })} />
+          <SliderRow onCommit={onCommit} label="Offset Y" value={layer.shadowOffsetY} min={-30} max={30} onChange={(v) => onUpdateT({ shadowOffsetY: v })} />
         </Section>
       )}
 
@@ -220,27 +237,28 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
               </button>
             ))}
           </div>
-          <SliderRow label="Opacity" value={layer.opacity} min={0} max={1} step={0.05} onChange={(v) => onUpdate({ opacity: v })} />
+          <SliderRow onCommit={onCommit} label="Opacity" value={layer.opacity} min={0} max={1} step={0.05} onChange={(v) => onUpdateT({ opacity: v })} />
         </Section>
       )}
 
       {/* ─── Image Layer: Filters ─── */}
       {isImage && (
         <Section title="Image Filters">
-          <SliderRow label="Brightness" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).brightness} min={0} max={200} unit="%" onChange={(v) => onUpdate({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), brightness: v } })} />
-          <SliderRow label="Contrast" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).contrast} min={0} max={200} unit="%" onChange={(v) => onUpdate({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), contrast: v } })} />
-          <SliderRow label="Saturation" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).saturation} min={0} max={200} unit="%" onChange={(v) => onUpdate({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), saturation: v } })} />
-          <SliderRow label="Blur" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).blur} min={0} max={20} step={0.5} unit="px" onChange={(v) => onUpdate({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), blur: v } })} />
+          <SliderRow onCommit={onCommit} label="Brightness" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).brightness} min={0} max={200} unit="%" onChange={(v) => onUpdateT({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), brightness: v } })} />
+          <SliderRow onCommit={onCommit} label="Contrast" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).contrast} min={0} max={200} unit="%" onChange={(v) => onUpdateT({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), contrast: v } })} />
+          <SliderRow onCommit={onCommit} label="Saturation" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).saturation} min={0} max={200} unit="%" onChange={(v) => onUpdateT({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), saturation: v } })} />
+          <SliderRow onCommit={onCommit} label="Blur" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).blur} min={0} max={20} step={0.5} unit="px" onChange={(v) => onUpdateT({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), blur: v } })} />
           <div className="flex items-center gap-2 mb-3">
             <label className="text-xs text-text-muted">Overlay</label>
             <input
               type="color"
               value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).overlayColor}
-              onChange={(e) => onUpdate({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), overlayColor: e.target.value } })}
+              onChange={(e) => onUpdateT({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), overlayColor: e.target.value } })}
+              onBlur={onCommit}
               className="w-10 h-10 rounded-lg cursor-pointer border border-border ml-auto"
             />
           </div>
-          <SliderRow label="Overlay Opacity" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).overlayOpacity} min={0} max={1} step={0.05} onChange={(v) => onUpdate({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), overlayOpacity: v } })} />
+          <SliderRow onCommit={onCommit} label="Overlay Opacity" value={(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS).overlayOpacity} min={0} max={1} step={0.05} onChange={(v) => onUpdateT({ imageFilters: { ...(layer.imageFilters ?? DEFAULT_IMAGE_FILTERS), overlayOpacity: v } })} />
           <div className="flex items-center gap-2 mb-3">
             <label className="text-xs text-text-muted">Fit</label>
             <div className="flex gap-1 ml-auto">
@@ -271,10 +289,10 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
       {/* ─── Image Layer: Crop ─── */}
       {isImage && (
         <Section title="Crop" defaultOpen={false}>
-          <SliderRow label="Top" value={layer.imageCrop?.top ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdate({ imageCrop: { top: v, right: layer.imageCrop?.right ?? 0, bottom: layer.imageCrop?.bottom ?? 0, left: layer.imageCrop?.left ?? 0 } })} />
-          <SliderRow label="Bottom" value={layer.imageCrop?.bottom ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdate({ imageCrop: { top: layer.imageCrop?.top ?? 0, right: layer.imageCrop?.right ?? 0, bottom: v, left: layer.imageCrop?.left ?? 0 } })} />
-          <SliderRow label="Left" value={layer.imageCrop?.left ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdate({ imageCrop: { top: layer.imageCrop?.top ?? 0, right: layer.imageCrop?.right ?? 0, bottom: layer.imageCrop?.bottom ?? 0, left: v } })} />
-          <SliderRow label="Right" value={layer.imageCrop?.right ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdate({ imageCrop: { top: layer.imageCrop?.top ?? 0, right: v, bottom: layer.imageCrop?.bottom ?? 0, left: layer.imageCrop?.left ?? 0 } })} />
+          <SliderRow onCommit={onCommit} label="Top" value={layer.imageCrop?.top ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdateT({ imageCrop: { top: v, right: layer.imageCrop?.right ?? 0, bottom: layer.imageCrop?.bottom ?? 0, left: layer.imageCrop?.left ?? 0 } })} />
+          <SliderRow onCommit={onCommit} label="Bottom" value={layer.imageCrop?.bottom ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdateT({ imageCrop: { top: layer.imageCrop?.top ?? 0, right: layer.imageCrop?.right ?? 0, bottom: v, left: layer.imageCrop?.left ?? 0 } })} />
+          <SliderRow onCommit={onCommit} label="Left" value={layer.imageCrop?.left ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdateT({ imageCrop: { top: layer.imageCrop?.top ?? 0, right: layer.imageCrop?.right ?? 0, bottom: layer.imageCrop?.bottom ?? 0, left: v } })} />
+          <SliderRow onCommit={onCommit} label="Right" value={layer.imageCrop?.right ?? 0} min={0} max={50} unit="%" onChange={(v) => onUpdateT({ imageCrop: { top: layer.imageCrop?.top ?? 0, right: v, bottom: layer.imageCrop?.bottom ?? 0, left: layer.imageCrop?.left ?? 0 } })} />
           {layer.imageCrop && (layer.imageCrop.top > 0 || layer.imageCrop.right > 0 || layer.imageCrop.bottom > 0 || layer.imageCrop.left > 0) && (
             <button
               onClick={() => onUpdate({ imageCrop: undefined })}
@@ -288,13 +306,13 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
 
       {/* ─── Position ─── */}
       <Section title="Position" defaultOpen={false}>
-        <SliderRow label="X" value={Math.round(layer.x)} min={0} max={canvasWidth} onChange={(v) => onUpdate({ x: v })} />
-        <SliderRow label="Y" value={Math.round(layer.y)} min={0} max={canvasHeight} onChange={(v) => onUpdate({ y: v })} />
-        <SliderRow label="Width" value={Math.round(layer.width)} min={50} max={canvasWidth} onChange={(v) => onUpdate({ width: v })} />
+        <SliderRow onCommit={onCommit} label="X" value={Math.round(layer.x)} min={0} max={canvasWidth} onChange={(v) => onUpdateT({ x: v })} />
+        <SliderRow onCommit={onCommit} label="Y" value={Math.round(layer.y)} min={0} max={canvasHeight} onChange={(v) => onUpdateT({ y: v })} />
+        <SliderRow onCommit={onCommit} label="Width" value={Math.round(layer.width)} min={50} max={canvasWidth} onChange={(v) => onUpdateT({ width: v })} />
         {isImage && (
-          <SliderRow label="Height" value={Math.round(layer.imageHeight || layer.width)} min={30} max={canvasHeight} onChange={(v) => onUpdate({ imageHeight: v })} />
+          <SliderRow onCommit={onCommit} label="Height" value={Math.round(layer.imageHeight || layer.width)} min={30} max={canvasHeight} onChange={(v) => onUpdateT({ imageHeight: v })} />
         )}
-        <SliderRow label="Rotation" value={Math.round(layer.rotation)} min={0} max={360} unit="deg" onChange={(v) => onUpdate({ rotation: v })} />
+        <SliderRow onCommit={onCommit} label="Rotation" value={Math.round(layer.rotation)} min={0} max={360} unit="deg" onChange={(v) => onUpdateT({ rotation: v })} />
       </Section>
 
       {/* ─── Advanced toggle (text & divider only) ─── */}
@@ -318,7 +336,7 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
                     variant="manager"
                     className="text-[13px] rounded-lg"
                     value={layer.fontWeight || 400}
-                    onChange={(v) => onUpdate({ fontWeight: v })}
+                    onChange={(v) => onUpdateT({ fontWeight: v })}
                     options={[
                       { value: 300, label: 'Light (300)' },
                       { value: 400, label: 'Regular (400)' },
@@ -334,7 +352,7 @@ export const PropertyPanel = memo(function PropertyPanel({ layer, onUpdate, onDe
                     variant="manager"
                     className="text-[13px] rounded-lg"
                     value={layer.textTransform || 'none'}
-                    onChange={(v) => onUpdate({ textTransform: v })}
+                    onChange={(v) => onUpdateT({ textTransform: v })}
                     options={[
                       { value: 'none', label: 'None' },
                       { value: 'uppercase', label: 'UPPERCASE' },

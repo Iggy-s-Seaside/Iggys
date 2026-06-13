@@ -70,6 +70,8 @@ export function SpecialEditor() {
   const [exportFormat, setExportFormat] = useState<'png' | 'jpeg'>('png');
   const [exportQuality, setExportQuality] = useState(92);
   const [currentScale, setCurrentScale] = useState(1);
+  // Static image (PNG/JPEG) export state — separate from GIF export below
+  const [isExportingImage, setIsExportingImage] = useState(false);
   // GIF export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -79,6 +81,21 @@ export function SpecialEditor() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileFontPickerOpen, setMobileFontPickerOpen] = useState(false);
   const [mobileBlendPickerOpen, setMobileBlendPickerOpen] = useState(false);
+
+  // Pristine = nothing has been placed/changed yet. Drives the empty-canvas onboarding.
+  // One-way latch: starts true, flips false on the first layer add / background change /
+  // template-or-draft load, and never returns to true this session. This is a real flag
+  // rather than sniffing for the default bg color literal (which a user could re-pick).
+  const [isPristine, setIsPristine] = useState(true);
+  useEffect(() => {
+    if (!isPristine) return;
+    const touched =
+      state.layers.length > 0 ||
+      !!state.backgroundImage ||
+      !!state.backgroundGradient ||
+      state.backgroundColor !== '#1a1a2e';
+    if (touched) setIsPristine(false);
+  }, [isPristine, state.layers.length, state.backgroundImage, state.backgroundGradient, state.backgroundColor]);
 
   // Close all floating overlays and bottom sheets — ensures only one is open at a time
   const closeAllOverlays = useCallback(() => {
@@ -397,38 +414,57 @@ export function SpecialEditor() {
   }, [state.layers, state.canvasWidth, state.canvasHeight, dispatch]);
 
   const handleExport = useCallback(async (format: 'png' | 'jpeg' = 'png', quality = 92) => {
-    dispatch({ type: 'SELECT_LAYER', id: null });
+    setIsExportingImage(true);
+    const loadingToast = toast.loading('Preparing export…');
+    try {
+      dispatch({ type: 'SELECT_LAYER', id: null });
 
-    // Wait for deselection render
-    await new Promise((r) => setTimeout(r, 100));
+      // Wait for deselection render
+      await new Promise((r) => setTimeout(r, 100));
 
-    const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-    const ext = format === 'jpeg' ? 'jpg' : 'png';
-    const dataUrl = canvasRef.current?.exportImage(mimeType, quality / 100);
-    if (!dataUrl) return;
-
-    // Convert data URL to blob
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    const file = new File([blob], `iggy-special-${Date.now()}.${ext}`, { type: mimeType });
-
-    // Use Web Share API on mobile (iOS Safari ignores <a download>)
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file] });
-        toast.success(`Image ready to save!`);
-      } catch {
-        // User cancelled share sheet — not an error
+      const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const ext = format === 'jpeg' ? 'jpg' : 'png';
+      // Async export preloads every layer/background image so nothing is dropped from an uncached <img>.
+      const dataUrl = await canvasRef.current?.exportImageAsync(mimeType, quality / 100);
+      if (!dataUrl) {
+        toast.dismiss(loadingToast);
+        toast.error('Export failed — please try again');
+        return;
       }
-      return;
-    }
 
-    // Desktop fallback: <a download> works on Chrome/Firefox/Edge
-    const link = document.createElement('a');
-    link.download = file.name;
-    link.href = dataUrl;
-    link.click();
-    toast.success(`Image exported as ${ext.toUpperCase()}!`);
+      // Convert data URL to blob
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `iggy-special-${Date.now()}.${ext}`, { type: mimeType });
+
+      // Blob is ready — safe to close the modal now.
+      setExportModalOpen(false);
+      toast.dismiss(loadingToast);
+
+      // Use Web Share API on mobile (iOS Safari ignores <a download>)
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          toast.success(`Image ready to save!`);
+        } catch {
+          // User cancelled share sheet — not an error
+        }
+        return;
+      }
+
+      // Desktop fallback: <a download> works on Chrome/Firefox/Edge
+      const link = document.createElement('a');
+      link.download = file.name;
+      link.href = dataUrl;
+      link.click();
+      toast.success(`Image exported as ${ext.toUpperCase()}!`);
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error('Export failed — please try again');
+      console.error('[handleExport]', err);
+    } finally {
+      setIsExportingImage(false);
+    }
   }, [dispatch]);
 
   const handleExportGif = useCallback(async () => {
@@ -468,7 +504,7 @@ export function SpecialEditor() {
       dispatch({ type: 'SELECT_LAYER', id: null });
       await new Promise((r) => setTimeout(r, 150));
 
-      const dataUrl = canvasRef.current?.exportImage();
+      const dataUrl = await canvasRef.current?.exportImageAsync();
       let imageUrl: string | null = null;
       let imageFile: File | null = null;
 
@@ -748,7 +784,7 @@ export function SpecialEditor() {
     await new Promise((r) => setTimeout(r, 150));
 
     // Export and downscale thumbnail
-    const fullDataUrl = canvasRef.current?.exportImage('image/jpeg', 0.7);
+    const fullDataUrl = await canvasRef.current?.exportImageAsync('image/jpeg', 0.7);
     let thumbnailUrl: string | null = null;
     if (fullDataUrl) {
       try {
@@ -1129,7 +1165,7 @@ export function SpecialEditor() {
 
       {/* Mobile header — ultra-minimal, just back + title */}
       <div
-        className="flex md:hidden items-center gap-3 px-3 py-1.5 shrink-0 bg-surface/90 backdrop-blur-xl border-b border-border/30"
+        className="flex md:hidden items-center gap-3 px-3 py-1.5 shrink-0 bg-surface/90 backdrop-blur-xl border-b border-border/30 safe-area-top"
         style={{
           opacity: isGesturing ? 0 : 1,
           transform: isGesturing ? 'translateY(-10px)' : 'translateY(0)',
@@ -1179,7 +1215,7 @@ export function SpecialEditor() {
           />
 
           {/* Empty canvas onboarding */}
-          {state.layers.length === 0 && !state.backgroundImage && !state.backgroundGradient && state.backgroundColor === '#1a1a2e' && (
+          {isPristine && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
               <div className="text-center pointer-events-auto">
                 <Sparkles size={36} className="mx-auto text-text-muted mb-3" />
@@ -1227,7 +1263,8 @@ export function SpecialEditor() {
               selectedLayer ? (
                 <PropertyPanel
                   layer={selectedLayer}
-                  onUpdate={(changes) => dispatch({ type: 'UPDATE_LAYER', id: selectedLayer.id, changes })}
+                  onUpdate={(changes, transient) => dispatch({ type: 'UPDATE_LAYER', id: selectedLayer.id, changes, transient })}
+                  onCommit={() => dispatch({ type: 'COMMIT_HISTORY' })}
                   onDelete={() => dispatch({ type: 'REMOVE_LAYER', id: selectedLayer.id })}
                   canvasWidth={state.canvasWidth}
                   canvasHeight={state.canvasHeight}
@@ -1320,7 +1357,8 @@ export function SpecialEditor() {
         {selectedLayer ? (
           <PropertyPanel
             layer={selectedLayer}
-            onUpdate={(changes) => dispatch({ type: 'UPDATE_LAYER', id: selectedLayer.id, changes })}
+            onUpdate={(changes, transient) => dispatch({ type: 'UPDATE_LAYER', id: selectedLayer.id, changes, transient })}
+            onCommit={() => dispatch({ type: 'COMMIT_HISTORY' })}
             onDelete={() => dispatch({ type: 'REMOVE_LAYER', id: selectedLayer.id })}
             canvasWidth={state.canvasWidth}
             canvasHeight={state.canvasHeight}
@@ -1458,10 +1496,12 @@ export function SpecialEditor() {
             </div>
           )}
           <button
-            onClick={() => { handleExport(exportFormat, exportQuality); setExportModalOpen(false); }}
+            onClick={() => handleExport(exportFormat, exportQuality)}
+            disabled={isExportingImage}
             className="btn-primary w-full"
           >
-            <Download size={14} /> Download {exportFormat.toUpperCase()}
+            {isExportingImage ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {isExportingImage ? 'Exporting…' : `Download ${exportFormat.toUpperCase()}`}
           </button>
         </div>
       </Modal>

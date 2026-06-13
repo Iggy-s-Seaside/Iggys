@@ -184,14 +184,23 @@ function drawDividerToCtx(ctx: CanvasRenderingContext2D, layer: TextLayer) {
 }
 
 /**
- * Draw an image layer element to the canvas context (synchronous — requires pre-loaded image).
+ * Draw an image layer element to the canvas context.
+ * If `preloaded` is provided it is used directly; otherwise falls back to a
+ * synchronous `new Image()` (only works for already-cached/data-URL sources).
  */
-function drawImageLayerToCtx(ctx: CanvasRenderingContext2D, layer: TextLayer) {
+function drawImageLayerToCtx(
+  ctx: CanvasRenderingContext2D,
+  layer: TextLayer,
+  preloaded?: HTMLImageElement
+) {
   if (!layer.imageSrc) return;
 
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.src = layer.imageSrc;
+  let img = preloaded;
+  if (!img) {
+    img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = layer.imageSrc;
+  }
 
   // Only works if the image is already cached/loaded (data URLs are always synchronous)
   if (!img.complete || img.naturalWidth === 0) return;
@@ -369,6 +378,27 @@ function drawVideoLayerToCtx(
 }
 
 /**
+ * Load an image source into a fully-decoded HTMLImageElement.
+ * Resolves even on error (returns null) so a single bad source can't abort the export.
+ * Prefers img.decode() but falls back to onload/onerror for older engines.
+ */
+function preloadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img.naturalWidth > 0 ? img : null);
+    img.onerror = () => resolve(null);
+    img.src = src;
+    // decode() guarantees the bitmap is ready before we draw (avoids the cache race)
+    if (img.decode) {
+      img.decode().then(() => resolve(img)).catch(() => {
+        // Fall through to onload/onerror above.
+      });
+    }
+  });
+}
+
+/**
  * Synchronously render the editor state to an off-screen canvas.
  * Returns the canvas element for toDataURL() or toBlob().
  * Pass videoRefs to include video layer current frames.
@@ -457,6 +487,28 @@ export async function exportToCanvasAsync(
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
 
+  // 0. Preload EVERY image up-front (background + visible image layers) so nothing
+  //    renders from an uncached <img>. idb:// blob URLs and fresh Supabase URLs are a
+  //    cache race for the synchronous path — decoding here guarantees they're ready.
+  const layerImages = new Map<string, HTMLImageElement>();
+  let bgImg: HTMLImageElement | null = null;
+
+  const preloadTasks: Promise<void>[] = [];
+  if (state.backgroundImage) {
+    const bgSrc = state.backgroundImage;
+    preloadTasks.push(preloadImage(bgSrc).then((img) => { bgImg = img; }));
+  }
+  for (const layer of state.layers) {
+    if (!layer.visible) continue;
+    if (layer.elementType === 'image' && layer.imageSrc) {
+      const { id, imageSrc } = layer;
+      preloadTasks.push(
+        preloadImage(imageSrc).then((img) => { if (img) layerImages.set(id, img); })
+      );
+    }
+  }
+  await Promise.all(preloadTasks);
+
   // 1. Background color
   ctx.fillStyle = state.backgroundColor;
   ctx.fillRect(0, 0, w, h);
@@ -466,30 +518,18 @@ export async function exportToCanvasAsync(
     renderGradient(ctx, state.backgroundGradient, w, h);
   }
 
-  // 3. Background image with filters (async load)
-  if (state.backgroundImage) {
-    try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const i = new Image();
-        i.crossOrigin = 'anonymous';
-        i.onload = () => resolve(i);
-        i.onerror = reject;
-        i.src = state.backgroundImage!;
-      });
+  // 3. Background image with filters (preloaded)
+  if (state.backgroundImage && bgImg) {
+    const filterStr = buildFilterString(state.imageFilters);
+    if (filterStr !== 'none') ctx.filter = filterStr;
+    drawImageCover(ctx, bgImg, w, h);
+    ctx.filter = 'none';
 
-      const filterStr = buildFilterString(state.imageFilters);
-      if (filterStr !== 'none') ctx.filter = filterStr;
-      drawImageCover(ctx, img, w, h);
-      ctx.filter = 'none';
-
-      if (state.imageFilters.overlayOpacity > 0) {
-        ctx.globalAlpha = state.imageFilters.overlayOpacity;
-        ctx.fillStyle = state.imageFilters.overlayColor;
-        ctx.fillRect(0, 0, w, h);
-        ctx.globalAlpha = 1;
-      }
-    } catch {
-      // CORS or network error, continue without image
+    if (state.imageFilters.overlayOpacity > 0) {
+      ctx.globalAlpha = state.imageFilters.overlayOpacity;
+      ctx.fillStyle = state.imageFilters.overlayColor;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -508,7 +548,7 @@ export async function exportToCanvasAsync(
       const videoEl = videoRefs?.get(layer.id);
       if (videoEl) drawVideoLayerToCtx(ctx, layer, videoEl);
     } else if (layer.elementType === 'image') {
-      drawImageLayerToCtx(ctx, layer);
+      drawImageLayerToCtx(ctx, layer, layerImages.get(layer.id));
     } else {
       drawLayerToCtx(ctx, layer);
     }
