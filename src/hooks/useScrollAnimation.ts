@@ -33,6 +33,19 @@ export function useScrollAnimation() {
     const el = ref.current;
     if (!el) return;
 
+    // If the element is already within or above the viewport at mount time, the
+    // IntersectionObserver may never fire its "isIntersecting" callback. This
+    // happens to sections gated on async data (e.g. the homepage Events &
+    // Specials preview): they mount AFTER the data loads, by which point the
+    // user has often scrolled past, leaving the section stuck invisible — a big
+    // empty gap. Reveal immediately in that case; only observe truly-below-fold
+    // elements for the scroll-in animation.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight) {
+      setIsVisible(true);
+      return;
+    }
+
     const observer = getSharedObserver();
     observerCallbacks.set(el, () => setIsVisible(true));
     observer.observe(el);
