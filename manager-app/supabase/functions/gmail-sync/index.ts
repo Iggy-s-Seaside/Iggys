@@ -164,6 +164,7 @@ serve(async (req: Request) => {
       const body = (extractText(msg.payload) || msg.snippet || "").trim().slice(0, 8000);
       rows.push({
         gmail_id: id,
+        gmail_thread_id: msg.threadId ?? null,
         source: "gmail",
         name: name.slice(0, 120),
         email: email.slice(0, 254),

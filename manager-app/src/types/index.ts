@@ -472,6 +472,8 @@ export interface Message {
   source?: string | null;
   /** Gmail message id when source='gmail'; dedupe key. */
   gmail_id?: string | null;
+  /** Gmail thread id, for showing the full conversation. */
+  gmail_thread_id?: string | null;
 }
 
 export const MESSAGE_STATUSES = ['unread', 'read', 'replied', 'archived'] as const;

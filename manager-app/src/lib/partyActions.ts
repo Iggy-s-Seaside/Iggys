@@ -66,6 +66,34 @@ export async function listCalendarEvents(timeMin: string, timeMax: string): Prom
   return (data?.events ?? []) as CalendarEvent[];
 }
 
+export interface ThreadMessage {
+  id: string;
+  from_name: string;
+  from_email: string;
+  from_me: boolean;
+  date: string | null;
+  subject: string;
+  body: string;
+}
+
+/** Fetch the full Gmail conversation for a message (by thread id, or message id fallback). */
+export async function fetchGmailThread(args: { threadId?: string | null; messageId?: string | null }): Promise<ThreadMessage[]> {
+  await requireSession();
+  const { data, error } = await supabase.functions.invoke('gmail-thread', {
+    body: { threadId: args.threadId ?? undefined, messageId: args.messageId ?? undefined },
+  });
+  if (error) {
+    let message = error.message;
+    try {
+      const ctx = await (error as { context?: Response }).context?.json();
+      if (ctx?.error) message = ctx.error;
+    } catch { /* keep generic */ }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return (data?.messages ?? []) as ThreadMessage[];
+}
+
 /** Pull new Gmail inbox mail into the Messages table. Returns how many were synced. */
 export async function syncGmailInbox(): Promise<{ synced: number; scanned: number }> {
   await requireSession();

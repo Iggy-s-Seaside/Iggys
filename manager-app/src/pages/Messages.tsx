@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { supabase } from '../lib/supabase';
-import { syncGmailInbox } from '../lib/partyActions';
+import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
@@ -17,6 +17,47 @@ type StatusFilter = 'all' | 'unread' | 'read' | 'replied' | 'archived';
 // Throttle Gmail auto-sync across page remounts (module-level, not per-mount).
 let lastAutoSync = 0;
 const AUTO_SYNC_MS = 5 * 60 * 1000;
+
+/** Full Gmail conversation (inbound + the bar's sent replies). Falls back to the
+ * single stored message if the thread can't be loaded. */
+function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMessage[]; loading: boolean; fallback: string }) {
+  if (loading && messages.length === 0) {
+    return (
+      <div className="card p-5 animate-pulse space-y-2">
+        <div className="h-3 bg-surface-hover rounded w-1/3" />
+        <div className="h-3 bg-surface-hover rounded w-full" />
+        <div className="h-3 bg-surface-hover rounded w-5/6" />
+      </div>
+    );
+  }
+  if (messages.length === 0) {
+    return (
+      <div className="card p-5">
+        <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">{fallback}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {messages.length > 1 && (
+        <p className="text-xs text-text-muted px-1">{messages.length} messages in this conversation</p>
+      )}
+      {messages.map((m) => (
+        <div key={m.id} className={`card p-4 ${m.from_me ? 'border-primary/30 bg-primary/[0.03]' : ''}`}>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-xs font-semibold text-text-primary">
+              {m.from_me ? "Iggy's Seaside" : (m.from_name || m.from_email)}
+            </span>
+            <span className="text-[11px] text-text-muted shrink-0">
+              {m.date ? format(parseISO(m.date), 'MMM d, h:mm a') : ''}
+            </span>
+          </div>
+          <p className="text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">{m.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function Messages() {
   const {
@@ -64,6 +105,8 @@ export function Messages() {
   }, [refresh]);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [thread, setThread] = useState<ThreadMessage[]>([]);
+  const [threadLoading, setThreadLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [replyText, setReplyText] = useState('');
@@ -109,6 +152,37 @@ export function Messages() {
     setReplyText('');
   }, [selected]);
 
+  // Load the Gmail conversation for the selected message (when it's from Gmail).
+  const refetchThread = async () => {
+    const msg = messages.find((m) => m.id === selectedId);
+    if (!msg || msg.source !== 'gmail') {
+      setThread([]);
+      return;
+    }
+    setThreadLoading(true);
+    try {
+      setThread(await fetchGmailThread({ threadId: msg.gmail_thread_id, messageId: msg.gmail_id }));
+    } catch {
+      setThread([]); // fall back to the single stored message
+    }
+    setThreadLoading(false);
+  };
+
+  // Only refetch when the selection changes (not on every realtime message update).
+  useEffect(() => {
+    let cancelled = false;
+    const msg = messages.find((m) => m.id === selectedId);
+    setThread([]);
+    if (!msg || msg.source !== 'gmail') return;
+    setThreadLoading(true);
+    fetchGmailThread({ threadId: msg.gmail_thread_id, messageId: msg.gmail_id })
+      .then((t) => { if (!cancelled) setThread(t); })
+      .catch(() => { if (!cancelled) setThread([]); })
+      .finally(() => { if (!cancelled) setThreadLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   const handleSelect = (msg: Message) => {
     setSelectedId(msg.id);
     setShowMobileDetail(true);
@@ -128,13 +202,15 @@ export function Messages() {
         return;
       }
 
-      // Call the send-reply Edge Function
+      // Call the send-reply Edge Function. gmailId threads the reply into the
+      // original Gmail conversation (In-Reply-To/References + threadId).
       const { data, error } = await supabase.functions.invoke('send-reply', {
         body: {
           to: selected.email,
           subject: selected.subject,
           body: replyText,
           messageId: selected.id,
+          gmailId: selected.gmail_id ?? undefined,
         },
       });
 
@@ -143,6 +219,7 @@ export function Messages() {
 
       toast.success(`Reply sent to ${selected.email}`);
       setReplyText('');
+      if (selected.source === 'gmail') refetchThread(); // show the sent reply in the thread
     } catch (err) {
       console.error('Reply failed:', err);
       // Fallback: save reply to DB even if Gmail send fails
@@ -389,12 +466,16 @@ export function Messages() {
 
               {/* Detail Body */}
               <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-                {/* Message Content */}
-                <div className="card p-5">
-                  <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
-                    {selected.message}
-                  </p>
-                </div>
+                {/* Message / conversation */}
+                {selected.source === 'gmail' ? (
+                  <GmailThreadView messages={thread} loading={threadLoading} fallback={selected.message} />
+                ) : (
+                  <div className="card p-5">
+                    <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+                      {selected.message}
+                    </p>
+                  </div>
+                )}
 
                 {/* Previous Reply */}
                 {selected.reply_text && (
