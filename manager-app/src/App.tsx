@@ -28,6 +28,12 @@ import { Shift } from './pages/Shift';
 import { Checks } from './pages/Checks';
 import { ShiftLog } from './pages/ShiftLog';
 import { CloseOut } from './pages/CloseOut';
+import { Reputation } from './pages/Reputation';
+import { Marketing } from './pages/Marketing';
+import { Reservations } from './pages/Reservations';
+import { Cogs } from './pages/Cogs';
+import { Schedule } from './pages/Schedule';
+import { Compliance } from './pages/Compliance';
 
 export default function App() {
   return (
@@ -69,6 +75,12 @@ export default function App() {
         <Route path="/packages" element={<Packages />} />
         <Route path="/luna" element={<Luna />} />
         <Route path="/team" element={<Team />} />
+        <Route path="/reputation" element={<Reputation />} />
+        <Route path="/marketing" element={<Marketing />} />
+        <Route path="/reservations" element={<Reservations />} />
+        <Route path="/cogs" element={<Cogs />} />
+        <Route path="/schedule" element={<Schedule />} />
+        <Route path="/compliance" element={<Compliance />} />
       </Route>
     </Routes>
   );

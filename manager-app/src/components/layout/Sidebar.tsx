@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, CalendarClock, Calculator, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,20 +12,26 @@ const navItems = [
   { to: '/run-sheet', icon: ClipboardList, label: 'Run Sheet' },
   { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna' },
   { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages' },
+  { to: '/reputation', icon: Star, label: 'Reviews' },
   { to: '/parties', icon: PartyPopper, label: 'Parties' },
+  { to: '/reservations', icon: CalendarClock, label: 'Reservations' },
   { to: '/pipeline', icon: KanbanSquare, label: 'Pipeline' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/todos', icon: ListChecks, label: 'To-Do' },
   { to: '/invoices', icon: Receipt, label: 'Invoices' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/compliance', icon: ShieldCheck, label: 'Compliance' },
   { to: '/events', icon: Calendar, label: 'Events' },
   { to: '/specials', icon: Sparkles, label: 'Specials' },
   { to: '/social', icon: Share2, label: 'Social' },
+  { to: '/marketing', icon: Megaphone, label: 'Marketing' },
   { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
   { to: '/inventory', icon: Package, label: 'Inventory' },
+  { to: '/cogs', icon: Calculator, label: 'COGS' },
   { to: '/packages', icon: Tags, label: 'Packages' },
   { to: '/media', icon: FolderOpen, label: 'Media' },
   { to: '/team', icon: Users, label: 'Team' },
+  { to: '/schedule', icon: Users, label: 'Schedule' },
 ];
 
 export function Sidebar() {

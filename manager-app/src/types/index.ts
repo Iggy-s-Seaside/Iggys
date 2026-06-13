@@ -999,3 +999,154 @@ export interface EonReport {
   metrics: Record<string, unknown>;
   emailed_at: string | null;
 }
+
+// ── Reputation (Wave 4) ──
+// Reviews inbox (external platforms) + table-side feedback QR.
+// See scripts/add-reviews.sql for the source schema.
+
+/** A platform we ingest reviews from / link out to (review_sources lookup). */
+export interface ReviewSource {
+  id: number;
+  created_at: string;
+  key: string;                 // 'google' | 'yelp' | 'facebook' | 'manual'
+  label: string;
+  review_url: string | null;   // public "write a review" deep link
+  active: boolean;
+}
+
+/** One public review ingested from an external platform. */
+export interface Review {
+  id: number;
+  created_at: string;
+  source: string;              // review_sources.key
+  author: string | null;
+  rating: number;              // 1–5
+  body: string | null;
+  url: string | null;          // deep link back to the review
+  replied: boolean;
+  reply_text: string | null;
+  sentiment: string | null;    // 'positive' | 'neutral' | 'negative'
+  external_id: string | null;  // platform review id (dedupe)
+}
+
+/** Private table-side feedback from the /feedback QR page. */
+export interface Feedback {
+  id: number;
+  created_at: string;
+  area: string | null;         // 'food' | 'drinks' | 'service' | 'atmosphere' | 'other'
+  rating: number | null;       // 1–5 (nullable)
+  comment: string | null;
+  contact_email: string | null;
+  public_review_clicked: boolean;
+}
+
+// ── Marketing / CRM + Campaigns (Wave 4) ──
+// See scripts/add-marketing.sql for the source schema.
+
+export const CAMPAIGN_CHANNELS = ['email', 'sms'] as const;
+export type CampaignChannel = (typeof CAMPAIGN_CHANNELS)[number];
+
+export const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'sending', 'sent', 'cancelled'] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  sending: 'Sending',
+  sent: 'Sent',
+  cancelled: 'Cancelled',
+};
+
+/** Per-channel consent (the gate reads sms_opt_in / email_opt_in). */
+export type ConsentChannel = 'sms' | 'email';
+export type ConsentSource = 'manager' | 'website' | 'sms_keyword' | 'import' | 'webhook';
+
+/** The CRM contact, enriched with the marketing columns add-marketing.sql adds. */
+export interface MarketingContact {
+  id: number;
+  created_at: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  tags: string[] | null;
+  marketing_opt_in: boolean;
+  notes: string | null;
+  last_event_date: string | null;
+  // marketing enrichment + per-channel consent
+  first_seen: string | null;
+  last_visit: string | null;
+  visit_count: number | null;
+  total_spend: number | null;
+  email_opt_in: boolean;
+  sms_opt_in: boolean;
+  birthday_month: number | null;   // 1–12 (null = unknown)
+  normalized_phone: string | null; // E.164, SMS dedupe key
+}
+
+/** A small JSON predicate the marketing UI evaluates client-side (segments.rule). */
+export interface SegmentRule {
+  type: 'all' | 'sms_opted_in' | 'email_opted_in' | 'birthday_this_month' | 'lapsed';
+  days?: number;
+}
+
+/** One email/SMS blast (draft → scheduled → sending → sent). */
+export interface Campaign {
+  id: number;
+  created_at: string;
+  name: string;
+  channel: CampaignChannel;
+  subject: string | null;       // email only
+  body: string;
+  status: CampaignStatus;
+  scheduled_at: string | null;
+  sent_count: number;
+}
+
+// ── Labor / Scheduling (Wave 4) ──
+// See scripts/add-labor.sql. Times are integer minutes-from-midnight.
+
+/** A roster member. wage is dollars/hour; certs is a string array. */
+export interface Staff {
+  id: number;
+  created_at: string;
+  name: string;
+  email: string | null;
+  role: string;                 // 'bartender' | 'server' | 'barback' | 'kitchen' | 'manager'
+  wage: number;
+  certs: string[];
+  active: boolean;
+}
+
+/** One assigned shift on the schedule grid (draft until published). */
+export interface Shift {
+  id: number;
+  created_at: string;
+  staff_id: number;
+  date: string;                 // 'yyyy-MM-dd'
+  start_min: number;            // minutes from midnight
+  end_min: number;
+  role: string | null;
+  published: boolean;
+}
+
+/** A date-range PTO request. */
+export interface TimeOffRequest {
+  id: number;
+  created_at: string;
+  staff_id: number;
+  date_from: string;            // inclusive DATE
+  date_to: string;
+  status: 'pending' | 'approved' | 'denied';
+  reason: string | null;
+}
+
+/** A saved tip-pool run for a date (total + method + allocations snapshot). */
+export interface TipPool {
+  id: number;
+  created_at: string;
+  date: string;
+  total_cents: number;
+  method: string;               // 'hours' | 'even' | 'points'
+  allocations: { staff_id: number; name: string; hours: number; share_cents: number }[];
+}

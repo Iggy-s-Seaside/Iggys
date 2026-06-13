@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import App from './App';
+import { registerSW } from './pwa/registerSW';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -30,3 +31,7 @@ createRoot(document.getElementById('root')!).render(
         </BrowserRouter>
     </StrictMode>,
 );
+
+// Conservative PWA: only registers in production (network-first, auto-update);
+// in dev it unregisters any stale worker so Vite HMR is never shadowed.
+registerSW();
