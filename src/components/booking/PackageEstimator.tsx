@@ -38,6 +38,8 @@ function lineAmount(pkg: PublicPackage, guests: number, hours: number): number {
 }
 
 function unitDetail(pkg: PublicPackage): string {
+  // Prices aren't all locked yet — never show "$0". Anything unpriced reads as a quote.
+  if (pkg.price <= 0) return 'Price on request';
   if (pkg.unit === 'per_person') return `${moneyPrecise(pkg.price)} / guest`;
   if (pkg.unit === 'per_hour') return `${moneyPrecise(pkg.price)} / hour`;
   return `${moneyPrecise(pkg.price)} flat`;
@@ -143,7 +145,9 @@ function PackageCard({ pkg, selected, amount, onToggle }: PackageCardProps) {
       </div>
       {pkg.publicDescription && <p className="text-xs text-text-muted leading-relaxed">{pkg.publicDescription}</p>}
       {selected && (
-        <p className="text-sm font-semibold text-primary tabular-nums mt-auto pt-1">{moneyPrecise(amount)}</p>
+        <p className="text-sm font-semibold text-primary tabular-nums mt-auto pt-1">
+          {pkg.price > 0 ? moneyPrecise(amount) : 'Quoted by our team'}
+        </p>
       )}
     </button>
   );
@@ -195,7 +199,10 @@ export default function PackageEstimator() {
     }
     const gratuity = GRATUITY_RATE * (food + drink);
     const grandTotal = food + drink + gratuity + room + addons;
-    return { food, drink, room, addons, gratuity, grandTotal };
+    // How many chosen packages aren't priced yet — surfaced as "on request"
+    // instead of silently contributing $0 to the total.
+    const unpriced = selectedPackages.filter((p) => p.price <= 0).length;
+    return { food, drink, room, addons, gratuity, grandTotal, unpriced };
   }, [selectedPackages, guests, hours]);
 
   const hasSelection = selectedPackages.length > 0;
@@ -297,15 +304,32 @@ export default function PackageEstimator() {
                   <dd className="text-white tabular-nums">{moneyPrecise(estimate.addons)}</dd>
                 </div>
               )}
+              {estimate.unpriced > 0 && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-text-muted">
+                    {estimate.unpriced} item{estimate.unpriced === 1 ? '' : 's'} on request
+                  </dt>
+                  <dd className="text-text-dim italic">quoted by our team</dd>
+                </div>
+              )}
             </dl>
 
             <div className="mt-4 pt-4 border-t border-white/10 flex items-end justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-text-dim">Starting from</p>
-                <p className="font-heading text-3xl font-bold gradient-text-teal tabular-nums leading-tight">
-                  {money(estimate.grandTotal)}
-                </p>
-              </div>
+              {estimate.grandTotal > 0 ? (
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-text-dim">Starting from</p>
+                  <p className="font-heading text-3xl font-bold gradient-text-teal tabular-nums leading-tight">
+                    {money(estimate.grandTotal)}{estimate.unpriced > 0 ? '+' : ''}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-text-dim">Your selection</p>
+                  <p className="font-heading text-2xl font-bold gradient-text-teal leading-tight">
+                    Custom quote
+                  </p>
+                </div>
+              )}
               <p className="text-2xs text-text-dim text-right max-w-[10rem]">
                 Final quote confirmed by our team
               </p>
