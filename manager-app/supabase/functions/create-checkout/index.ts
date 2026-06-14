@@ -3,8 +3,8 @@
 //   purpose 'merch'         → cart of merch_products (prices looked up server-side)
 //   purpose 'party_deposit' → a private-party deposit (amount read from parties row)
 //   purpose 'gift_card'     → a gift card for an arbitrary amount
-// Returns { url } to redirect the buyer. Apple Pay / Google Pay / Link come free via
-// automatic_payment_methods. NEVER trusts client-sent prices for known products.
+// Returns { url } to redirect the buyer. Apple Pay / Google Pay / Link come free
+// from Checkout's default method selection. NEVER trusts client-sent prices.
 //
 // Deploy: supabase functions deploy create-checkout --no-verify-jwt
 // Required secrets: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -227,7 +227,9 @@ serve(async (req: Request) => {
       line_items,
       success_url,
       cancel_url,
-      automatic_payment_methods: { enabled: true }, // free Apple Pay / Google Pay / Link
+      // Omitting payment_method_types lets Checkout auto-enable every eligible
+      // method (card + Apple Pay / Google Pay / Link) — the modern default.
+      // (automatic_payment_methods is a PaymentIntent-only param; invalid here.)
       metadata,
       payment_intent_data: { metadata },
       ...(sessionEmail ? { customer_email: sessionEmail } : {}),
