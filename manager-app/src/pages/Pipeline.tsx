@@ -29,8 +29,10 @@ function buzz(pattern: number | number[]) {
  * or menu data:
  *   new → proposal : stamp last_contacted_at (you reached out)
  *   proposal → confirmed : status = confirmed (the booking is won)
- *   confirmed → paid : payment_status = partial (a deposit/payment landed)
- * Back-transitions clear the corresponding signal.
+ * The board NEVER writes payment_status: the "Paid" column is derived from a
+ * REAL recorded payment (Stripe webhook / Deposit panel). Moves into/out of Paid
+ * are intercepted in moveCard and routed to the party's deposit panel — dragging
+ * must never fabricate (or wipe) a payment. Back-transitions clear contact signals.
  */
 function fieldsForStage(target: PipelineStage, card: PipelineCardData): Partial<Party> {
   switch (target) {
@@ -42,9 +44,10 @@ function fieldsForStage(target: PipelineStage, card: PipelineCardData): Partial<
         last_contacted_at: card.party.last_contacted_at || new Date().toISOString(),
       };
     case 'confirmed':
-      return { status: 'confirmed', cancelled_at: null, payment_status: 'unpaid' };
+      return { status: 'confirmed', cancelled_at: null };
     case 'paid':
-      return { status: 'confirmed', payment_status: 'partial' };
+      // Never reached: moveCard guards 'paid' transitions before calling this.
+      return {};
   }
 }
 
@@ -112,6 +115,20 @@ export function Pipeline() {
     async (card: PipelineCardData, from: PipelineStage, target: PipelineStage) => {
       if (target === from) return;
 
+      // The "Paid" column mirrors a real recorded payment (payment_status), never a
+      // drag. Route any move into/out of Paid to the party's deposit panel so the
+      // manager records (or refunds) actual money — dragging must not fabricate a
+      // payment, nor wipe one off a genuinely-paid party.
+      if (target === 'paid' || from === 'paid') {
+        toast(
+          target === 'paid'
+            ? 'Record the deposit on the party to move it to Paid.'
+            : 'This party has a payment on file — manage it from the party profile.',
+        );
+        navigate(`/parties/${card.party.id}`);
+        return;
+      }
+
       const fields = fieldsForStage(target, card);
       const targetIdx = PIPELINE_STAGES.indexOf(target);
       const fromIdx = PIPELINE_STAGES.indexOf(from);
@@ -152,7 +169,7 @@ export function Pipeline() {
         else toast.success(`Moved back to ${label}`);
       }
     },
-    [update],
+    [update, navigate],
   );
 
   const stepCard = useCallback(

@@ -34,9 +34,14 @@ export function usePayments() {
 
     setRequesting(true);
     try {
+      // create-checkout requires success/cancel URLs; without them it 400s before
+      // it ever reaches the deposit branch. Return the manager to the party profile
+      // (the ?paid=1 flag lets the page surface a "deposit paid" confirmation).
       const body: Record<string, unknown> = {
         purpose: args.purpose,
         party_id: args.partyId,
+        success_url: `${window.location.origin}/parties/${args.partyId}?paid=1`,
+        cancel_url: `${window.location.origin}/parties/${args.partyId}`,
       };
       if (args.amount != null) body.amount = args.amount;
 

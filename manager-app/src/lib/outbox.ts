@@ -159,7 +159,20 @@ export function clear(): void {
  * Stops at the first failure so writes against the same row stay ordered
  * (e.g. an insert that hasn't landed must not be followed by its update).
  */
+let flushing: Promise<FlushResult> | null = null;
+
 export async function flush(supabase: SupabaseClient): Promise<FlushResult> {
+  // Single-flight guard: useSupabaseCRUD mounts on 10+ screens and each calls
+  // flush() on mount + on the window 'online' event. Without this, two flushes
+  // would read the same not-yet-removed entry (removeById only runs AFTER the
+  // network insert resolves) and replay it twice — a duplicate INSERT. Concurrent
+  // callers share the one in-flight pass.
+  if (flushing) return flushing;
+  flushing = doFlush(supabase).finally(() => { flushing = null; });
+  return flushing;
+}
+
+async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
   const queue = getAll();
   if (queue.length === 0) return { flushed: 0, remaining: 0 };
 

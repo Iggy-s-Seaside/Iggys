@@ -98,34 +98,65 @@ serve(async (req: Request) => {
 
   try {
     if (purpose === "merch") {
-      // Idempotency: stripe_event_id is UNIQUE → a retried event no-ops.
+      // Resolve (or create) the order header. The previous guard returned early
+      // whenever the header existed — but if an earlier attempt wrote the header
+      // and then failed before inserting order_items (or Stripe's listLineItems
+      // threw → 500 → Stripe retried), the retry saw the header and short-circuited,
+      // leaving a PAID order with zero items forever. We now only treat it as a
+      // true duplicate once the items are present too; otherwise we backfill them.
+      let orderId: number | null = null;
       const { data: existing } = await admin
         .from("customer_orders")
         .select("id")
         .eq("stripe_event_id", event.id)
         .maybeSingle();
-      if (existing) return json({ received: true, duplicate: true });
 
-      const { data: order, error: orderErr } = await admin
-        .from("customer_orders")
-        .insert({
-          stripe_session_id: session.id,
-          stripe_event_id: event.id,
-          payment_intent_id: paymentIntentId,
-          customer_email: email,
-          customer_name: name,
-          amount_total: amountTotal,
-          currency: session.currency || "usd",
-          status: "paid",
-          shipping: session.shipping_details ?? null,
-          metadata: meta,
-        })
-        .select("id")
-        .single();
-      // Unique-violation (concurrent retry) → treat as already-handled.
-      if (orderErr) {
-        if ((orderErr as { code?: string }).code === "23505") return json({ received: true, duplicate: true });
-        throw new Error(orderErr.message);
+      if (existing) {
+        const { count } = await admin
+          .from("order_items")
+          .select("id", { count: "exact", head: true })
+          .eq("order_id", existing.id);
+        if (count && count > 0) return json({ received: true, duplicate: true });
+        orderId = existing.id; // header exists but items missing → backfill below
+      } else {
+        const { data: order, error: orderErr } = await admin
+          .from("customer_orders")
+          .insert({
+            stripe_session_id: session.id,
+            stripe_event_id: event.id,
+            payment_intent_id: paymentIntentId,
+            customer_email: email,
+            customer_name: name,
+            amount_total: amountTotal,
+            currency: session.currency || "usd",
+            status: "paid",
+            shipping: session.shipping_details ?? null,
+            metadata: meta,
+          })
+          .select("id")
+          .single();
+        if (orderErr) {
+          // Unique-violation: a concurrent retry created the header. Re-resolve it
+          // and fall through to (re)check/backfill items rather than dropping them.
+          if ((orderErr as { code?: string }).code === "23505") {
+            const { data: dupe } = await admin
+              .from("customer_orders")
+              .select("id")
+              .eq("stripe_event_id", event.id)
+              .maybeSingle();
+            if (!dupe) return json({ received: true, duplicate: true });
+            const { count } = await admin
+              .from("order_items")
+              .select("id", { count: "exact", head: true })
+              .eq("order_id", dupe.id);
+            if (count && count > 0) return json({ received: true, duplicate: true });
+            orderId = dupe.id;
+          } else {
+            throw new Error(orderErr.message);
+          }
+        } else {
+          orderId = order.id;
+        }
       }
 
       // Pull line items from Stripe (authoritative; client cart isn't trusted).
@@ -137,7 +168,7 @@ serve(async (req: Request) => {
         const product = li.price?.product as Stripe.Product | undefined;
         const pmeta = (product?.metadata || {}) as Record<string, string>;
         return {
-          order_id: order.id,
+          order_id: orderId,
           product_id: pmeta.product_id || null,
           name: li.description || product?.name || "Item",
           size: pmeta.size || null,
@@ -158,21 +189,29 @@ serve(async (req: Request) => {
 
       const { data: party } = await admin
         .from("parties")
-        .select("id, payment_intent_id, balance_due, food_total, drink_total, room_rate, room_hours, gratuity_rate")
+        .select("id, payment_intent_id, balance_due, amount_paid")
         .eq("id", partyId)
         .single();
 
-      // Idempotency: same intent already recorded → no-op.
+      // Idempotency: same intent already recorded → no-op (also prevents the
+      // additive amount_paid below from double-counting on a Stripe retry).
       if (party && party.payment_intent_id && party.payment_intent_id === paymentIntentId) {
         return json({ received: true, duplicate: true });
       }
 
+      // Apply the deposit ADDITIVELY and recompute the balance, preserving the
+      // balance_due = grandTotal − amount_paid invariant (so a manual payment
+      // already on file isn't clobbered). Fully covered → 'paid', else 'partial'.
+      const priorPaid = Number(party?.amount_paid) || 0;
+      const priorBalance = Number(party?.balance_due) || 0;
+      const newPaid = priorPaid + amountTotal;
+      const newBalance = Math.max(0, Math.round((priorBalance - amountTotal) * 100) / 100);
       const { error: updErr } = await admin
         .from("parties")
         .update({
-          // Manager UI enum is 'unpaid' | 'partial' | 'paid'; a deposit → 'partial'.
-          payment_status: "partial",
-          amount_paid: amountTotal,
+          payment_status: newBalance <= 0 ? "paid" : "partial",
+          amount_paid: newPaid,
+          balance_due: newBalance,
           payment_intent_id: paymentIntentId,
           paid_at: new Date().toISOString(),
         })
