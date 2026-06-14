@@ -4,6 +4,7 @@ import {
   Loader2, Sparkles, Send, Filter, Inbox, ThumbsUp, MessageCircle,
 } from 'lucide-react';
 import { useReviews } from '../hooks/useReviews';
+import { ErrorState } from '../components/ui/ErrorState';
 import { StatTrend } from '../components/charts/StatTrend';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import type { Review } from '../types';
@@ -268,7 +269,7 @@ function ReviewCard({ review, onReply, onMarkReplied }: ReviewCardProps) {
 type RatingFilter = 'all' | '5' | '4' | '3' | '2' | '1' | 'low' | 'unreplied';
 
 export function Reputation() {
-  const { reviews, feedback, loading, replyToReview, markReplied } = useReviews();
+  const { reviews, feedback, loading, error, refresh, replyToReview, markReplied } = useReviews();
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>('all');
 
   const stats = useMemo(() => {
@@ -368,6 +369,8 @@ export function Reputation() {
             <div className="card p-16 flex items-center justify-center">
               <Loader2 size={24} className="animate-spin text-text-muted" />
             </div>
+          ) : error && reviews.length === 0 ? (
+            <ErrorState onRetry={refresh} description="We couldn't load your reviews. Nothing was lost." />
           ) : filtered.length === 0 ? (
             <div className="card p-16 text-center">
               <Inbox size={48} className="mx-auto text-text-muted mb-3" />

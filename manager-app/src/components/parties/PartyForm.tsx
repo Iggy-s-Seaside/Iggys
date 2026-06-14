@@ -15,6 +15,8 @@ const FOOD_SERVICE_OPTIONS = [
 interface PartyFormProps {
   open: boolean;
   onClose: () => void;
+  /** Pre-seed the event date for a new party (e.g. tapped from the calendar). yyyy-MM-dd. */
+  initialDate?: string;
   party?: Party | null;
   /** Persist the payload; return the saved Party (create) or boolean (update). */
   onSave: (payload: Partial<Party>) => Promise<Party | boolean | null>;
@@ -44,7 +46,7 @@ const empty = {
   internal_notes: '',
 };
 
-export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
+export function PartyForm({ open, onClose, party, onSave, initialDate }: PartyFormProps) {
   const [form, setForm] = useState({ ...empty });
   const [saving, setSaving] = useState(false);
 
@@ -74,9 +76,9 @@ export function PartyForm({ open, onClose, party, onSave }: PartyFormProps) {
         internal_notes: party.internal_notes ?? '',
       });
     } else {
-      setForm({ ...empty });
+      setForm({ ...empty, event_date: initialDate ?? '' });
     }
-  }, [party, open]);
+  }, [party, open, initialDate]);
 
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));

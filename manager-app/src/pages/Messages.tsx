@@ -4,6 +4,7 @@ import {
   Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
+import { ErrorState } from '../components/ui/ErrorState';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
@@ -62,7 +63,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
 
 export function Messages() {
   const {
-    messages, loading, refresh, markAsRead, markAsReplied,
+    messages, loading, error, refresh, markAsRead, markAsReplied,
     archiveMessage, updateNotes, bulkMarkRead, bulkArchive
   } = useMessages();
   const handoff = useLunaHandoff();
@@ -407,6 +408,13 @@ export function Messages() {
                   </div>
                 ))}
               </div>
+            ) : error && messages.length === 0 ? (
+              <ErrorState
+                onRetry={refresh}
+                offline
+                className="m-3"
+                description="We couldn't load your inbox. No messages were lost."
+              />
             ) : filtered.length === 0 ? (
               <div className="text-center py-12">
                 <MailWarning size={32} className="mx-auto text-text-muted mb-2" />

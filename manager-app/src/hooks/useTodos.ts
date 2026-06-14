@@ -20,6 +20,7 @@ function sortTodos(todos: Todo[]): Todo[] {
 export function useTodos() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -27,8 +28,10 @@ export function useTodos() {
     if (error) {
       toast.error('Failed to load todos');
       console.error(error);
+      setError(error.message);
     } else {
       setTodos(sortTodos((data as Todo[]) || []));
+      setError(null);
     }
     setLoading(false);
   }, []);
@@ -104,5 +107,5 @@ export function useTodos() {
     return true;
   };
 
-  return { todos, loading, refresh, add, toggle, update, remove };
+  return { todos, loading, error, refresh, add, toggle, update, remove };
 }

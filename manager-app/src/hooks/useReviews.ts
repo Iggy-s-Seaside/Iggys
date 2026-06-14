@@ -14,6 +14,7 @@ export function useReviews() {
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [sources, setSources] = useState<ReviewSource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -26,8 +27,10 @@ export function useReviews() {
     if (revRes.error) {
       console.error('[reviews] load error:', revRes.error.message);
       toast.error('Failed to load reviews. Please refresh.');
+      setError(revRes.error.message);
     } else {
       setReviews((revRes.data as Review[]) || []);
+      setError(null);
     }
     if (fbRes.error) {
       console.error('[feedback] load error:', fbRes.error.message);
@@ -145,6 +148,7 @@ export function useReviews() {
     feedback,
     sources,
     loading,
+    error,
     refresh,
     replyToReview,
     markReplied,

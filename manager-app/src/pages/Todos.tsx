@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2, CheckSquare, Square, Loader2, Flag } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { useTodos } from '../hooks/useTodos';
+import { ErrorState } from '../components/ui/ErrorState';
 import { useAuth } from '../context/AuthContext';
 import Select from '../components/ui/Select';
 import { TODO_PRIORITIES, type Todo, type TodoPriority } from '../types';
@@ -24,7 +25,7 @@ function isOverdue(t: Todo) {
 }
 
 export function Todos() {
-  const { todos, loading, add, toggle, update, remove } = useTodos();
+  const { todos, loading, error, refresh, add, toggle, update, remove } = useTodos();
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [details, setDetails] = useState('');
@@ -93,6 +94,8 @@ export function Todos() {
 
       {loading ? (
         <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="card p-4 animate-pulse h-14" />)}</div>
+      ) : error && todos.length === 0 ? (
+        <ErrorState onRetry={refresh} description="We couldn't load the task list. Your tasks are safe." />
       ) : todos.length === 0 ? (
         <div className="card p-12 text-center">
           <CheckSquare size={40} className="mx-auto text-text-muted mb-3" />

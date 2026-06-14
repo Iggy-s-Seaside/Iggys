@@ -28,6 +28,7 @@ import {
   type ReservationDepositStatus,
 } from '../hooks/useReservations';
 import { useConfirm } from '../hooks/useConfirm';
+import { ErrorState } from '../components/ui/ErrorState';
 
 // ── helpers ──
 
@@ -316,6 +317,8 @@ export function Reservations() {
     sectionName,
     tableById,
     loading,
+    error,
+    refresh,
     createReservation,
     setReservationStatus,
     seatReservation,
@@ -376,6 +379,9 @@ export function Reservations() {
         </div>
       </div>
 
+      {error && reservations.length === 0 && waitlist.length === 0 ? (
+        <ErrorState onRetry={refresh} description="We couldn't load the host board. Your reservations are safe." />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Reservations timeline ── */}
         <section>
@@ -465,6 +471,7 @@ export function Reservations() {
           </div>
         </section>
       </div>
+      )}
 
       <ReservationModal
         open={modalOpen}

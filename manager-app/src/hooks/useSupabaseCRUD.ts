@@ -1,5 +1,6 @@
 import { createElement, useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { enqueue, flush, subscribeOnline, isOffline } from '../lib/outbox';
 import toast from 'react-hot-toast';
 
 export function useSupabaseCRUD<T extends { id: number }>(table: string) {
@@ -25,10 +26,28 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
     refresh();
   }, [refresh]);
 
+  // Drain any writes queued while offline — on mount and whenever the
+  // connection returns. flush() is a no-op when the outbox is empty, and it
+  // replays the whole cross-table queue (one shared outbox); the trailing
+  // refresh only re-pulls this table's authoritative state.
+  useEffect(() => {
+    flush(supabase);
+    const unsub = subscribeOnline(() => {
+      flush(supabase).then(() => refresh());
+    });
+    return unsub;
+  }, [refresh]);
+
   const create = async (item: Omit<T, 'id' | 'created_at'>) => {
     const { error: err } = await supabase.from(table).insert(item as Record<string, unknown>);
     if (err) {
       console.error(`[${table}] create error:`, err.message);
+      if (isOffline()) {
+        enqueue({ table, op: 'insert', payload: item as Record<string, unknown> });
+        toast('Saved offline — will sync when back online');
+        await refresh();
+        return true;
+      }
       toast.error('Failed to create. Please try again.');
       return false;
     }
@@ -45,6 +64,12 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
     const { error: err } = await supabase.from(table).update(fields as Record<string, unknown>).eq('id', id);
     if (err) {
       console.error(`[${table}] update error:`, err.message);
+      if (isOffline()) {
+        // Keep the optimistic patch — it matches what flush() will land.
+        enqueue({ table, op: 'update', rowId: id, payload: fields as Record<string, unknown> });
+        toast('Edit saved offline — will sync');
+        return true;
+      }
       setData(snapshot);
       toast.error('Failed to update. Please try again.');
       return false;
@@ -69,7 +94,17 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
     const commit = setTimeout(async () => {
       if (undone) return;
       const { error: err } = await supabase.from(table).delete().eq('id', id);
-      if (err) { console.error(`[${table}] delete error:`, err.message); restore(); toast.error("Couldn't delete — restored."); }
+      if (err) {
+        console.error(`[${table}] delete error:`, err.message);
+        if (isOffline()) {
+          // Undo window already elapsed; keep the delete pending instead of restoring.
+          enqueue({ table, op: 'delete', rowId: id });
+          toast('Delete saved offline — will sync');
+          return;
+        }
+        restore();
+        toast.error("Couldn't delete — restored.");
+      }
     }, 5000);
     toast(
       (t) => createElement(

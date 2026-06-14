@@ -11,6 +11,7 @@ import {
   X,
   ClipboardList,
 } from 'lucide-react';
+import { ErrorState } from '../components/ui/ErrorState';
 import {
   useInventoryItems,
   useInventoryCategories,
@@ -197,7 +198,7 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
 // ── Main Inventory Page ──
 
 export function Inventory() {
-  const { items, loading, refresh, create, update, remove } = useInventoryItems();
+  const { items, loading, error, refresh, create, update, remove } = useInventoryItems();
   const { data: categories } = useInventoryCategories();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -355,6 +356,8 @@ export function Inventory() {
         <div className="card p-16 flex items-center justify-center">
           <Loader2 size={24} className="animate-spin text-text-muted" />
         </div>
+      ) : error && items.length === 0 ? (
+        <ErrorState onRetry={refresh} description="We couldn't load your inventory. Your counts are safe." />
       ) : filtered.length === 0 ? (
         <div className="card p-16 text-center">
           <Package size={48} className="mx-auto text-text-muted mb-3" />

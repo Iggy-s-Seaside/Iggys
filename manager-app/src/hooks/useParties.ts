@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 export function useParties() {
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -18,8 +19,10 @@ export function useParties() {
     if (error) {
       toast.error('Failed to load parties');
       console.error(error);
+      setError(error.message);
     } else {
       setParties((data as Party[]) || []);
+      setError(null);
     }
     setLoading(false);
   }, []);
@@ -77,7 +80,7 @@ export function useParties() {
     return true;
   };
 
-  return { parties, loading, refresh, create, update, remove };
+  return { parties, loading, error, refresh, create, update, remove };
 }
 
 /** A single party by id (used by the profile page) — fetched fresh, no realtime. */

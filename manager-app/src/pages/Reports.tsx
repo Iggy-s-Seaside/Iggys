@@ -9,11 +9,16 @@ import {
   Receipt,
   ChevronRight,
   Building2,
+  Printer,
+  Download,
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
 import { StatTrend } from '../components/charts/StatTrend';
 import { BarChart } from '../components/charts/BarChart';
 import { Sparkline } from '../components/charts/Sparkline';
+import { money, safeFmtDate } from '../utils/format';
+import { toCsv, downloadCsv } from '../utils/exportCsv';
+import '../styles/reports-print.css';
 
 const usd = (n: number) =>
   n >= 1000
@@ -59,6 +64,55 @@ export function Reports() {
     [r.bySpace]
   );
 
+  const generatedOn = safeFmtDate(new Date());
+
+  // Build a flat CSV that mirrors what's on screen: the headline KPIs, then the
+  // revenue-by-month series, then the revenue-by-space breakdown. Each block is
+  // labelled in a "Section" column so a single file reads cleanly in a spreadsheet.
+  function handleExportCsv() {
+    type Row = { section: string; label: string; metric: string; events: string };
+    const rows: Row[] = [
+      // ── Headline KPIs ──
+      { section: 'KPI', label: 'Revenue (trailing 12 mo)', metric: money(trailingTotal), events: '' },
+      {
+        section: 'KPI',
+        label: 'Forward book (90 days)',
+        metric: money(r.forwardBook90),
+        events: String(r.forwardBookCount),
+      },
+      { section: 'KPI', label: 'Avg event value', metric: money(r.avgEventValue), events: String(r.confirmedCount) },
+      {
+        section: 'KPI',
+        label: 'Inquiry → booked',
+        metric: `${Math.round(r.conversionPct)}%`,
+        events: `${r.confirmedCount} of ${r.inquiryCount}`,
+      },
+      // ── Revenue by month (trailing 12) ──
+      ...r.byMonth.map((m) => ({
+        section: 'Revenue by month',
+        label: m.label,
+        metric: money(m.revenue),
+        events: String(m.events),
+      })),
+      // ── Revenue by space ──
+      ...r.bySpace.map((s) => ({
+        section: 'Revenue by space',
+        label: s.label,
+        metric: money(s.revenue),
+        events: String(s.events),
+      })),
+      { section: 'Total', label: 'Total confirmed', metric: money(r.totalRevenue), events: String(r.confirmedCount) },
+    ];
+
+    const csv = toCsv<Row>(rows, [
+      { header: 'Section', value: (row) => row.section },
+      { header: 'Item', value: (row) => row.label },
+      { header: 'Amount', value: (row) => row.metric },
+      { header: 'Events', value: (row) => row.events },
+    ]);
+    downloadCsv(`iggys-report-${safeFmtDate(new Date(), 'yyyy-MM-dd')}`, csv);
+  }
+
   if (r.loading) {
     return (
       <div>
@@ -82,6 +136,12 @@ export function Reports() {
 
   return (
     <div>
+      {/* Print-only report header — Iggy's + period + generated date. Hidden on screen. */}
+      <div className="reports-print-header" aria-hidden="true">
+        <div className="rp-title">Iggy's — Reports</div>
+        <div className="rp-meta">Trailing 12 months · Generated {generatedOn}</div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
         <div>
@@ -93,10 +153,30 @@ export function Reports() {
             Private-events revenue, conversion, and what's on the books — straight from your parties.
           </p>
         </div>
-        <Link to="/invoices" className="btn-secondary flex items-center gap-2 self-start sm:self-auto">
-          <Receipt size={16} />
-          View invoices
-        </Link>
+        <div className="reports-no-print flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="btn-secondary flex items-center gap-2 min-h-[44px]"
+            aria-label="Export report as CSV"
+          >
+            <Download size={16} />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn-secondary flex items-center gap-2 min-h-[44px]"
+            aria-label="Print or save report as PDF"
+          >
+            <Printer size={16} />
+            Print / PDF
+          </button>
+          <Link to="/invoices" className="btn-secondary flex items-center gap-2 min-h-[44px]">
+            <Receipt size={16} />
+            View invoices
+          </Link>
+        </div>
       </div>
 
       {/* KPI strip — benchmarked */}
@@ -222,7 +302,7 @@ export function Reports() {
         </div>
         <Link
           to="/parties"
-          className="mt-5 flex items-center justify-between px-4 py-3 rounded-lg bg-surface-hover hover:bg-surface-active transition-colors group"
+          className="reports-no-print mt-5 flex items-center justify-between px-4 py-3 rounded-lg bg-surface-hover hover:bg-surface-active transition-colors group"
         >
           <span className="text-sm font-medium text-text-secondary group-hover:text-text-primary">
             Work the pipeline

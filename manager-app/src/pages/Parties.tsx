@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, PartyPopper, ChevronRight, Users, CalendarClock, Clock, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useParties } from '../hooks/useParties';
+import { ErrorState } from '../components/ui/ErrorState';
 import { PartyForm } from '../components/parties/PartyForm';
 import { PARTY_STATUS_LABELS, PARTY_SOURCE_LABELS, type Party, type PartyStatus } from '../types';
 
@@ -20,11 +21,23 @@ const STATUS_BADGE: Record<PartyStatus, string> = {
 const TABS: PartyStatus[] = ['inquiry', 'confirmed', 'cancelled'];
 
 export function Parties() {
-  const { parties, loading, create } = useParties();
+  const { parties, loading, error, refresh, create } = useParties();
   const navigate = useNavigate();
   const [tab, setTab] = useState<PartyStatus>('inquiry');
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [initialDate, setInitialDate] = useState<string | undefined>();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Deep-link from the calendar's "New Party" chooser: /parties?new=1&date=YYYY-MM-DD
+  // opens the form pre-seeded with that date, then clears the params.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setInitialDate(searchParams.get('date') ?? undefined);
+      setFormOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const counts = useMemo(() => {
     const c: Record<PartyStatus, number> = { inquiry: 0, confirmed: 0, cancelled: 0 };
@@ -112,6 +125,8 @@ export function Parties() {
             </div>
           ))}
         </div>
+      ) : error && parties.length === 0 ? (
+        <ErrorState onRetry={refresh} description="We couldn't load your parties. Your bookings are safe." />
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <PartyPopper size={40} className="mx-auto text-text-muted mb-3" />
@@ -178,7 +193,12 @@ export function Parties() {
         </div>
       )}
 
-      <PartyForm open={formOpen} onClose={() => setFormOpen(false)} onSave={handleCreate} />
+      <PartyForm
+        open={formOpen}
+        onClose={() => { setFormOpen(false); setInitialDate(undefined); }}
+        onSave={handleCreate}
+        initialDate={initialDate}
+      />
     </div>
   );
 }

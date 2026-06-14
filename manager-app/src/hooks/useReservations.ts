@@ -132,6 +132,7 @@ export function useReservations() {
   const [sections, setSections] = useState<Section[]>([]);
   const [tables, setTables] = useState<FloorTable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -157,11 +158,13 @@ export function useReservations() {
       const err = resRes.error || waitRes.error || secRes.error || tblRes.error;
       console.error('[reservations] load error:', err?.message);
       toast.error('Failed to load the host board. Please refresh.');
+      setError(err?.message ?? 'Failed to load the host board.');
     } else {
       setReservations((resRes.data as Reservation[]) || []);
       setWaitlist((waitRes.data as WaitlistEntry[]) || []);
       setSections((secRes.data as Section[]) || []);
       setTables((tblRes.data as FloorTable[]) || []);
+      setError(null);
     }
     setLoading(false);
   }, []);
@@ -357,6 +360,7 @@ export function useReservations() {
     sectionName,
     tableById,
     loading,
+    error,
     refresh,
     // reservation actions
     createReservation,

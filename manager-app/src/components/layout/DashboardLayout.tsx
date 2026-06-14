@@ -5,6 +5,7 @@ import { BottomNav } from './BottomNav';
 import { QuickAddParty } from '../parties/QuickAddParty';
 import { CommandPalette, CMD_NEW_PARTY, CMD_QUICK_POST } from '../CommandPalette';
 import { OfflineBanner } from '../OfflineBanner';
+import { NotificationBell } from '../NotificationBell';
 
 export function DashboardLayout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -42,6 +43,9 @@ export function DashboardLayout() {
 
       {/* Global Cmd/Ctrl+K command palette — mounted once, event-driven */}
       <CommandPalette />
+
+      {/* Global notification bell — self-contained, fixed top-right */}
+      <NotificationBell />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Loader2, Eye } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
@@ -16,6 +16,7 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 export function EventForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: events, create, update, loading: dataLoading } = useSupabaseCRUD<IggyEvent>('events');
   const isEdit = Boolean(id);
 
@@ -59,6 +60,15 @@ export function EventForm() {
       }
     }
   }, [isEdit, id, events]);
+
+  // Deep-link from the calendar's "New Event" chooser: /events/new?date=YYYY-MM-DD
+  // seeds the date once for a brand-new event (never overrides an edit).
+  useEffect(() => {
+    if (!isEdit) {
+      const d = searchParams.get('date');
+      if (d) setForm((f) => ({ ...f, date: d }));
+    }
+  }, [isEdit, searchParams]);
 
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
