@@ -7,7 +7,7 @@ import {
   FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt,
   Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare,
   Share2, Star, Megaphone, CalendarClock, Calculator, ShieldCheck, Moon,
-  Plus, PenSquare, DoorOpen, DoorClosed,
+  Plus, PenSquare, DoorOpen, DoorClosed, Shirt,
 } from 'lucide-react';
 import { useCommandPaletteController } from '../hooks/useCommandPalette';
 
@@ -64,7 +64,9 @@ const PAGE_COMMANDS: Command[] = [
   { id: 'page:social', label: 'Social', to: '/social', icon: Share2, kind: 'page', keywords: 'instagram facebook posts queue' },
   { id: 'page:marketing', label: 'Marketing', to: '/marketing', icon: Megaphone, kind: 'page', keywords: 'campaigns promo email' },
   { id: 'page:menu', label: 'Menu', to: '/menu', icon: UtensilsCrossed, kind: 'page', keywords: 'food drinks items prices' },
-  { id: 'page:inventory', label: 'Inventory', to: '/inventory', icon: Package, kind: 'page', keywords: 'stock supplies counts' },
+  { id: 'page:inventory', label: 'Inventory', to: '/inventory', icon: Package, kind: 'page', keywords: 'stock supplies counts mark low out 86' },
+  { id: 'page:inventory-count', label: 'Count Stock', to: '/inventory/count', icon: ClipboardCheck, kind: 'page', keywords: 'count inventory periodic variance reconcile shrink' },
+  { id: 'page:merch', label: 'Merch', to: '/merch', icon: Shirt, kind: 'page', keywords: 'merch shirts crop sweatshirt hats variants sizes stock apparel' },
   { id: 'page:cogs', label: 'COGS', to: '/cogs', icon: Calculator, kind: 'page', keywords: 'cost of goods margins pour' },
   { id: 'page:packages', label: 'Packages', to: '/packages', icon: Tags, kind: 'page', keywords: 'party packages pricing' },
   { id: 'page:media', label: 'Media', to: '/media', icon: FolderOpen, kind: 'page', keywords: 'photos images library assets' },

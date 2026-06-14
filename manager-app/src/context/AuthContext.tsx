@@ -8,6 +8,9 @@ interface AuthContextType {
   session: Session | null;
   /** Permission tier: owner | manager | employee. Fail-closed to 'employee'. */
   role: Role;
+  /** False until the role RPC has resolved — role guards must wait on this so an
+   *  owner isn't briefly treated as 'employee' and bounced on first load. */
+  roleResolved: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -19,18 +22,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<Role>('employee');
+  const [roleResolved, setRoleResolved] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
     // Resolve the caller's role from the DB (SECURITY DEFINER RPC reads auth.email()
-    // from the JWT). Fail-closed to 'employee'. Hydrates async — never blocks loading.
+    // from the JWT). Fail-closed to 'employee'. Hydrates async; role guards wait on
+    // roleResolved so an owner isn't briefly seen as 'employee' and bounced.
     const applyRole = async (s: Session | null) => {
-      if (!s?.user) { if (mounted) setRole('employee'); return; }
+      if (!s?.user) { if (mounted) { setRole('employee'); setRoleResolved(true); } return; }
+      if (mounted) setRoleResolved(false);
       const { data, error } = await supabase.rpc('get_my_role');
       if (!mounted) return;
       setRole(!error && (data === 'owner' || data === 'manager' || data === 'employee') ? data : 'employee');
+      setRoleResolved(true);
     };
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -68,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, role, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, role, roleResolved, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
