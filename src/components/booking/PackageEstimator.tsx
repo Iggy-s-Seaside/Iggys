@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calculator, Check, Loader2, Minus, Plus, Sparkles, UtensilsCrossed, Wine, DoorOpen, Gift } from 'lucide-react';
+import { Calculator, Check, Loader2, Minus, Plus, Sparkles, UtensilsCrossed, Wine, DoorOpen, Gift, ArrowRight } from 'lucide-react';
 import { usePublicPackages, type PublicPackage, type PublicPackageCategory } from '../../hooks/usePublicPackages';
 
 /** Gratuity rate — matches the manager's invoice default (18%, food + drink only). */
@@ -153,7 +153,12 @@ function PackageCard({ pkg, selected, amount, onToggle }: PackageCardProps) {
   );
 }
 
-export default function PackageEstimator() {
+interface PackageEstimatorProps {
+  /** Carry the live selection into the booking form so nothing is re-entered. */
+  onContinue?: (sel: { guests: number; hours: number; packageIds: number[] }) => void;
+}
+
+export default function PackageEstimator({ onContinue }: PackageEstimatorProps) {
   const { packages, loading } = usePublicPackages();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [guests, setGuests] = useState(30);
@@ -345,6 +350,22 @@ export default function PackageEstimator() {
           Estimates are a starting point — taxes, custom requests, and final headcount may adjust the total.
           Your team confirms every quote before anything's locked in.
         </p>
+
+        {onContinue && (
+          <>
+            <button
+              type="button"
+              onClick={() => onContinue({ guests, hours, packageIds: selectedPackages.map((p) => p.id) })}
+              className="mt-5 w-full btn-primary text-base py-4 flex items-center justify-center gap-2"
+            >
+              {hasSelection ? "Love it? Let's set a date" : "Let's set a date"}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <p className="mt-2 text-center text-2xs text-text-dim">
+              We'll carry everything you picked into the form — no re-typing. Takes about a minute.
+            </p>
+          </>
+        )}
       </div>
     </section>
   );

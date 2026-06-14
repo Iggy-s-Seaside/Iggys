@@ -43,6 +43,8 @@ export default function BookEvent() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+  const [carried, setCarried] = useState<{ packages: number; guests: number } | null>(null);
+  const [pendingHours, setPendingHours] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -54,6 +56,28 @@ export default function BookEvent() {
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
   const togglePkg = (id: number) =>
     setSelectedPkgs((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // When the estimator hands a duration over, fill the END time once a START is
+  // picked — suggested + fully editable, never forced into a conflicting window.
+  useEffect(() => {
+    if (pendingHours != null && startMin != null && endMin == null) {
+      setEndMin(startMin + pendingHours * 60);
+      setPendingHours(null);
+    }
+  }, [pendingHours, startMin, endMin]);
+
+  // "Love it? Let's set a date" — carry the estimator's selections into the form
+  // so nothing is re-entered, then smooth-scroll down to it.
+  const handleEstimatorContinue = ({ guests, hours, packageIds }: { guests: number; hours: number; packageIds: number[] }) => {
+    if (guests > 0) set('guest_count', String(guests));
+    if (packageIds.length) setSelectedPkgs(new Set(packageIds));
+    setIsPrivate(true);
+    setPendingHours(hours > 0 ? hours : null);
+    if (guests > 0 || packageIds.length > 0) setCarried({ packages: packageIds.length, guests });
+    requestAnimationFrame(() => {
+      document.getElementById('book-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   // Fully blocked + busy days for the chosen space (PRIVATE mode).
   const taken = useMemo(
@@ -186,13 +210,24 @@ export default function BookEvent() {
 
       <section className="section-padding">
         <div className="section-container max-w-3xl mx-auto">
-          <PackageEstimator />
+          <PackageEstimator onContinue={handleEstimatorContinue} />
         </div>
       </section>
 
-      <section className="section-padding">
+      <section id="book-form" className="section-padding scroll-mt-24">
         <div className="section-container max-w-3xl mx-auto">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {carried && (
+              <div className="glass-card p-4 border-primary/30 bg-primary/[0.06] flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-white font-medium text-sm">We kept your selections — just add a date &amp; your details.</p>
+                  <p className="text-text-muted text-xs mt-0.5">
+                    {[carried.guests > 0 ? `${carried.guests} guests` : '', carried.packages > 0 ? `${carried.packages} package${carried.packages === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')} carried over from your estimate.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* About you */}
             <div className="glass-card p-6 space-y-4">
               <h2 className="font-heading text-xl font-bold text-white">About you</h2>
