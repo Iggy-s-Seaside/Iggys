@@ -107,6 +107,34 @@ export function usePartyPackages(partyId: number | null) {
     return true;
   };
 
+  /**
+   * Insert a one-off custom line (not from the catalog): package_id stays null
+   * and the manager types the name/category/unit/price/quantity/notes directly.
+   * computeInvoice buckets it by category exactly like a catalog line, so a
+   * 'food'/'drink' line feeds gratuity while 'room'/'addon'/'other' don't.
+   * A discount/comp is just a line with a negative unit_price (or a non-gratuity
+   * category to keep gratuity off it).
+   */
+  const addCustomLine = async (fields: Partial<PartyPackage> = {}) => {
+    if (partyId == null) return false;
+    const { error } = await supabase.from('party_packages').insert({
+      party_id: partyId,
+      package_id: null,
+      name: fields.name ?? 'Custom line',
+      category: fields.category ?? 'other',
+      unit: fields.unit ?? 'flat',
+      quantity: fields.quantity ?? 1,
+      unit_price: fields.unit_price ?? 0,
+      notes: fields.notes ?? null,
+    });
+    if (error) {
+      toast.error('Failed to add line');
+      return false;
+    }
+    await refresh();
+    return true;
+  };
+
   const updateLine = async (id: number, fields: Partial<PartyPackage>) => {
     const { error } = await supabase.from('party_packages').update(fields).eq('id', id);
     if (!error) await refresh();
@@ -119,5 +147,5 @@ export function usePartyPackages(partyId: number | null) {
     return !error;
   };
 
-  return { items, loading, refresh, addPackage, updateLine, removeLine };
+  return { items, loading, refresh, addPackage, addCustomLine, updateLine, removeLine };
 }

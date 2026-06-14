@@ -17,6 +17,23 @@ if (clarityId) {
   document.head.appendChild(s);
 }
 
+// Google Ads (gtag.js) — conversion tracking for high-intent funnel events.
+// Inert until VITE_GOOGLE_ADS_ID is set (mirrors the Clarity gate above), so
+// this ships safely with no account id. The actual conversion firing lives in
+// lib/track.ts, which checks for window.gtag before sending anything.
+const googleAdsId = import.meta.env.VITE_GOOGLE_ADS_ID as string | undefined;
+if (googleAdsId) {
+  const w = window as unknown as { dataLayer?: unknown[]; gtag?: (...a: unknown[]) => void };
+  w.dataLayer = w.dataLayer || [];
+  w.gtag = w.gtag || function (...args: unknown[]) { w.dataLayer!.push(args); };
+  w.gtag('js', new Date());
+  w.gtag('config', googleAdsId);
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleAdsId)}`;
+  document.head.appendChild(s);
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

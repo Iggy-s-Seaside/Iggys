@@ -476,10 +476,47 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
           toast.error('SMS send failed for all recipients');
         }
       } else {
-        // Email send rides the existing transactional rail. Until a bulk sender is
-        // wired, we record the campaign + audience; delivery is the opted-in count.
-        delivered = finalAudience.filter((c) => c.email).length;
-        toast.success(`Campaign saved for ${delivered} opted-in recipient${delivered === 1 ? '' : 's'}`);
+        // Email rides the send-campaign edge function, which RE-APPLIES the
+        // consent gate server-side (audience = contacts where email_opt_in=true)
+        // and is SAFE-BY-DEFAULT: with RESEND_API_KEY absent it sends nothing and
+        // returns { blocked:true, would_send:N }. We report that honestly rather
+        // than pretending the campaign went out.
+        const { data, error } = await supabase.functions.invoke('send-campaign', {
+          body: { campaign_id: campaign.id, subject: subject.trim(), body: body.trim() },
+        });
+        const res = (data ?? {}) as {
+          sent?: number;
+          would_send?: number;
+          skipped?: number;
+          blocked?: boolean;
+          error?: string;
+        };
+        if (error || res.error) {
+          throw new Error(res.error || error?.message || 'Email send failed');
+        }
+        if (res.blocked) {
+          // Stubbed rail — nothing was emailed. Record the would-reach count so
+          // the history is honest, and leave the campaign as a draft (not "sent").
+          const would = res.would_send ?? finalAudience.filter((c) => c.email).length;
+          await onUpdate(campaign.id, { status: 'draft', sent_count: 0 });
+          toast(
+            `Email provider not connected yet — would reach ${would.toLocaleString()} opted-in recipient${would === 1 ? '' : 's'}. Saved as draft.`,
+            { icon: 'ℹ️', duration: 6000 },
+          );
+          onClose();
+          setSending(false);
+          return;
+        }
+        // Live send (or allowlist-limited rollout): sent is the real delivered count.
+        delivered = res.sent ?? 0;
+        if (delivered > 0) {
+          toast.success(`Sent ${delivered.toLocaleString()} email${delivered === 1 ? '' : 's'}`);
+        } else {
+          toast('Email rail is live but no recipients were delivered (allowlist or empty audience).', {
+            icon: 'ℹ️',
+            duration: 5000,
+          });
+        }
       }
 
       await onUpdate(campaign.id, { status: 'sent', sent_count: delivered });
@@ -610,7 +647,9 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
 
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border sticky bottom-0 bg-surface">
           <p className="text-xs text-text-muted">
-            {channel === 'sms' ? 'SMS rail is gated until Twilio is configured.' : 'Only opted-in contacts are reached.'}
+            {channel === 'sms'
+              ? 'SMS rail is gated until Twilio is configured.'
+              : 'Email rail is gated until a provider (Resend) is configured. Only opted-in contacts are reached.'}
           </p>
           <button onClick={handleSend} disabled={!canSend} className="btn-primary text-sm">
             {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}

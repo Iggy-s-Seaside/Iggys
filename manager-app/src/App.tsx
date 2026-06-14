@@ -24,6 +24,7 @@ const Messages = lazy(() => import('./pages/Messages').then((m) => ({ default: m
 const Parties = lazy(() => import('./pages/Parties').then((m) => ({ default: m.Parties })));
 const PartyProfile = lazy(() => import('./pages/PartyProfile').then((m) => ({ default: m.PartyProfile })));
 const PartyBEO = lazy(() => import('./pages/PartyBEO').then((m) => ({ default: m.PartyBEO })));
+const PartyInvoice = lazy(() => import('./pages/PartyInvoice').then((m) => ({ default: m.PartyInvoice })));
 const Pipeline = lazy(() => import('./pages/Pipeline').then((m) => ({ default: m.Pipeline })));
 const SocialQueue = lazy(() => import('./pages/SocialQueue').then((m) => ({ default: m.SocialQueue })));
 const Calendar = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.Calendar })));
@@ -96,6 +97,7 @@ export default function App() {
           <Route path="/parties" element={<Ops><Parties /></Ops>} />
           <Route path="/parties/:id" element={<Ops><PartyProfile /></Ops>} />
           <Route path="/parties/:id/beo" element={<Ops><PartyBEO /></Ops>} />
+          <Route path="/parties/:id/invoice" element={<Ops><PartyInvoice /></Ops>} />
           <Route path="/pipeline" element={<Ops><Pipeline /></Ops>} />
           <Route path="/social" element={<Ops><SocialQueue /></Ops>} />
           <Route path="/calendar" element={<Ops><Calendar /></Ops>} />

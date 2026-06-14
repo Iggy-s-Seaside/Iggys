@@ -3,6 +3,7 @@ import { Loader2, Printer, Send, Save, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Party, PartyPackage } from '../../types';
 import { computeInvoice, partyToInvoiceInputs, buildInvoiceText, buildInvoiceHtml } from '../../utils/invoice';
+import { money as fmtMoney } from '../../utils/format';
 import { sendPartyEmail } from '../../lib/partyActions';
 
 interface InvoicePanelProps {
@@ -11,7 +12,8 @@ interface InvoicePanelProps {
   onSave: (fields: Partial<Party>) => Promise<boolean>;
 }
 
-const money = (n: number) => `$${(n || 0).toFixed(2)}`;
+// Invoice amounts render to the cent through the shared formatter (thousands-separated).
+const money = (n: number) => fmtMoney(n, { cents: true });
 
 export function InvoicePanel({ party, lines, onSave }: InvoicePanelProps) {
   const [roomRate, setRoomRate] = useState(String(party.room_rate ?? 200));
@@ -138,7 +140,7 @@ export function InvoicePanel({ party, lines, onSave }: InvoicePanelProps) {
         {totalRow(`Gratuity (${gratuityPct || 0}%)`, breakdown.gratuity)}
         {totalRow('Subtotal (food + drink + gratuity)', breakdown.subtotal, { muted: true })}
         {totalRow('Room total', breakdown.roomTotal)}
-        {breakdown.addons > 0 && totalRow('Add-ons', breakdown.addons)}
+        {breakdown.addons !== 0 && totalRow('Add-ons', breakdown.addons)}
         {totalRow('Grand total', breakdown.grandTotal, { strong: true })}
       </div>
 

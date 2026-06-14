@@ -564,6 +564,9 @@ export interface Party {
   created_at: string;
   updated_at: string;
   status: PartyStatus;
+  // Invoice lifecycle (the party IS the invoice; see add-invoice-fields.sql)
+  invoice_number?: string | null;
+  invoice_sent_at?: string | null;
   contact_id: number | null;
   contact_name: string;
   contact_email: string | null;

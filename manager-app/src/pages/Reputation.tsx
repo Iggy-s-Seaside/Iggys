@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
   Star, MessageSquareReply, Check, CheckCheck, AlertTriangle, ExternalLink,
-  Loader2, Sparkles, Send, Filter, Inbox, ThumbsUp, MessageCircle,
+  Loader2, Sparkles, Send, Filter, Inbox, ThumbsUp, MessageCircle, Plus,
 } from 'lucide-react';
 import { useReviews } from '../hooks/useReviews';
+import { AddReviewModal } from '../components/reviews/AddReviewModal';
 import { ErrorState } from '../components/ui/ErrorState';
 import { StatTrend } from '../components/charts/StatTrend';
 import { formatDistanceToNow, parseISO } from 'date-fns';
@@ -270,8 +271,9 @@ function ReviewCard({ review, onReply, onMarkReplied }: ReviewCardProps) {
 type RatingFilter = 'all' | '5' | '4' | '3' | '2' | '1' | 'low' | 'unreplied';
 
 export function Reputation() {
-  const { reviews, feedback, loading, error, refresh, replyToReview, markReplied } = useReviews();
+  const { reviews, feedback, sources, loading, error, refresh, addReview, replyToReview, markReplied } = useReviews();
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>('all');
+  const [addOpen, setAddOpen] = useState(false);
 
   const stats = useMemo(() => {
     const count = reviews.length;
@@ -316,7 +318,21 @@ export function Reputation() {
             {stats.unreplied} to reply
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="btn-primary text-sm ml-auto flex items-center gap-1.5"
+        >
+          <Plus size={16} /> Add review
+        </button>
       </div>
+
+      <AddReviewModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        sources={sources}
+        onAdd={addReview}
+      />
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -375,11 +391,23 @@ export function Reputation() {
           ) : filtered.length === 0 ? (
             <div className="card p-16 text-center">
               <Inbox size={48} className="mx-auto text-text-muted mb-3" />
-              <p className="text-text-muted">
-                {reviews.length === 0
-                  ? 'No reviews yet. They appear here once review sync is connected.'
-                  : 'No reviews match this filter.'}
-              </p>
+              {reviews.length === 0 ? (
+                <>
+                  <p className="text-text-muted mb-4">
+                    No reviews yet. Add one you found on a platform, or they'll appear here once
+                    review sync is connected.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(true)}
+                    className="btn-secondary text-sm inline-flex items-center gap-1.5"
+                  >
+                    <Plus size={16} /> Add review
+                  </button>
+                </>
+              ) : (
+                <p className="text-text-muted">No reviews match this filter.</p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">

@@ -39,6 +39,71 @@ const clean = (v: unknown, max = 2000): string | null => {
   const t = v.trim();
   return t ? t.slice(0, max) : null;
 };
+
+/** Best-effort E.164 normalization for US numbers (matches contacts.normalized_phone). */
+function normalizePhone(raw: string): string | null {
+  const digits = raw.replace(/[^\d+]/g, "");
+  if (digits.startsWith("+")) return digits.length >= 8 ? digits : null;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return null;
+}
+
+/**
+ * OPTIONAL marketing consent capture — runs ONLY when the visitor checked a box.
+ * Find-or-creates a contact, flips the per-channel opt-in, and appends a
+ * consent_events row per opted channel. Never sends anything; never throws into
+ * the request path (caller wraps in try/catch). Default (no boxes) = no-op.
+ */
+async function captureConsent(
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  name: string | null,
+  email: string | null,
+  phone: string | null,
+  wantEmail: boolean,
+  wantSms: boolean,
+): Promise<void> {
+  if (!wantEmail && !wantSms) return;
+  const normalizedPhone = phone ? normalizePhone(phone) : null;
+
+  let contactId: number | null = null;
+  if (email) {
+    const { data } = await admin.from("contacts").select("id").eq("email", email).limit(1).maybeSingle();
+    if (data) contactId = (data as { id: number }).id;
+  }
+  if (!contactId && normalizedPhone) {
+    const { data } = await admin.from("contacts").select("id").eq("normalized_phone", normalizedPhone).limit(1).maybeSingle();
+    if (data) contactId = (data as { id: number }).id;
+  }
+  if (!contactId && phone) {
+    const { data } = await admin.from("contacts").select("id").eq("phone", phone).limit(1).maybeSingle();
+    if (data) contactId = (data as { id: number }).id;
+  }
+
+  const optFields: Record<string, unknown> = {};
+  if (wantEmail) optFields.email_opt_in = true;
+  if (wantSms) optFields.sms_opt_in = true;
+
+  if (!contactId) {
+    const { data, error } = await admin
+      .from("contacts")
+      .insert({ name, email, phone, normalized_phone: normalizedPhone, ...optFields })
+      .select("id")
+      .single();
+    if (error) throw new Error(`contact: ${error.message}`);
+    contactId = (data as { id: number }).id;
+  } else {
+    const patch: Record<string, unknown> = { ...optFields };
+    if (normalizedPhone) patch.normalized_phone = normalizedPhone;
+    await admin.from("contacts").update(patch).eq("id", contactId);
+  }
+
+  const events: Array<Record<string, unknown>> = [];
+  if (wantEmail) events.push({ contact_id: contactId, channel: "email", action: "opt_in", source: "website" });
+  if (wantSms) events.push({ contact_id: contactId, channel: "sms", action: "opt_in", source: "website" });
+  if (events.length) await admin.from("consent_events").insert(events);
+}
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -190,6 +255,21 @@ serve(async (req: Request) => {
       status: "unread",
     });
     if (insErr) throw new Error(`messages: ${insErr.message}`);
+
+    // OPTIONAL marketing consent — only acts if a box was checked (default false).
+    // Never sends; never blocks the submission.
+    try {
+      await captureConsent(
+        admin,
+        name,
+        email,
+        phone,
+        body.email_opt_in === true,
+        body.sms_opt_in === true,
+      );
+    } catch (e) {
+      console.error("consent capture failed (non-fatal):", e);
+    }
 
     // Best-effort owner heads-up — never blocks the submission.
     try {

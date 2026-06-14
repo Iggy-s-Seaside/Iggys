@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Trash2, Package as PackageIcon } from 'lucide-react';
+import { Plus, Package as PackageIcon, Sparkles } from 'lucide-react';
 import Select from '../ui/Select';
 import { usePackages } from '../../hooks/usePackages';
-import { lineAmount } from '../../utils/invoice';
+import { money } from '../../utils/format';
+import { InvoiceLineEditor } from '../parties/InvoiceLineEditor';
 import { PACKAGE_UNIT_LABELS, type Package, type PartyPackage } from '../../types';
 
 interface PackagePickerProps {
@@ -12,11 +13,13 @@ interface PackagePickerProps {
   onAdd: (pkg: Package, qty: number) => Promise<boolean> | void;
   onUpdateLine: (id: number, fields: Partial<PartyPackage>) => Promise<boolean> | void;
   onRemoveLine: (id: number) => Promise<boolean> | void;
+  /** Optional: insert a one-off custom line (package_id=null). When omitted, the custom-line button is hidden. */
+  onAddCustom?: (fields?: Partial<PartyPackage>) => Promise<boolean> | void;
 }
 
-const fmt = (n: number) => `$${(n || 0).toFixed(2)}`;
-
-export function PackagePicker({ items, guestCount, roomHours, onAdd, onUpdateLine, onRemoveLine }: PackagePickerProps) {
+export function PackagePicker({
+  items, guestCount, roomHours, onAdd, onUpdateLine, onRemoveLine, onAddCustom,
+}: PackagePickerProps) {
   const { packages } = usePackages();
   const [selectedId, setSelectedId] = useState('');
   const [qty, setQty] = useState('1');
@@ -34,51 +37,28 @@ export function PackagePicker({ items, guestCount, roomHours, onAdd, onUpdateLin
   return (
     <div className="card p-5">
       <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-        <PackageIcon size={14} /> Packages
+        <PackageIcon size={14} /> Packages &amp; line items
       </h3>
 
       {items.length === 0 ? (
-        <p className="text-xs text-text-muted">No packages added yet.</p>
+        <p className="text-xs text-text-muted">No line items yet — add a package or a custom line.</p>
       ) : (
         <div className="divide-y divide-border">
           {items.map((line) => (
-            <div key={line.id} className="flex items-center gap-3 py-2.5">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-text-primary truncate">{line.name}</p>
-                <p className="text-xs text-text-muted">
-                  {fmt(line.unit_price)} {PACKAGE_UNIT_LABELS[line.unit]} · {line.category}
-                </p>
-              </div>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                key={`${line.id}:${line.quantity}`}
-                defaultValue={line.quantity}
-                onBlur={(e) => {
-                  const q = parseFloat(e.target.value) || 0;
-                  if (q !== line.quantity) onUpdateLine(line.id, { quantity: q });
-                }}
-                className="input-field w-16 py-1.5 text-center"
-                aria-label="Quantity"
-              />
-              <span className="text-sm font-medium text-text-primary w-20 text-right">
-                {fmt(lineAmount(line, guestCount, roomHours))}
-              </span>
-              <button
-                onClick={() => onRemoveLine(line.id)}
-                className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors"
-                aria-label="Remove package"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
+            <InvoiceLineEditor
+              key={line.id}
+              line={line}
+              guestCount={guestCount}
+              roomHours={roomHours}
+              onUpdate={onUpdateLine}
+              onRemove={onRemoveLine}
+            />
           ))}
         </div>
       )}
 
       <div className="flex items-end gap-2 mt-4">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <label className="label">Add package</label>
           <Select<string>
             variant="manager"
@@ -86,7 +66,7 @@ export function PackagePicker({ items, guestCount, roomHours, onAdd, onUpdateLin
             onChange={setSelectedId}
             options={active.map((p) => ({
               value: String(p.id),
-              label: `${p.name} — ${fmt(p.price)} ${PACKAGE_UNIT_LABELS[p.unit]}`,
+              label: `${p.name} — ${money(p.price, { cents: true })} ${PACKAGE_UNIT_LABELS[p.unit]}`,
             }))}
             placeholder="Select a package…"
           />
@@ -100,6 +80,16 @@ export function PackagePicker({ items, guestCount, roomHours, onAdd, onUpdateLin
           <Plus size={16} /> Add
         </button>
       </div>
+
+      {onAddCustom && (
+        <button
+          type="button"
+          onClick={() => onAddCustom({ name: 'Custom line', category: 'other', unit: 'flat', quantity: 1, unit_price: 0 })}
+          className="btn-ghost text-sm mt-3 text-primary"
+        >
+          <Sparkles size={15} /> Add custom line
+        </button>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import type { Party, PartyPackage, PaymentStatus } from '../../types';
 import { computeInvoice, partyToInvoiceInputs } from '../../utils/invoice';
+import { money as fmtMoney } from '../../utils/format';
 import { usePayments } from '../../hooks/usePayments';
 
 interface DepositPanelProps {
@@ -12,7 +13,8 @@ interface DepositPanelProps {
   onSave: (fields: Partial<Party>) => Promise<boolean>;
 }
 
-const money = (n: number) => `$${(n || 0).toFixed(2)}`;
+// Deposit/balance amounts render to the cent through the shared formatter.
+const money = (n: number) => fmtMoney(n, { cents: true });
 
 function fmtDate(d: string | null): string | null {
   if (!d) return null;

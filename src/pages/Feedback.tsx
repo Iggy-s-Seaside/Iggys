@@ -11,10 +11,17 @@ import Select from '../components/ui/Select';
 // We never branch on the rating: happy and unhappy guests get the identical
 // page. The public-review tap is recorded only as funnel analytics.
 //
-// Fallback Google review link, used if the review_sources lookup is missing the
-// URL. Replace the placeholder Place ID once it's known.
-const FALLBACK_GOOGLE_REVIEW_URL =
-  'https://search.google.com/local/writereview?placeid=REPLACE_WITH_PLACE_ID';
+// Fallback Google review link, used only if the review_sources lookup is missing
+// the URL. Env-driven so it works the moment Bradley provides the Place ID:
+//   VITE_GOOGLE_PLACE_ID → the "write a review" deep link.
+// If the Place ID is unset, we degrade gracefully to a Google search for the bar
+// (still lets guests find us + leave a review) rather than a dead placeholder.
+const GOOGLE_PLACE_ID = import.meta.env.VITE_GOOGLE_PLACE_ID as string | undefined;
+const GOOGLE_SEARCH_FALLBACK =
+  'https://www.google.com/search?q=Iggy%27s+Seaside+200+S+Franklin+St+Seaside+OR';
+const FALLBACK_GOOGLE_REVIEW_URL = GOOGLE_PLACE_ID
+  ? `https://search.google.com/local/writereview?placeid=${GOOGLE_PLACE_ID}`
+  : GOOGLE_SEARCH_FALLBACK;
 
 const areaOptions = [
   { value: 'food', label: 'Food' },

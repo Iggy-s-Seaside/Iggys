@@ -3,6 +3,16 @@ import { supabase } from '../lib/supabase';
 import type { Review, Feedback, ReviewSource } from '../types';
 import toast from 'react-hot-toast';
 
+/** Fields the manual "Add review" modal collects. */
+export interface AddReviewInput {
+  source: string;          // review_sources.key — 'google' | 'yelp' | 'facebook' | 'manual'
+  author?: string | null;  // optional reviewer name
+  rating: number;          // 1–5
+  body?: string | null;    // optional review text
+  url?: string | null;     // optional deep link back to the platform
+  created_at?: string;     // ISO timestamp; omit to let the DB default to now()
+}
+
 /**
  * Reputation data: public reviews (external platforms), the source lookup, and
  * private table-side feedback. Mirrors the Messages inbox pattern — initial
@@ -108,6 +118,41 @@ export function useReviews() {
     };
   }, []);
 
+  /**
+   * Manually log a review the owner found on a platform (or jotting a note),
+   * until live GBP/Yelp sync is wired. Sentiment is derived client-side from the
+   * rating; external_id stays null (manual rows aren't dedupe-keyed). The
+   * realtime INSERT handler above renders the new row — no local setstate here,
+   * which also keeps it dedupe-safe (the handler guards on id).
+   */
+  const addReview = useCallback(async (input: AddReviewInput): Promise<boolean> => {
+    const rating = Math.max(1, Math.min(5, Math.round(input.rating)));
+    const sentiment = rating >= 4 ? 'positive' : rating === 3 ? 'neutral' : 'negative';
+    const author = input.author?.trim() || null;
+    const body = input.body?.trim() || null;
+    const url = input.url?.trim() || null;
+
+    const { error } = await supabase.from('reviews').insert({
+      source: input.source,
+      author,
+      rating,
+      body,
+      url,
+      sentiment,
+      external_id: null,
+      replied: false,
+      ...(input.created_at ? { created_at: input.created_at } : {}),
+    });
+
+    if (error) {
+      console.error('[reviews] add error:', error.message);
+      toast.error('Failed to add review. Please try again.');
+      return false;
+    }
+    toast.success('Review added');
+    return true;
+  }, []);
+
   /** Record the owner's reply and flip the review to replied. */
   const replyToReview = useCallback(async (id: number, replyText: string) => {
     const text = replyText.trim();
@@ -150,6 +195,7 @@ export function useReviews() {
     loading,
     error,
     refresh,
+    addReview,
     replyToReview,
     markReplied,
   };
