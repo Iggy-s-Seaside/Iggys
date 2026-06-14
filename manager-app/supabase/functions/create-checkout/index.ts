@@ -88,6 +88,12 @@ serve(async (req: Request) => {
     if (!success_url || !cancel_url) {
       return json({ error: "success_url and cancel_url are required" }, 400);
     }
+    // Stripe substitutes the literal {CHECKOUT_SESSION_ID} template in success_url,
+    // letting the result page show a reference / fetch the session. Append it once
+    // if the caller didn't already include it.
+    const successWithSession = success_url.includes("{CHECKOUT_SESSION_ID}")
+      ? success_url
+      : success_url + (success_url.includes("?") ? "&" : "?") + "session_id={CHECKOUT_SESSION_ID}";
     if (!purpose || !["merch", "party_deposit", "gift_card"].includes(purpose)) {
       return json({ error: "Invalid or missing purpose" }, 400);
     }
