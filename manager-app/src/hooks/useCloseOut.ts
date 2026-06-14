@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useCurrentShiftId } from './useChecklists';
+import { todaysBusinessDay } from '../utils/businessDay';
 import type { CashCount, EonReport } from '../types';
 
 // ── Denominations (largest first) — value in CENTS keyed for the grid + jsonb ──
@@ -50,7 +52,12 @@ interface EonShape {
  */
 export function useCloseOut(shiftId?: number | null) {
   const { user } = useAuth();
-  const sid = shiftId ?? null;
+  // When no explicit shift is given, scope the close-out (counts, reports,
+  // close action) to today's service session — the same business-day
+  // resolution Checks/Shift use — so a close past midnight files against the
+  // night actually being closed. An explicit numeric shiftId still wins.
+  const resolvedShiftId = useCurrentShiftId(shiftId);
+  const sid = shiftId ?? resolvedShiftId;
 
   const [counts, setCounts] = useState<CashCount[]>([]);
   const [reports, setReports] = useState<EonReport[]>([]);
@@ -136,7 +143,10 @@ export function useCloseOut(shiftId?: number | null) {
   // ── Compose a CLIENT-SIDE preview of the EON report by gathering shift data.
   //    Every SELECT is wrapped so a missing/empty table degrades gracefully. ──
   const composePreview = useCallback(async (): Promise<EonShape> => {
-    const todayKey = new Date().toISOString().slice(0, 10);
+    // Use the SERVICE day (9am Pacific cutoff), not the raw UTC calendar date,
+    // so a close run at 1am pulls the night being closed — and the preview
+    // matches what the generate-eon edge function produces.
+    const todayKey = todaysBusinessDay();
     const metrics: Record<string, unknown> = { date: todayKey, shift_id: sid };
     const lines: string[] = [];
 

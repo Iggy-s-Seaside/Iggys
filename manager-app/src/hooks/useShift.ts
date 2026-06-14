@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { ShiftSession } from '../types';
+import { todaysBusinessDay } from '../utils/businessDay';
 import toast from 'react-hot-toast';
+
+// shift_sessions.business_day (see scripts/add-business-day.sql) is the service
+// day this row belongs to (9am Pacific cutoff). The shared ShiftSession type
+// may not carry it yet, so read it through a widened local view.
+type ShiftSessionRow = ShiftSession & { business_day?: string | null };
 
 /**
  * The shift spine. A shift_sessions row is one open->close bar shift; every
  * other shift reading (line checks, the log, the cash close) carries a
  * nullable shift_id pointing back here.
  *
- * Exposes the current open shift (if any), recent shifts, and the
- * open/close actions. Realtime-aware: any insert/update to shift_sessions
- * refreshes both lists so every device sees "the bar is open" instantly.
+ * Exposes the CURRENT service session, recent shifts, and the open/close
+ * actions. "Current" is resolved by business_day (today's service day), NOT by
+ * status=open — so after the 9am Pacific cutoff the day flips on its own even
+ * if a tired closer left a session open, and a fresh open after 9am starts a
+ * clean checklist day. Realtime-aware: any insert/update to shift_sessions
+ * refreshes both lists so every device sees the change instantly.
  */
 export function useShift() {
   const [current, setCurrent] = useState<ShiftSession | null>(null);
@@ -28,9 +37,18 @@ export function useShift() {
       toast.error('Failed to load shift status');
       console.error('[shift_sessions] load error:', error.message);
     } else {
-      const rows = (data as ShiftSession[]) || [];
+      const rows = (data as ShiftSessionRow[]) || [];
       setRecent(rows);
-      setCurrent(rows.find((s) => s.status === 'open') ?? null);
+      // The current SERVICE session is the most recent row stamped with today's
+      // business day (rows arrive newest-first). This is what drives today's
+      // checklists, so it rolls automatically at the 9am cutoff — independent of
+      // whether anyone remembered to close. Fall back to a still-open session
+      // for legacy rows written before business_day existed.
+      const today = todaysBusinessDay();
+      const byBusinessDay = rows.find((s) => s.business_day === today) ?? null;
+      const openFallback =
+        byBusinessDay == null ? rows.find((s) => s.business_day == null && s.status === 'open') ?? null : null;
+      setCurrent(byBusinessDay ?? openFallback);
     }
     setLoading(false);
   }, []);
@@ -51,17 +69,22 @@ export function useShift() {
     };
   }, [refresh]);
 
-  /** Open the bar. Stamps opened_by from the manager's email. Returns the new row (or null). */
+  /**
+   * Open the bar. Stamps opened_by + business_day (today's service day) so the
+   * session — and the checklists hung off it — belong to the right day even
+   * past midnight. Returns the new row (or null).
+   */
   const openShift = useCallback(
     async (userEmail?: string | null): Promise<ShiftSession | null> => {
-      // Guard against a double-open if two devices race.
+      // Guard against a double-open: `current` already resolves to today's
+      // service session, so this also blocks re-opening the same business day.
       if (current) {
         toast.error('A shift is already open');
         return current;
       }
       const { data, error } = await supabase
         .from('shift_sessions')
-        .insert({ opened_by: userEmail ?? null, status: 'open' })
+        .insert({ opened_by: userEmail ?? null, status: 'open', business_day: todaysBusinessDay() })
         .select()
         .single();
       if (error) {

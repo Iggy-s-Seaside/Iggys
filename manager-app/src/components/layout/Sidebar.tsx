@@ -1,14 +1,19 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, CalendarClock, CalendarRange, Calculator, ShieldCheck, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, CalendarRange, Calculator, ShieldCheck, ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useRole, type Role } from '../../hooks/useRole';
 import { useUnreadCount } from '../../hooks/useMessages';
 import { useNewInsightCount } from '../../hooks/useLuna';
 
-type NavItem = { to: string; icon: LucideIcon; label: string; badge?: 'messages' | 'luna' };
+type NavItem = { to: string; icon: LucideIcon; label: string; badge?: 'messages' | 'luna'; roles?: Role[] };
 type NavSection = { id: string; label: string; items: NavItem[] };
+
+// Operational tier (owner + manager). Items with no `roles` are visible to ALL
+// roles incl. employees — that's just the host waitlist + the bar service cockpit.
+const OPS: Role[] = ['owner', 'manager'];
 
 // Grouped nav. Every existing route is kept — sections only label + organise them.
 const navSections: NavSection[] = [
@@ -16,61 +21,61 @@ const navSections: NavSection[] = [
     id: 'tonight',
     label: 'Tonight',
     items: [
-      { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/shift', icon: ClipboardCheck, label: 'Shift' },
-      { to: '/run-sheet', icon: ClipboardList, label: 'Run Sheet' },
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: OPS },
+      { to: '/shift', icon: ClipboardCheck, label: 'Service' },
+      { to: '/waitlist', icon: Hourglass, label: 'Waitlist' },
+      { to: '/run-sheet', icon: ClipboardList, label: 'Run Sheet', roles: OPS },
     ],
   },
   {
     id: 'bookings',
     label: 'Bookings & Sales',
     items: [
-      { to: '/parties', icon: PartyPopper, label: 'Parties' },
-      { to: '/reservations', icon: CalendarClock, label: 'Reservations' },
-      { to: '/pipeline', icon: KanbanSquare, label: 'Pipeline' },
-      { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
-      { to: '/events', icon: Calendar, label: 'Events' },
-      { to: '/invoices', icon: Receipt, label: 'Invoices' },
-      { to: '/packages', icon: Tags, label: 'Packages' },
+      { to: '/parties', icon: PartyPopper, label: 'Parties', roles: OPS },
+      { to: '/pipeline', icon: KanbanSquare, label: 'Pipeline', roles: OPS },
+      { to: '/calendar', icon: CalendarDays, label: 'Calendar', roles: OPS },
+      { to: '/events', icon: Calendar, label: 'Events', roles: OPS },
+      { to: '/invoices', icon: Receipt, label: 'Invoices', roles: OPS },
+      { to: '/packages', icon: Tags, label: 'Packages', roles: OPS },
     ],
   },
   {
     id: 'marketing',
     label: 'Marketing',
     items: [
-      { to: '/specials', icon: Sparkles, label: 'Specials' },
-      { to: '/social', icon: Share2, label: 'Social' },
-      { to: '/marketing', icon: Megaphone, label: 'Marketing' },
-      { to: '/reputation', icon: Star, label: 'Reviews' },
-      { to: '/media', icon: FolderOpen, label: 'Media' },
+      { to: '/specials', icon: Sparkles, label: 'Specials', roles: OPS },
+      { to: '/social', icon: Share2, label: 'Social', roles: OPS },
+      { to: '/marketing', icon: Megaphone, label: 'Marketing', roles: OPS },
+      { to: '/reputation', icon: Star, label: 'Reviews', roles: OPS },
+      { to: '/media', icon: FolderOpen, label: 'Media', roles: OPS },
     ],
   },
   {
     id: 'menu',
     label: 'Menu & Stock',
     items: [
-      { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
-      { to: '/inventory', icon: Package, label: 'Inventory' },
-      { to: '/cogs', icon: Calculator, label: 'COGS' },
+      { to: '/menu', icon: UtensilsCrossed, label: 'Menu', roles: OPS },
+      { to: '/inventory', icon: Package, label: 'Inventory', roles: OPS },
+      { to: '/cogs', icon: Calculator, label: 'COGS', roles: OPS },
     ],
   },
   {
     id: 'boh',
     label: 'Back-of-House',
     items: [
-      { to: '/team', icon: Users, label: 'Team' },
-      { to: '/schedule', icon: CalendarRange, label: 'Schedule' },
-      { to: '/todos', icon: ListChecks, label: 'To-Do' },
-      { to: '/compliance', icon: ShieldCheck, label: 'Compliance' },
+      { to: '/team', icon: Users, label: 'Team', roles: ['owner'] },
+      { to: '/schedule', icon: CalendarRange, label: 'Schedule', roles: OPS },
+      { to: '/todos', icon: ListChecks, label: 'To-Do', roles: OPS },
+      { to: '/compliance', icon: ShieldCheck, label: 'Compliance', roles: OPS },
     ],
   },
   {
     id: 'insights',
     label: 'Insights',
     items: [
-      { to: '/reports', icon: BarChart3, label: 'Reports' },
-      { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna' },
-      { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages' },
+      { to: '/reports', icon: BarChart3, label: 'Reports', roles: OPS },
+      { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna', roles: OPS },
+      { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages', roles: OPS },
     ],
   },
 ];
@@ -107,6 +112,7 @@ function activeSectionId(pathname: string): string | undefined {
 export function Sidebar() {
   const { signOut, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { can } = useRole();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
@@ -114,6 +120,12 @@ export function Sidebar() {
   const newInsightCount = useNewInsightCount();
 
   const activeSection = activeSectionId(location.pathname);
+
+  // Role-filter: items with no `roles` are visible to everyone (employees see
+  // just Service + Waitlist). Sections with nothing left drop out entirely.
+  const visibleSections = navSections
+    .map((s) => ({ ...s, items: s.items.filter((i) => !i.roles || can(i.roles)) }))
+    .filter((s) => s.items.length > 0);
 
   const toggleSection = (id: string) => {
     setCollapsed((prev) => {
@@ -138,7 +150,7 @@ export function Sidebar() {
 
       {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
-        {navSections.map((section) => {
+        {visibleSections.map((section) => {
           // The active route's section is always shown, even if the user collapsed it.
           const isOpen = !collapsed.includes(section.id) || section.id === activeSection;
           return (
@@ -228,7 +240,7 @@ export function Sidebar() {
         <h1 className="text-sm font-bold text-text-primary tracking-tight">
           Iggy's <span className="text-primary">Manager</span>
         </h1>
-        {unreadCount > 0 && (
+        {can(OPS) && unreadCount > 0 && (
           <NavLink to="/messages" className="ml-auto flex items-center gap-1 text-xs text-primary">
             <MessageSquare size={14} />
             <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>

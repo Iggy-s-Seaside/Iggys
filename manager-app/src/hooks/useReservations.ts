@@ -1,68 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 // ── Types ──
-// These mirror the canonical interfaces that belong in src/types/index.ts
-// (Reservation, WaitlistEntry, Section, FloorTable). They are re-exported here
-// so this feature is self-contained; once the shared types land, callers may
-// import from either place — the shapes are identical.
+// The family does NOT take table reservations — the host stand runs purely off a
+// walk-up waitlist. This hook owns the live waitlist board. The file keeps its
+// `useReservations` name/path for now so existing imports don't break; the
+// integrator may alias it to `useWaitlist` later.
 
-export const RESERVATION_STATUSES = [
-  'booked',
-  'confirmed',
-  'seated',
-  'completed',
-  'cancelled',
-  'no_show',
-] as const;
-export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
-
-export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
-  booked: 'Booked',
-  confirmed: 'Confirmed',
-  seated: 'Seated',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-  no_show: 'No-show',
-};
-
-export const DEPOSIT_STATUSES = ['none', 'requested', 'paid'] as const;
-export type ReservationDepositStatus = (typeof DEPOSIT_STATUSES)[number];
-
-export const DEPOSIT_STATUS_LABELS: Record<ReservationDepositStatus, string> = {
-  none: 'No deposit',
-  requested: 'Deposit requested',
-  paid: 'Deposit paid',
-};
-
-export const WAITLIST_STATUSES = ['waiting', 'notified', 'seated', 'cancelled'] as const;
+export const WAITLIST_STATUSES = ['waiting', 'notified', 'seated', 'cancelled', 'no_show'] as const;
 export type WaitlistStatus = (typeof WAITLIST_STATUSES)[number];
 
-export interface Section {
-  id: number;
-  name: string;
-}
+/** Statuses that keep a party on the *active* board (waiting + notified). */
+export const ACTIVE_WAITLIST_STATUSES: WaitlistStatus[] = ['waiting', 'notified'];
 
-export interface FloorTable {
-  id: number;
-  section_id: number | null;
-  name: string;
-  seats: number;
-}
-
-export interface Reservation {
-  id: number;
-  created_at: string;
-  guest_name: string;
-  phone: string | null;
-  party_size: number;
-  reserved_for: string;
-  status: ReservationStatus;
-  table_id: number | null;
-  notes: string | null;
-  deposit_status: ReservationDepositStatus;
-}
+/** Default room area for a new walk-up. Bar / patio can be added later. */
+export const DEFAULT_WAITLIST_AREA = 'main-restaurant';
 
 export interface WaitlistEntry {
   id: number;
@@ -73,29 +26,23 @@ export interface WaitlistEntry {
   status: WaitlistStatus;
   quoted_minutes: number | null;
   notified_at: string | null;
+  area: string;
 }
-
-export type NewReservation = {
-  guest_name: string;
-  phone?: string | null;
-  party_size: number;
-  reserved_for: string;
-  status?: ReservationStatus;
-  table_id?: number | null;
-  notes?: string | null;
-  deposit_status?: ReservationDepositStatus;
-};
 
 export type NewWaitlistEntry = {
   guest_name: string;
   phone?: string | null;
   party_size: number;
   quoted_minutes?: number | null;
+  area?: string;
 };
 
 // ── Helpers ──
 
-/** Bounds of "today" (local) as ISO strings, for the tonight board's window. */
+/**
+ * Bounds of "today" (local) as ISO strings. Exported for other surfaces that
+ * window on the current day (e.g. the activity feed). Kept here for back-compat.
+ */
 export function todayBounds(now = new Date()): { startISO: string; endISO: string } {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
@@ -120,50 +67,34 @@ export function suggestWaitQuote(partiesWaiting: number, partySize: number): num
 // ── Hook ──
 
 /**
- * Live host-board data: reservations for tonight, the active waitlist, and the
- * floor plan (sections + tables). Subscribes to realtime so the board stays in
- * sync across the host stand and any second screen. All write actions optimistically
- * refresh; realtime reconciles. "notify" calls the gated send-sms function and
- * tolerates it being disabled (the row is still advanced to 'notified').
+ * Live waitlist board: the active walk-up queue (waiting + notified). Subscribes
+ * to realtime so the board stays in sync across the host stand and any second
+ * screen. All write actions refresh; realtime reconciles. "notify" calls the
+ * gated send-sms function and tolerates it being disabled (the row is still
+ * advanced to 'notified').
+ *
+ * NOTE: the hook name `useReservations` is retained for now to avoid churning
+ * every import site; this hook no longer touches the reservations table.
  */
 export function useReservations() {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [tables, setTables] = useState<FloorTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { startISO, endISO } = todayBounds();
+    const { data, error: err } = await supabase
+      .from('waitlist_entries')
+      .select('*')
+      .in('status', ACTIVE_WAITLIST_STATUSES)
+      .order('created_at', { ascending: true });
 
-    const [resRes, waitRes, secRes, tblRes] = await Promise.all([
-      supabase
-        .from('reservations')
-        .select('*')
-        .gte('reserved_for', startISO)
-        .lt('reserved_for', endISO)
-        .order('reserved_for', { ascending: true }),
-      supabase
-        .from('waitlist_entries')
-        .select('*')
-        .in('status', ['waiting', 'notified'])
-        .order('created_at', { ascending: true }),
-      supabase.from('sections').select('*').order('name', { ascending: true }),
-      supabase.from('floor_tables').select('*').order('name', { ascending: true }),
-    ]);
-
-    if (resRes.error || waitRes.error || secRes.error || tblRes.error) {
-      const err = resRes.error || waitRes.error || secRes.error || tblRes.error;
-      console.error('[reservations] load error:', err?.message);
-      toast.error('Failed to load the host board. Please refresh.');
-      setError(err?.message ?? 'Failed to load the host board.');
+    if (err) {
+      console.error('[waitlist] load error:', err.message);
+      toast.error('Failed to load the waitlist. Please refresh.');
+      setError(err.message ?? 'Failed to load the waitlist.');
     } else {
-      setReservations((resRes.data as Reservation[]) || []);
-      setWaitlist((waitRes.data as WaitlistEntry[]) || []);
-      setSections((secRes.data as Section[]) || []);
-      setTables((tblRes.data as FloorTable[]) || []);
+      setWaitlist((data as WaitlistEntry[]) || []);
       setError(null);
     }
     setLoading(false);
@@ -173,72 +104,16 @@ export function useReservations() {
     refresh();
   }, [refresh]);
 
-  // Realtime: any change to the two live tables re-pulls the board.
+  // Realtime: any change to the waitlist table re-pulls the board.
   useEffect(() => {
     const channel = supabase
-      .channel('reservations-board')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => refresh())
+      .channel('waitlist-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist_entries' }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [refresh]);
-
-  // ── Reservation actions ──
-
-  const createReservation = async (input: NewReservation) => {
-    const { error } = await supabase.from('reservations').insert({
-      guest_name: input.guest_name,
-      phone: input.phone ?? null,
-      party_size: input.party_size,
-      reserved_for: input.reserved_for,
-      status: input.status ?? 'booked',
-      table_id: input.table_id ?? null,
-      notes: input.notes ?? null,
-      deposit_status: input.deposit_status ?? 'none',
-    });
-    if (error) {
-      console.error('[reservations] create error:', error.message);
-      toast.error('Failed to add reservation. Please try again.');
-      return false;
-    }
-    toast.success('Reservation added');
-    await refresh();
-    return true;
-  };
-
-  const updateReservation = async (id: number, fields: Partial<Reservation>) => {
-    const { error } = await supabase.from('reservations').update(fields).eq('id', id);
-    if (error) {
-      console.error('[reservations] update error:', error.message);
-      toast.error('Failed to update reservation. Please try again.');
-      return false;
-    }
-    await refresh();
-    return true;
-  };
-
-  const setReservationStatus = (id: number, status: ReservationStatus) =>
-    updateReservation(id, { status });
-
-  const assignTable = (id: number, table_id: number | null) =>
-    updateReservation(id, { table_id });
-
-  const seatReservation = (id: number, table_id?: number | null) =>
-    updateReservation(id, { status: 'seated', ...(table_id != null ? { table_id } : {}) });
-
-  const deleteReservation = async (id: number) => {
-    const { error } = await supabase.from('reservations').delete().eq('id', id);
-    if (error) {
-      console.error('[reservations] delete error:', error.message);
-      toast.error('Failed to delete reservation.');
-      return false;
-    }
-    toast.success('Reservation removed');
-    await refresh();
-    return true;
-  };
 
   // ── Waitlist actions ──
 
@@ -251,6 +126,7 @@ export function useReservations() {
       party_size: input.party_size,
       status: 'waiting',
       quoted_minutes: quote,
+      area: input.area ?? DEFAULT_WAITLIST_AREA,
     });
     if (error) {
       console.error('[waitlist] create error:', error.message);
@@ -303,34 +179,11 @@ export function useReservations() {
     return true;
   };
 
-  const seatWaitlist = async (id: number) => {
-    const { error } = await supabase.from('waitlist_entries').update({ status: 'seated' }).eq('id', id);
+  /** Set any waitlist status (free-text column — no enum migration needed). */
+  const setWaitlistStatus = async (id: number, status: WaitlistStatus) => {
+    const { error } = await supabase.from('waitlist_entries').update({ status }).eq('id', id);
     if (error) {
-      console.error('[waitlist] seat error:', error.message);
-      toast.error('Failed to seat party. Please try again.');
-      return false;
-    }
-    toast.success('Party seated');
-    await refresh();
-    return true;
-  };
-
-  const cancelWaitlist = async (id: number) => {
-    const { error } = await supabase.from('waitlist_entries').update({ status: 'cancelled' }).eq('id', id);
-    if (error) {
-      console.error('[waitlist] cancel error:', error.message);
-      toast.error('Failed to cancel. Please try again.');
-      return false;
-    }
-    toast.success('Removed from waitlist');
-    await refresh();
-    return true;
-  };
-
-  const updateWaitlist = async (id: number, fields: Partial<WaitlistEntry>) => {
-    const { error } = await supabase.from('waitlist_entries').update(fields).eq('id', id);
-    if (error) {
-      console.error('[waitlist] update error:', error.message);
+      console.error('[waitlist] status update error:', error.message);
       toast.error('Failed to update. Please try again.');
       return false;
     }
@@ -338,42 +191,35 @@ export function useReservations() {
     return true;
   };
 
-  // ── Derived ──
+  const seatWaitlist = async (id: number) => {
+    const ok = await setWaitlistStatus(id, 'seated');
+    if (ok) toast.success('Party seated');
+    return ok;
+  };
 
-  const sectionName = useMemo(() => {
-    const map = new Map<number, string>();
-    sections.forEach((s) => map.set(s.id, s.name));
-    return map;
-  }, [sections]);
+  const cancelWaitlist = async (id: number) => {
+    const ok = await setWaitlistStatus(id, 'cancelled');
+    if (ok) toast.success('Removed from waitlist');
+    return ok;
+  };
 
-  const tableById = useMemo(() => {
-    const map = new Map<number, FloorTable>();
-    tables.forEach((t) => map.set(t.id, t));
-    return map;
-  }, [tables]);
+  const addNoShow = async (id: number) => {
+    const ok = await setWaitlistStatus(id, 'no_show');
+    if (ok) toast.success('Marked as no-show');
+    return ok;
+  };
 
   return {
-    reservations,
     waitlist,
-    sections,
-    tables,
-    sectionName,
-    tableById,
     loading,
     error,
     refresh,
-    // reservation actions
-    createReservation,
-    updateReservation,
-    setReservationStatus,
-    assignTable,
-    seatReservation,
-    deleteReservation,
     // waitlist actions
     addToWaitlist,
     notifyWaitlist,
+    setWaitlistStatus,
     seatWaitlist,
     cancelWaitlist,
-    updateWaitlist,
+    addNoShow,
   };
 }

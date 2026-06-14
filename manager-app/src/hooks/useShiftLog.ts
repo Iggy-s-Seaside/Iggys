@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useCurrentShiftId } from './useChecklists';
 import type { ShiftLogEntry, ShiftLogTag } from '../types';
 import toast from 'react-hot-toast';
 
@@ -37,6 +38,12 @@ export interface AddShiftLogInput {
  */
 export function useShiftLog(shiftId?: number | null) {
   const { user } = useAuth();
+  // When no explicit shift is given, attach to (and scope by) today's service
+  // session — the same business-day resolution the Checks page uses — so the
+  // floor log rolls with the service day instead of pooling every shift's
+  // entries together. An explicit numeric shiftId still wins.
+  const resolvedShiftId = useCurrentShiftId(shiftId);
+  const effectiveShiftId = shiftId ?? resolvedShiftId;
   const [entries, setEntries] = useState<ShiftLogEntry[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemRef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +54,7 @@ export function useShiftLog(shiftId?: number | null) {
       .from('shift_log')
       .select('*')
       .order('created_at', { ascending: false });
-    if (shiftId != null) query = query.eq('shift_id', shiftId);
+    if (effectiveShiftId != null) query = query.eq('shift_id', effectiveShiftId);
 
     const { data, error } = await query;
     if (error) {
@@ -57,7 +64,7 @@ export function useShiftLog(shiftId?: number | null) {
       setEntries((data as ShiftLogEntry[]) || []);
     }
     setLoading(false);
-  }, [shiftId]);
+  }, [effectiveShiftId]);
 
   const refreshMenuItems = useCallback(async () => {
     const { data, error } = await supabase
@@ -99,7 +106,7 @@ export function useShiftLog(shiftId?: number | null) {
         return false;
       }
       const { error } = await supabase.from('shift_log').insert({
-        shift_id: input.shiftId ?? shiftId ?? null,
+        shift_id: input.shiftId ?? effectiveShiftId ?? null,
         author: user?.email ?? null,
         tag: input.tag,
         body,
@@ -114,7 +121,7 @@ export function useShiftLog(shiftId?: number | null) {
       await refresh();
       return true;
     },
-    [refresh, shiftId, user?.email]
+    [refresh, effectiveShiftId, user?.email]
   );
 
   /** Toggle the resolved flag (incidents / maintenance close out). */
@@ -195,7 +202,7 @@ export function useShiftLog(shiftId?: number | null) {
       const bodyParts = [`86 — ${matched?.name ?? name}`];
       if (opts.note?.trim()) bodyParts.push(opts.note.trim());
       const { error: logErr } = await supabase.from('shift_log').insert({
-        shift_id: shiftId ?? null,
+        shift_id: effectiveShiftId ?? null,
         author: user?.email ?? null,
         tag: '86' as ShiftLogTag,
         body: bodyParts.join(' — '),
@@ -212,7 +219,7 @@ export function useShiftLog(shiftId?: number | null) {
       await refreshMenuItems();
       return true;
     },
-    [menuItems, refresh, refreshMenuItems, shiftId, user?.email]
+    [menuItems, refresh, refreshMenuItems, effectiveShiftId, user?.email]
   );
 
   /** Clear the 86 flag on a menu item (best-effort) and log the un-86. */
@@ -230,7 +237,7 @@ export function useShiftLog(shiftId?: number | null) {
       }
 
       await supabase.from('shift_log').insert({
-        shift_id: shiftId ?? null,
+        shift_id: effectiveShiftId ?? null,
         author: user?.email ?? null,
         tag: 'note' as ShiftLogTag,
         body: `Back on — ${item?.name ?? `item #${menuItemId}`}`,
@@ -242,7 +249,7 @@ export function useShiftLog(shiftId?: number | null) {
       await refreshMenuItems();
       return true;
     },
-    [menuItems, refresh, refreshMenuItems, shiftId, user?.email]
+    [menuItems, refresh, refreshMenuItems, effectiveShiftId, user?.email]
   );
 
   /** Filter the loaded entries client-side (tag / search). */

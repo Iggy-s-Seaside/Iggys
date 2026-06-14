@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  PartyPopper, CalendarClock, UserPlus, ListTodo, Share2, CalendarDays, Sparkles,
+  PartyPopper, UserPlus, ListTodo, Share2, CalendarDays, Sparkles,
   PenLine, Ban, DoorClosed, type LucideIcon,
 } from 'lucide-react';
 import { BottomSheet } from './ui/BottomSheet';
@@ -24,8 +24,7 @@ interface QuickAction {
  * regardless, so this stays forward-compatible with pages that ignore it. */
 const CREATE_ACTIONS: QuickAction[] = [
   { label: 'New Party', hint: 'Booking inquiry', icon: PartyPopper, to: '/parties?new=1' },
-  { label: 'New Reservation', hint: 'Book a table', icon: CalendarClock, to: '/reservations?new=1' },
-  { label: 'Add Walk-in', hint: 'Seat right now', icon: UserPlus, to: '/reservations?new=walkin' },
+  { label: 'Add to waitlist', hint: 'Walk-up guest', icon: UserPlus, to: '/waitlist' },
   { label: 'New To-do', hint: 'Task for the team', icon: ListTodo, to: '/todos?new=1' },
   { label: 'Quick Post', hint: 'Social draft', icon: Share2, to: '/social?new=1' },
   { label: 'New Event', hint: 'Add to calendar', icon: CalendarDays, to: '/events/new' },
@@ -69,7 +68,9 @@ function ActionButton({ action, onSelect }: { action: QuickAction; onSelect: (to
 export function QuickCreateSheet({ open, onClose }: QuickCreateSheetProps) {
   const navigate = useNavigate();
   const { current } = useShift();
-  const shiftOpen = !!current;
+  // current now resolves to "today's service session" (9am business-day), which can
+  // exist after close — so gate the shift-actions strictly on the bar being open.
+  const shiftOpen = current?.status === 'open';
 
   const handleSelect = (to: string) => {
     onClose();

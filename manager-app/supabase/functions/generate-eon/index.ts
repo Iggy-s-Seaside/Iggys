@@ -30,9 +30,31 @@ function corsHeaders(req: Request) {
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+// The SERVICE day (business day) — mirrors src/utils/businessDay.ts. A bar's
+// night spills past midnight, so we roll the day at 9:00am Pacific: any moment
+// before the cutoff counts as the previous calendar date. This is the date the
+// EON's parties/events query and header must use, so the report matches the
+// night actually being closed (not the next morning's calendar date).
+const BUSINESS_DAY_CUTOFF_HOUR = 9;
+const BUSINESS_DAY_TZ = "America/Los_Angeles";
 function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_DAY_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  // Anchor the Pacific calendar date at UTC noon (DST-safe whole-day math).
+  const anchor = new Date(Date.UTC(get("year"), get("month") - 1, get("day"), 12, 0, 0));
+  if (get("hour") < BUSINESS_DAY_CUTOFF_HOUR) {
+    anchor.setUTCDate(anchor.getUTCDate() - 1);
+  }
+  return `${anchor.getUTCFullYear()}-${pad(anchor.getUTCMonth() + 1)}-${pad(anchor.getUTCDate())}`;
 }
 function fmtCents(cents: number): string {
   const sign = cents < 0 ? "-" : "";

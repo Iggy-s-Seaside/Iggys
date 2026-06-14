@@ -5,7 +5,9 @@
 // role) adds the allowlist row, creates the user, and returns a one-time
 // temp password. Any authenticated manager may manage the team (single-
 // tenant app; the bar's managers are mutually trusted).
-// Actions: list | create {email} | reset_password {user_id} | delete {user_id}
+// Actions: list | create {email, role?} | reset_password {user_id} | delete {user_id}
+// Each account carries a role (owner|manager|employee) stored on the allowlist
+// row AND mirrored into the auth user's app_metadata for cheap client reads.
 // Required secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
@@ -29,6 +31,16 @@ function getCorsHeaders(req: Request) {
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email) && email.length < 254;
+}
+
+type Role = "owner" | "manager" | "employee";
+const ROLES: Role[] = ["owner", "manager", "employee"];
+const isRole = (v: unknown): v is Role => typeof v === "string" && (ROLES as string[]).includes(v);
+
+/** Read the role an existing auth user carries (app_metadata first, allowlist fallback). */
+function roleFromMetadata(meta: Record<string, unknown> | null | undefined): Role | null {
+  const r = meta?.role;
+  return isRole(r) ? r : null;
 }
 
 /** Random, readable temp password (no ambiguous chars). Shown ONCE. */
@@ -70,18 +82,31 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { action, email, user_id } = await req.json();
+    const { action, email, user_id, role } = await req.json();
 
     // ── LIST ──
     if (action === "list") {
       const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
       if (error) throw new Error(error.message);
+
+      // Allowlist holds the source-of-truth role; app_metadata mirrors it but
+      // pre-migration accounts may only have it on the allowlist row.
+      const { data: allow } = await admin.from("manager_allowlist").select("email, role");
+      const roleByEmail = new Map<string, Role>();
+      for (const row of allow ?? []) {
+        if (row?.email && isRole(row.role)) roleByEmail.set(String(row.email).toLowerCase(), row.role);
+      }
+
       const users = data.users.map((u) => ({
         id: u.id,
         email: u.email,
         created_at: u.created_at,
         last_sign_in_at: u.last_sign_in_at ?? null,
         is_me: u.id === caller.id,
+        role:
+          roleFromMetadata(u.app_metadata as Record<string, unknown> | undefined) ??
+          (u.email ? roleByEmail.get(u.email.toLowerCase()) : undefined) ??
+          "employee",
       }));
       return json({ users });
     }
@@ -91,10 +116,17 @@ serve(async (req: Request) => {
       const target = typeof email === "string" ? email.trim().toLowerCase() : "";
       if (!isValidEmail(target)) return json({ error: "Enter a valid email address." }, 400);
 
+      // Role: optional, defaults to manager; reject anything off the enum.
+      let newRole: Role = "manager";
+      if (role !== undefined && role !== null && role !== "") {
+        if (!isRole(role)) return json({ error: "Invalid role." }, 400);
+        newRole = role;
+      }
+
       // Allowlist first: the auth.users insert trigger requires it.
       const { error: alErr } = await admin
         .from("manager_allowlist")
-        .upsert({ email: target, added_by: caller.email ?? caller.id });
+        .upsert({ email: target, added_by: caller.email ?? caller.id, role: newRole });
       if (alErr) throw new Error(`allowlist: ${alErr.message}`);
 
       const password = tempPassword();
@@ -102,13 +134,14 @@ serve(async (req: Request) => {
         email: target,
         password,
         email_confirm: true,
+        app_metadata: { role: newRole },
       });
       if (error) {
         // Roll the allowlist entry back so a failed create leaves no door open.
         await admin.from("manager_allowlist").delete().eq("email", target);
         return json({ error: error.message }, 400);
       }
-      return json({ created: { id: data.user.id, email: target }, temp_password: password });
+      return json({ created: { id: data.user.id, email: target, role: newRole }, temp_password: password });
     }
 
     // ── RESET PASSWORD ──

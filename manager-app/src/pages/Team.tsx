@@ -7,6 +7,8 @@ import { supabase } from '../lib/supabase';
 import { useConfirm } from '../hooks/useConfirm';
 import { usePushSubscription } from '../hooks/usePushSubscription';
 import { Skeleton } from '../components/ui/Skeleton';
+import Select from '../components/ui/Select';
+import type { Role } from '../hooks/useRole';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 interface ManagerUser {
@@ -15,6 +17,34 @@ interface ManagerUser {
   created_at: string;
   last_sign_in_at: string | null;
   is_me: boolean;
+  role: Role;
+}
+
+const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'employee', label: 'Employee' },
+];
+
+const ROLE_LABEL: Record<Role, string> = {
+  owner: 'Owner',
+  manager: 'Manager',
+  employee: 'Employee',
+};
+
+/** Per-role badge tint — owner reads as the strongest, employee the quietest. */
+function RoleBadge({ role }: { role: Role }) {
+  const tint =
+    role === 'owner'
+      ? 'bg-primary/10 text-primary'
+      : role === 'manager'
+        ? 'bg-accent/10 text-accent'
+        : 'bg-surface-active text-text-muted';
+  return (
+    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${tint}`}>
+      {ROLE_LABEL[role]}
+    </span>
+  );
 }
 
 interface TempCredential {
@@ -176,6 +206,7 @@ export function Team() {
   const [users, setUsers] = useState<ManagerUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState<Role>('manager');
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cred, setCred] = useState<TempCredential | null>(null);
@@ -206,13 +237,14 @@ export function Team() {
     if (!email || adding) return;
     setAdding(true);
     try {
-      const data = await callManageUsers({ action: 'create', email });
+      const data = await callManageUsers({ action: 'create', email, role: newRole });
       setCred({ email, password: data.temp_password, kind: 'created' });
       setNewEmail('');
-      toast.success('Manager added');
+      setNewRole('manager');
+      toast.success('Teammate added');
       fetchUsers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to add manager');
+      toast.error(e instanceof Error ? e.message : 'Failed to add teammate');
     }
     setAdding(false);
   };
@@ -313,14 +345,17 @@ export function Team() {
             {users.map((u) => (
               <li key={u.id} className="py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-primary truncate">
-                    {u.email}
-                    {u.is_me && (
-                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
-                        you
-                      </span>
-                    )}
-                  </p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">
+                      {u.email}
+                      {u.is_me && (
+                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                          you
+                        </span>
+                      )}
+                    </p>
+                    <RoleBadge role={u.role} />
+                  </div>
                   <p className="text-xs text-text-muted">Last sign-in {relativeTime(u.last_sign_in_at)}</p>
                 </div>
                 <button
@@ -336,7 +371,7 @@ export function Team() {
                   <button
                     onClick={() => handleRemove(u)}
                     disabled={busyId === u.id}
-                    title="Remove manager"
+                    title="Remove teammate"
                     aria-label={`Remove ${u.email}`}
                     className="p-2 rounded-lg text-text-muted hover:bg-surface-hover hover:text-danger transition-colors disabled:opacity-50"
                   >
@@ -349,24 +384,36 @@ export function Team() {
         )}
       </div>
 
-      {/* Add manager */}
+      {/* Add teammate */}
       <div className="card p-5 mb-6">
         <h2 className="text-sm font-semibold text-text-primary mb-1 flex items-center gap-2">
-          <UserPlus size={15} className="text-primary" /> Add a manager
+          <UserPlus size={15} className="text-primary" /> Add a teammate
         </h2>
         <p className="text-xs text-text-muted mb-4">
           Creates the account instantly and gives you a one-time temp password to hand them.
+          Pick what they can do: <span className="font-medium text-text-secondary">Owner</span> (full),
+          {' '}<span className="font-medium text-text-secondary">Manager</span> (operations), or
+          {' '}<span className="font-medium text-text-secondary">Employee</span> (waitlist, own schedule &amp; checklists).
         </p>
-        <form onSubmit={handleAdd} className="flex items-center gap-2">
+        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row sm:items-center gap-2">
           <input
             type="email"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="their-email@example.com"
-            aria-label="New manager email"
+            aria-label="New teammate email"
             className="input-field flex-1"
             required
           />
+          <div className="sm:w-40 shrink-0">
+            <Select<Role>
+              value={newRole}
+              onChange={setNewRole}
+              options={ROLE_OPTIONS}
+              variant="manager"
+              label="Role"
+            />
+          </div>
           <button type="submit" disabled={adding || !newEmail.trim()} className="btn-primary px-4 min-h-[44px] shrink-0">
             {adding ? <Loader2 size={16} className="animate-spin" /> : 'Add'}
           </button>

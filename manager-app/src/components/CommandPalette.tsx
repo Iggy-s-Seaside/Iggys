@@ -46,13 +46,13 @@ function fireEvent(name: string) {
 /* ── Pages: mirrors the nav list in Sidebar.tsx (keep in sync) ───────────── */
 const PAGE_COMMANDS: Command[] = [
   { id: 'page:dashboard', label: 'Dashboard', to: '/', icon: LayoutDashboard, kind: 'page', keywords: 'home overview' },
-  { id: 'page:shift', label: 'Shift', to: '/shift', icon: ClipboardCheck, kind: 'page', keywords: 'bar open close drawer' },
+  { id: 'page:shift', label: 'Service', to: '/shift', icon: ClipboardCheck, kind: 'page', keywords: 'shift bar open close drawer service tonight' },
   { id: 'page:run-sheet', label: 'Run Sheet', to: '/run-sheet', icon: ClipboardList, kind: 'page', keywords: 'today tonight prep' },
   { id: 'page:luna', label: 'Luna', to: '/luna', icon: Moon, kind: 'page', keywords: 'ai insights assistant' },
   { id: 'page:messages', label: 'Messages', to: '/messages', icon: MessageSquare, kind: 'page', keywords: 'inbox chat dm' },
   { id: 'page:reputation', label: 'Reviews', to: '/reputation', icon: Star, kind: 'page', keywords: 'reputation ratings google yelp' },
   { id: 'page:parties', label: 'Parties', to: '/parties', icon: PartyPopper, kind: 'page', keywords: 'events bookings functions' },
-  { id: 'page:reservations', label: 'Reservations', to: '/reservations', icon: CalendarClock, kind: 'page', keywords: 'bookings tables' },
+  { id: 'page:waitlist', label: 'Waitlist', to: '/waitlist', icon: CalendarClock, kind: 'page', keywords: 'waitlist walk-in walk in wait queue host table ready reservation seating' },
   { id: 'page:pipeline', label: 'Pipeline', to: '/pipeline', icon: KanbanSquare, kind: 'page', keywords: 'leads sales kanban' },
   { id: 'page:calendar', label: 'Calendar', to: '/calendar', icon: CalendarDays, kind: 'page', keywords: 'schedule month' },
   { id: 'page:todos', label: 'To-Do', to: '/todos', icon: ListChecks, kind: 'page', keywords: 'tasks checklist' },

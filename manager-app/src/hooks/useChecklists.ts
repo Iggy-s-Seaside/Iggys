@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useImageUpload } from './useImageUpload';
+import { todaysBusinessDay } from '../utils/businessDay';
 import type {
   ChecklistKind,
   ChecklistTemplate,
@@ -20,9 +21,13 @@ import type {
 
 /**
  * Resolve which shift a run should attach to. If `shiftId` is supplied
- * (from ?shift=) it wins; otherwise we look up the single open
- * shift_sessions row. Returns null when standalone / no open shift —
- * the run is still recorded, just unattributed.
+ * (from ?shift=) it wins; otherwise we resolve the current SERVICE session as
+ * the most recent shift_sessions row stamped with today's business day (9am
+ * Pacific cutoff) — NOT merely status=open. This is what makes today's
+ * checklists roll on their own: past 9am the resolved id flips to the new
+ * day's session, so a session left open overnight no longer pins yesterday's
+ * checklist. Returns null when standalone / nothing for today — the run is
+ * still recorded, just unattributed.
  */
 export function useCurrentShiftId(shiftId?: number | null) {
   const [resolved, setResolved] = useState<number | null>(shiftId ?? null);
@@ -34,20 +39,38 @@ export function useCurrentShiftId(shiftId?: number | null) {
       return;
     }
     (async () => {
+      const today = todaysBusinessDay();
+      // Primary: the most recent session for today's business day.
       const { data, error } = await supabase
         .from('shift_sessions')
         .select('id')
-        .eq('status', 'open')
+        .eq('business_day', today)
         .order('opened_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (!active) return;
-      // Missing table / no open shift is non-fatal — run standalone.
       if (error) {
+        // Missing table / column is non-fatal — run standalone.
         setResolved(null);
         return;
       }
-      setResolved((data as { id: number } | null)?.id ?? null);
+      const todays = (data as { id: number } | null)?.id ?? null;
+      if (todays != null) {
+        setResolved(todays);
+        return;
+      }
+      // Legacy fallback: rows written before business_day existed are still
+      // resolvable by an open status (only used until they're stamped/closed).
+      const { data: legacy } = await supabase
+        .from('shift_sessions')
+        .select('id')
+        .eq('status', 'open')
+        .is('business_day', null)
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!active) return;
+      setResolved((legacy as { id: number } | null)?.id ?? null);
     })();
     return () => {
       active = false;

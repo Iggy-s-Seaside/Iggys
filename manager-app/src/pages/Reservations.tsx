@@ -1,255 +1,48 @@
 import { useId, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarClock,
-  Plus,
   Users,
   Phone,
   Clock,
   Bell,
-  Check,
-  X,
   Armchair,
   Loader2,
   Hourglass,
-  CircleDollarSign,
-  Trash2,
+  X,
   PartyPopper,
+  Plus,
+  Ban,
 } from 'lucide-react';
-import { format, parseISO, formatDistanceToNow, differenceInMinutes } from 'date-fns';
+import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
 import { safeFmtDate } from '../utils/format';
 import { createPartyFromLead } from '../utils/partyUpsell';
 import {
   useReservations,
   suggestWaitQuote,
-  RESERVATION_STATUS_LABELS,
-  DEPOSIT_STATUS_LABELS,
-  type Reservation,
+  DEFAULT_WAITLIST_AREA,
   type WaitlistEntry,
-  type FloorTable,
-  type ReservationStatus,
-  type ReservationDepositStatus,
 } from '../hooks/useReservations';
 import { useConfirm } from '../hooks/useConfirm';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 
-// ── helpers ──
-
-/** Local datetime-local string for "tonight at the next round-ish slot". */
-function defaultReservedFor(): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0);
-  // datetime-local wants no timezone + minute precision
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-const RESERVATION_STATUS_TONE: Record<ReservationStatus, string> = {
-  booked: 'bg-surface-hover text-text-secondary',
-  confirmed: 'bg-primary/10 text-primary',
-  seated: 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-  completed: 'bg-surface-hover text-text-muted',
-  cancelled: 'bg-red-50 text-danger dark:bg-red-500/10',
-  no_show: 'bg-red-50 text-danger dark:bg-red-500/10',
-};
-
-const ACTIVE_RES_STATUSES: ReservationStatus[] = ['booked', 'confirmed', 'seated'];
-
-// ── Add Reservation Modal ──
-
-interface ReservationModalProps {
-  open: boolean;
-  onClose: () => void;
-  tables: FloorTable[];
-  sectionName: Map<number, string>;
-  onSubmit: (input: {
-    guest_name: string;
-    phone: string | null;
-    party_size: number;
-    reserved_for: string;
-    table_id: number | null;
-    notes: string | null;
-    deposit_status: ReservationDepositStatus;
-  }) => Promise<boolean>;
-}
-
-function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: ReservationModalProps) {
-  const [form, setForm] = useState({
-    guest_name: '',
-    phone: '',
-    party_size: 2,
-    reserved_for: defaultReservedFor(),
-    table_id: null as number | null,
-    notes: '',
-    deposit_status: 'none' as ReservationDepositStatus,
-  });
-  const [saving, setSaving] = useState(false);
-  const uid = useId();
-  const fieldId = (name: string) => `${uid}-${name}`;
-
-  if (!open) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.guest_name.trim()) {
-      toast.error('Guest name is required');
-      return;
-    }
-    setSaving(true);
-    const ok = await onSubmit({
-      guest_name: form.guest_name.trim(),
-      phone: form.phone.trim() || null,
-      party_size: form.party_size,
-      // datetime-local has no zone; treat as local time → ISO
-      reserved_for: new Date(form.reserved_for).toISOString(),
-      table_id: form.table_id,
-      notes: form.notes.trim() || null,
-      deposit_status: form.deposit_status,
-    });
-    setSaving(false);
-    if (ok) {
-      setForm({
-        guest_name: '',
-        phone: '',
-        party_size: 2,
-        reserved_for: defaultReservedFor(),
-        table_id: null,
-        notes: '',
-        deposit_status: 'none',
-      });
-      onClose();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-semibold text-text-primary">New Reservation</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover">
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label htmlFor={fieldId('guest_name')} className="label">Guest name *</label>
-            <input
-              id={fieldId('guest_name')}
-              className="input-field"
-              required
-              value={form.guest_name}
-              onChange={(e) => setForm({ ...form, guest_name: e.target.value })}
-              placeholder="e.g. Dana R."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor={fieldId('phone')} className="label">Phone</label>
-              <input
-                id={fieldId('phone')}
-                className="input-field"
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="(503) 555-0199"
-              />
-            </div>
-            <div>
-              <label htmlFor={fieldId('party_size')} className="label">Party size</label>
-              <input
-                id={fieldId('party_size')}
-                className="input-field"
-                type="number"
-                min={1}
-                value={form.party_size}
-                onChange={(e) => setForm({ ...form, party_size: Math.max(1, Number(e.target.value) || 1) })}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor={fieldId('reserved_for')} className="label">Reserved for</label>
-            <input
-              id={fieldId('reserved_for')}
-              className="input-field"
-              type="datetime-local"
-              value={form.reserved_for}
-              onChange={(e) => setForm({ ...form, reserved_for: e.target.value })}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor={fieldId('table_id')} className="label">Table</label>
-              <select
-                id={fieldId('table_id')}
-                className="input-field"
-                value={form.table_id ?? ''}
-                onChange={(e) => setForm({ ...form, table_id: e.target.value ? Number(e.target.value) : null })}
-              >
-                <option value="">Unassigned</option>
-                {tables.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} · {t.seats} seats
-                    {t.section_id != null && sectionName.get(t.section_id)
-                      ? ` (${sectionName.get(t.section_id)})`
-                      : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor={fieldId('deposit_status')} className="label">Deposit</label>
-              <select
-                id={fieldId('deposit_status')}
-                className="input-field"
-                value={form.deposit_status}
-                onChange={(e) => setForm({ ...form, deposit_status: e.target.value as ReservationDepositStatus })}
-              >
-                {(Object.keys(DEPOSIT_STATUS_LABELS) as ReservationDepositStatus[]).map((d) => (
-                  <option key={d} value={d}>
-                    {DEPOSIT_STATUS_LABELS[d]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor={fieldId('notes')} className="label">Notes</label>
-            <textarea
-              id={fieldId('notes')}
-              className="input-field"
-              rows={2}
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Window seat, birthday, allergy…"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-ghost">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="btn-primary">
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add reservation
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+// The family does NOT take table reservations — this page is the live walk-up
+// waitlist for the host stand. Auto wait-quote, realtime board, "Text table is
+// ready" notify, and a private-party upsell for large walk-ups.
 
 // ── Add Walk-in (waitlist) inline form ──
 
 interface WaitlistFormProps {
   partiesWaiting: number;
-  onAdd: (input: { guest_name: string; phone: string | null; party_size: number; quoted_minutes: number }) => Promise<boolean>;
+  onAdd: (input: {
+    guest_name: string;
+    phone: string | null;
+    party_size: number;
+    quoted_minutes: number;
+    area: string;
+  }) => Promise<boolean>;
 }
 
 function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
@@ -258,6 +51,10 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
   const [size, setSize] = useState(2);
   const [saving, setSaving] = useState(false);
   const sizeId = useId();
+
+  // Area defaults to the main restaurant; bar/patio land here once the room is
+  // split. Kept as a single default for now so the form stays one-tap fast.
+  const area = DEFAULT_WAITLIST_AREA;
 
   const quote = useMemo(() => suggestWaitQuote(partiesWaiting, size), [partiesWaiting, size]);
 
@@ -273,6 +70,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
       phone: phone.trim() || null,
       party_size: size,
       quoted_minutes: quote,
+      area,
     });
     setSaving(false);
     if (ok) {
@@ -290,6 +88,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
           placeholder="Guest name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          aria-label="Guest name"
         />
         <input
           className="input-field"
@@ -297,6 +96,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
           placeholder="Phone (for text)"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          aria-label="Phone number"
         />
       </div>
       <div className="flex items-center gap-3">
@@ -315,7 +115,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
           <Hourglass size={13} /> ~{quote} min quote
         </span>
         <button type="submit" disabled={saving} className="btn-primary text-sm ml-auto">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add to waitlist
         </button>
       </div>
     </form>
@@ -326,59 +126,46 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
 
 export function Reservations() {
   const {
-    reservations,
     waitlist,
-    tables,
-    sectionName,
-    tableById,
     loading,
     error,
     refresh,
-    createReservation,
-    setReservationStatus,
-    seatReservation,
-    deleteReservation,
     addToWaitlist,
     notifyWaitlist,
     seatWaitlist,
     cancelWaitlist,
+    addNoShow,
   } = useReservations();
 
-  const [modalOpen, setModalOpen] = useState(false);
   const [notifyingId, setNotifyingId] = useState<number | null>(null);
   const [convertingId, setConvertingId] = useState<number | null>(null);
 
   const confirm = useConfirm();
   const navigate = useNavigate();
 
-  // Turn a reservation (especially a large one) into a private-party inquiry,
-  // pre-filled from what we already know. Reuses the app's standard party-create
-  // path; sends no email. The reservation stays put — this is purely additive.
-  const handleStartParty = async (r: Reservation) => {
+  const partiesWaiting = waitlist.filter((w) => w.status === 'waiting').length;
+
+  // Turn a large walk-up into a private-party inquiry, pre-filled from what we
+  // already know. Reuses the app's standard party-create path; sends no email.
+  // The party stays on the waitlist — this is purely additive.
+  const handleStartParty = async (w: WaitlistEntry) => {
     if (convertingId != null) return;
-    setConvertingId(r.id);
+    setConvertingId(w.id);
     const party = await createPartyFromLead({
-      contactName: r.guest_name,
-      contactPhone: r.phone,
-      title: `Party — ${r.guest_name}`,
-      eventDate: format(parseISO(r.reserved_for), 'yyyy-MM-dd'),
-      guestCount: r.party_size,
-      internalNotes: `Started from a reservation for ${r.party_size} on ${format(
-        parseISO(r.reserved_for),
+      contactName: w.guest_name,
+      contactPhone: w.phone,
+      title: `Party — ${w.guest_name}`,
+      eventDate: format(new Date(), 'yyyy-MM-dd'),
+      guestCount: w.party_size,
+      internalNotes: `Started from a ${w.party_size}-person walk-up on the waitlist (${format(
+        new Date(),
         'MMM d, yyyy h:mm a'
-      )}.${r.notes ? ` Reservation notes: ${r.notes}` : ''}`,
-      source: 'phone',
+      )}).`,
+      source: 'walk-in',
     });
     setConvertingId(null);
     if (party) navigate(`/parties/${party.id}`);
   };
-
-  const activeReservations = useMemo(
-    () => reservations.filter((r) => ACTIVE_RES_STATUSES.includes(r.status)),
-    [reservations]
-  );
-  const partiesWaiting = waitlist.filter((w) => w.status === 'waiting').length;
-  const coversTonight = activeReservations.reduce((sum, r) => sum + r.party_size, 0);
 
   const handleNotify = async (entry: WaitlistEntry) => {
     setNotifyingId(entry.id);
@@ -388,268 +175,70 @@ export function Reservations() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-            <CalendarClock size={24} className="text-primary" /> Host Board
-          </h1>
-          <span className="badge text-text-muted">{safeFmtDate(new Date(), 'EEE, MMM d')}</span>
-        </div>
-        <button onClick={() => setModalOpen(true)} className="btn-primary flex items-center gap-2 shrink-0">
-          <Plus size={16} />
-          <span>New reservation</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Waitlist"
+        icon={Users}
+        subtitle="Walk-up parties waiting for a table"
+      >
+        <span className="badge text-text-muted">{safeFmtDate(new Date(), 'EEE, MMM d')}</span>
+        {partiesWaiting > 0 && <span className="badge-accent">{partiesWaiting} waiting</span>}
+      </PageHeader>
 
-      {/* Stat strip */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="card p-4">
-          <p className="text-xs text-text-muted">Reservations</p>
-          <p className="text-2xl font-bold text-text-primary mt-1 tabular-nums">{activeReservations.length}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-xs text-text-muted">Covers booked</p>
-          <p className="text-2xl font-bold text-text-primary mt-1 tabular-nums">{coversTonight}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-xs text-text-muted">Waiting</p>
-          <p className="text-2xl font-bold text-text-primary mt-1 tabular-nums">{partiesWaiting}</p>
-        </div>
-      </div>
-
-      {error && reservations.length === 0 && waitlist.length === 0 ? (
-        <ErrorState onRetry={refresh} description="We couldn't load the host board. Your reservations are safe." />
+      {error && waitlist.length === 0 ? (
+        <ErrorState onRetry={refresh} description="We couldn't load the waitlist. Your guests are safe." />
       ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ── Reservations timeline ── */}
-        <section>
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Clock size={16} /> Tonight's reservations
-          </h2>
+        <div className="space-y-3 max-w-2xl">
+          <WaitlistForm partiesWaiting={partiesWaiting} onAdd={addToWaitlist} />
 
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="card p-4 animate-pulse">
                   <div className="h-4 bg-surface-hover rounded w-1/3 mb-2" />
-                  <div className="h-3 bg-surface-hover rounded w-2/3" />
+                  <div className="h-3 bg-surface-hover rounded w-1/2" />
                 </div>
               ))}
             </div>
-          ) : activeReservations.length === 0 ? (
-            <div className="card p-10 text-center">
-              <CalendarClock size={40} className="mx-auto text-text-muted mb-3" />
-              <p className="text-sm text-text-muted">No reservations on the books tonight.</p>
-              <button onClick={() => setModalOpen(true)} className="btn-primary mt-4">
-                Add the first one
-              </button>
-            </div>
+          ) : waitlist.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No one's waiting"
+              description="Walk-ins you add land here. Each gets an auto wait-quote and a one-tap “table is ready” text."
+            />
           ) : (
-            <ol className="relative space-y-3">
-              {activeReservations.map((r) => (
-                <ReservationRow
-                  key={r.id}
-                  reservation={r}
-                  table={r.table_id != null ? tableById.get(r.table_id) ?? null : null}
-                  converting={convertingId === r.id}
-                  onStartParty={() => handleStartParty(r)}
-                  onSeat={() => seatReservation(r.id)}
-                  onStatus={(s) => setReservationStatus(r.id, s)}
-                  onDelete={async () => {
-                    const ok = await confirm({
-                      title: 'Remove reservation',
-                      message: `Remove ${r.guest_name}'s reservation?`,
-                      confirmLabel: 'Remove',
-                      danger: true,
-                    });
-                    if (ok) deleteReservation(r.id);
-                  }}
-                />
-              ))}
-            </ol>
+            waitlist.map((w) => (
+              <WaitlistRow
+                key={w.id}
+                entry={w}
+                notifying={notifyingId === w.id}
+                converting={convertingId === w.id}
+                onNotify={() => handleNotify(w)}
+                onStartParty={() => handleStartParty(w)}
+                onSeat={() => seatWaitlist(w.id)}
+                onCancel={async () => {
+                  const ok = await confirm({
+                    title: 'Remove from waitlist',
+                    message: `Remove ${w.guest_name} from the waitlist?`,
+                    confirmLabel: 'Remove',
+                    danger: true,
+                  });
+                  if (ok) cancelWaitlist(w.id);
+                }}
+                onNoShow={async () => {
+                  const ok = await confirm({
+                    title: 'Mark as no-show',
+                    message: `Mark ${w.guest_name} as a no-show? They'll drop off the board.`,
+                    confirmLabel: 'No-show',
+                    danger: true,
+                  });
+                  if (ok) addNoShow(w.id);
+                }}
+              />
+            ))
           )}
-        </section>
-
-        {/* ── Waitlist ── */}
-        <section>
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Users size={16} /> Waitlist
-            {partiesWaiting > 0 && (
-              <span className="badge-accent">{partiesWaiting} waiting</span>
-            )}
-          </h2>
-
-          <div className="space-y-3">
-            <WaitlistForm partiesWaiting={partiesWaiting} onAdd={addToWaitlist} />
-
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2].map((i) => (
-                  <div key={i} className="card p-4 animate-pulse">
-                    <div className="h-4 bg-surface-hover rounded w-1/3 mb-2" />
-                    <div className="h-3 bg-surface-hover rounded w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : waitlist.length === 0 ? (
-              <div className="card p-8 text-center">
-                <Users size={32} className="mx-auto text-text-muted mb-2" />
-                <p className="text-sm text-text-muted">Waitlist is empty. Walk-ins land here.</p>
-              </div>
-            ) : (
-              waitlist.map((w) => (
-                <WaitlistRow
-                  key={w.id}
-                  entry={w}
-                  notifying={notifyingId === w.id}
-                  onNotify={() => handleNotify(w)}
-                  onSeat={() => seatWaitlist(w.id)}
-                  onCancel={() => cancelWaitlist(w.id)}
-                />
-              ))
-            )}
-          </div>
-        </section>
-      </div>
+        </div>
       )}
-
-      <ReservationModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        tables={tables}
-        sectionName={sectionName}
-        onSubmit={createReservation}
-      />
     </div>
-  );
-}
-
-// ── Reservation row ──
-
-interface ReservationRowProps {
-  reservation: Reservation;
-  table: FloorTable | null;
-  converting: boolean;
-  onStartParty: () => void;
-  onSeat: () => void;
-  onStatus: (status: ReservationStatus) => void;
-  onDelete: () => void;
-}
-
-/** Large reservations are the strongest private-party upsell candidates. */
-const LARGE_PARTY_THRESHOLD = 6;
-
-function ReservationRow({ reservation: r, table, converting, onStartParty, onSeat, onStatus, onDelete }: ReservationRowProps) {
-  const when = parseISO(r.reserved_for);
-  const minsAway = differenceInMinutes(when, new Date());
-  const isSeated = r.status === 'seated';
-  const isSoon = !isSeated && minsAway >= 0 && minsAway <= 15;
-  const isLate = !isSeated && minsAway < 0;
-  const isLargeParty = r.party_size >= LARGE_PARTY_THRESHOLD;
-
-  return (
-    <li className={`card p-4 ${isSoon ? 'border-primary/40' : ''} ${isLate ? 'border-amber-400/50' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-text-primary">{safeFmtDate(when, 'h:mm a')}</span>
-            <span className="text-sm text-text-primary truncate">{r.guest_name}</span>
-            <span className="flex items-center gap-1 text-xs text-text-muted">
-              <Users size={12} /> {r.party_size}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${RESERVATION_STATUS_TONE[r.status]}`}>
-              {RESERVATION_STATUS_LABELS[r.status]}
-            </span>
-            {table ? (
-              <span className="flex items-center gap-1 text-xs text-text-secondary">
-                <Armchair size={12} /> {table.name}
-              </span>
-            ) : (
-              <span className="text-xs text-text-muted">Unassigned</span>
-            )}
-            {r.deposit_status === 'paid' && (
-              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                <CircleDollarSign size={12} /> Deposit paid
-              </span>
-            )}
-            {r.deposit_status === 'requested' && (
-              <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                <CircleDollarSign size={12} /> Deposit requested
-              </span>
-            )}
-            {r.phone && (
-              <a href={`tel:${r.phone}`} className="flex items-center gap-1 text-xs text-text-muted hover:text-primary">
-                <Phone size={12} /> {r.phone}
-              </a>
-            )}
-            {isLate && <span className="text-xs font-medium text-amber-600 dark:text-amber-400">{Math.abs(minsAway)}m late</span>}
-            {isSoon && <span className="text-xs font-medium text-primary">in {minsAway}m</span>}
-          </div>
-          {r.notes && <p className="text-xs text-text-muted mt-1.5">{r.notes}</p>}
-        </div>
-
-        <button
-          onClick={onDelete}
-          title="Remove"
-          className="p-1.5 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger shrink-0"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      {isLargeParty && (
-        <div className="flex items-center gap-2 mt-3 rounded-lg bg-accent/[0.07] border border-accent/20 px-3 py-2">
-          <PartyPopper size={14} className="text-accent shrink-0" />
-          <p className="text-xs text-text-secondary">
-            Big group ({r.party_size}) — could this be a private party?
-          </p>
-          <button
-            onClick={onStartParty}
-            disabled={converting}
-            className="btn-secondary text-xs py-1.5 ml-auto shrink-0"
-          >
-            {converting ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
-            Start a party
-          </button>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
-        {!isSeated ? (
-          <button onClick={onSeat} className="btn-primary text-xs py-1.5">
-            <Armchair size={14} /> Seat
-          </button>
-        ) : (
-          <button onClick={() => onStatus('completed')} className="btn-secondary text-xs py-1.5">
-            <Check size={14} /> Complete
-          </button>
-        )}
-        {r.status === 'booked' && (
-          <button onClick={() => onStatus('confirmed')} className="btn-ghost text-xs py-1.5">
-            <Check size={14} /> Confirm
-          </button>
-        )}
-        {!isLargeParty && (
-          <button
-            onClick={onStartParty}
-            disabled={converting}
-            title="Convert this reservation into a private-party inquiry"
-            className="btn-ghost text-xs py-1.5 text-text-muted"
-          >
-            {converting ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
-            Start a party
-          </button>
-        )}
-        {!isSeated && (
-          <button onClick={() => onStatus('no_show')} className="btn-ghost text-xs py-1.5 ml-auto text-text-muted">
-            No-show
-          </button>
-        )}
-      </div>
-    </li>
   );
 }
 
@@ -658,14 +247,33 @@ function ReservationRow({ reservation: r, table, converting, onStartParty, onSea
 interface WaitlistRowProps {
   entry: WaitlistEntry;
   notifying: boolean;
+  converting: boolean;
   onNotify: () => void;
+  onStartParty: () => void;
   onSeat: () => void;
   onCancel: () => void;
+  onNoShow: () => void;
 }
 
-function WaitlistRow({ entry: w, notifying, onNotify, onSeat, onCancel }: WaitlistRowProps) {
+/** Large walk-ups are the strongest private-party upsell candidates. */
+const LARGE_PARTY_THRESHOLD = 6;
+
+function WaitlistRow({
+  entry: w,
+  notifying,
+  converting,
+  onNotify,
+  onStartParty,
+  onSeat,
+  onCancel,
+  onNoShow,
+}: WaitlistRowProps) {
   const waited = formatDistanceToNow(parseISO(w.created_at), { addSuffix: false });
   const isNotified = w.status === 'notified';
+  const isLargeParty = w.party_size >= LARGE_PARTY_THRESHOLD;
+  // Don't shout "main-restaurant" when it's the only area; show it once bar/patio exist.
+  const showArea = !!w.area && w.area !== DEFAULT_WAITLIST_AREA;
+  const areaLabel = w.area ? w.area.replace(/-/g, ' ') : '';
 
   return (
     <div className={`card p-4 ${isNotified ? 'border-primary/40 bg-primary/[0.03]' : ''}`}>
@@ -677,6 +285,7 @@ function WaitlistRow({ entry: w, notifying, onNotify, onSeat, onCancel }: Waitli
               <Users size={12} /> {w.party_size}
             </span>
             {isNotified && <span className="badge-primary">Notified</span>}
+            {showArea && <span className="badge text-text-muted capitalize">{areaLabel}</span>}
           </div>
           <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-text-muted">
             <span className="flex items-center gap-1">
@@ -699,7 +308,24 @@ function WaitlistRow({ entry: w, notifying, onNotify, onSeat, onCancel }: Waitli
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+      {isLargeParty && (
+        <div className="flex items-center gap-2 mt-3 rounded-lg bg-accent/[0.07] border border-accent/20 px-3 py-2">
+          <PartyPopper size={14} className="text-accent shrink-0" />
+          <p className="text-xs text-text-secondary">
+            Big group ({w.party_size}) — could this be a private party?
+          </p>
+          <button
+            onClick={onStartParty}
+            disabled={converting}
+            className="btn-secondary text-xs py-1.5 ml-auto shrink-0"
+          >
+            {converting ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
+            Start a party
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border flex-wrap">
         <button
           onClick={onNotify}
           disabled={notifying}
@@ -712,7 +338,18 @@ function WaitlistRow({ entry: w, notifying, onNotify, onSeat, onCancel }: Waitli
         <button onClick={onSeat} className="btn-primary text-xs py-1.5">
           <Armchair size={14} /> Seat
         </button>
-        <button onClick={onCancel} className="btn-ghost text-xs py-1.5 ml-auto text-text-muted hover:text-danger">
+        <button
+          onClick={onNoShow}
+          className="btn-ghost text-xs py-1.5 ml-auto text-text-muted hover:text-danger"
+          title="Party never showed — drop them off the board"
+        >
+          <Ban size={14} /> No-show
+        </button>
+        <button
+          onClick={onCancel}
+          className="btn-ghost text-xs py-1.5 text-text-muted hover:text-danger"
+          title="Remove from the waitlist"
+        >
           <X size={14} /> Cancel
         </button>
       </div>

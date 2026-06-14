@@ -873,6 +873,8 @@ export interface ShiftSession {
   closed_by: string | null;
   status: ShiftStatus;
   notes: string | null;
+  /** Service day (YYYY-MM-DD), 9am Pacific cutoff. Drives checklist/log day resolution. */
+  business_day: string | null;
 }
 
 // ── Checklists (opening / closing / safety, photo-proof items) ──
