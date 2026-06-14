@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2, Waves } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { InstallHelp } from '../components/InstallHelp';
 
 /** Progressive lockout: 0s, 2s, 5s, 10s, 30s after successive failures */
 const LOCKOUT_DELAYS = [0, 2000, 5000, 10000, 30000];
@@ -91,6 +92,11 @@ export function Login() {
             {loading ? <Loader2 size={18} className="animate-spin" /> : isLocked ? 'Please wait...' : 'Sign In'}
           </button>
         </form>
+
+        {/* Dismissible install on-ramp — a not-yet-installed new hire sees it the
+            moment they land here. Renders nothing once installed; stays dismissed
+            via localStorage. */}
+        <InstallHelp variant="banner" className="mt-4" />
       </div>
     </div>
   );

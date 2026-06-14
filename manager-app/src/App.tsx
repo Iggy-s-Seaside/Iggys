@@ -20,6 +20,7 @@ const MediaLibraryPage = lazy(() => import('./pages/MediaLibrary').then((m) => (
 const Inventory = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.Inventory })));
 const InventoryCount = lazy(() => import('./pages/InventoryCount').then((m) => ({ default: m.InventoryCount })));
 const Merch = lazy(() => import('./pages/Merch').then((m) => ({ default: m.Merch })));
+const Help = lazy(() => import('./pages/Help').then((m) => ({ default: m.Help })));
 const Messages = lazy(() => import('./pages/Messages').then((m) => ({ default: m.Messages })));
 const Parties = lazy(() => import('./pages/Parties').then((m) => ({ default: m.Parties })));
 const PartyProfile = lazy(() => import('./pages/PartyProfile').then((m) => ({ default: m.PartyProfile })));
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/shift/checks" element={<Checks />} />
           <Route path="/shift/log" element={<ShiftLog />} />
           <Route path="/shift/close" element={<CloseOut />} />
+          <Route path="/help" element={<Help />} />
 
           {/* Operational (owner + manager) */}
           <Route path="/" element={<Ops><Dashboard /></Ops>} />

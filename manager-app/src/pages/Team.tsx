@@ -8,6 +8,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { usePushSubscription } from '../hooks/usePushSubscription';
 import { Skeleton } from '../components/ui/Skeleton';
 import Select from '../components/ui/Select';
+import { InstallHelp } from '../components/InstallHelp';
+import { InstallQR } from '../components/InstallQR';
 import type { Role } from '../hooks/useRole';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
@@ -328,6 +330,11 @@ export function Team() {
         <ShieldCheck size={13} className="text-primary shrink-0" />
         There is no public sign-up — accounts can only be created here.
       </p>
+
+      {/* Get your staff set up: install on-ramp (renders nothing once installed)
+          + a printable QR poster for the back office (owner/manager only). */}
+      <InstallHelp variant="card" className="mb-6" />
+      <InstallQR className="mb-6" />
 
       {cred && <div className="mb-6"><CredentialReveal cred={cred} onDone={() => setCred(null)} /></div>}
 

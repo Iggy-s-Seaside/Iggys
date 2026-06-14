@@ -7,7 +7,7 @@ import {
   FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt,
   Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare,
   Share2, Star, Megaphone, CalendarClock, Calculator, ShieldCheck, Moon,
-  Plus, PenSquare, DoorOpen, DoorClosed, Shirt,
+  Plus, PenSquare, DoorOpen, DoorClosed, Shirt, HelpCircle,
 } from 'lucide-react';
 import { useCommandPaletteController } from '../hooks/useCommandPalette';
 
@@ -67,6 +67,7 @@ const PAGE_COMMANDS: Command[] = [
   { id: 'page:inventory', label: 'Inventory', to: '/inventory', icon: Package, kind: 'page', keywords: 'stock supplies counts mark low out 86' },
   { id: 'page:inventory-count', label: 'Count Stock', to: '/inventory/count', icon: ClipboardCheck, kind: 'page', keywords: 'count inventory periodic variance reconcile shrink' },
   { id: 'page:merch', label: 'Merch', to: '/merch', icon: Shirt, kind: 'page', keywords: 'merch shirts crop sweatshirt hats variants sizes stock apparel' },
+  { id: 'page:help', label: 'Help & Guide', to: '/help', icon: HelpCircle, kind: 'page', keywords: 'help guide how to docs support training onboarding' },
   { id: 'page:cogs', label: 'COGS', to: '/cogs', icon: Calculator, kind: 'page', keywords: 'cost of goods margins pour' },
   { id: 'page:packages', label: 'Packages', to: '/packages', icon: Tags, kind: 'page', keywords: 'party packages pricing' },
   { id: 'page:media', label: 'Media', to: '/media', icon: FolderOpen, kind: 'page', keywords: 'photos images library assets' },

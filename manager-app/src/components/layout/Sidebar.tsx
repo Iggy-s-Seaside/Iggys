@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, HelpCircle, ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
@@ -24,6 +24,7 @@ const navSections: NavSection[] = [
       { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: OPS },
       { to: '/shift', icon: ClipboardCheck, label: 'Service' },
       { to: '/waitlist', icon: Hourglass, label: 'Waitlist' },
+      { to: '/help', icon: HelpCircle, label: 'Help' },
       { to: '/run-sheet', icon: ClipboardList, label: 'Run Sheet', roles: OPS },
     ],
   },

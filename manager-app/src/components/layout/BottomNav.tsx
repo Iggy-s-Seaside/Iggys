@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus, Hourglass, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus, Hourglass, ClipboardCheck, HelpCircle } from 'lucide-react';
 import { useUnreadCount } from '../../hooks/useMessages';
 import { useNewInsightCount } from '../../hooks/useLuna';
 import { useRole } from '../../hooks/useRole';
@@ -63,10 +63,11 @@ export function BottomNav() {
             <Tab to="/messages" icon={MessageSquare} label="Inbox" badge={unread} />
           </div>
         ) : (
-          // Employee view: just the two surfaces they're allowed to run.
-          <div className="grid grid-cols-2 items-center">
+          // Employee view: the surfaces they're allowed to run + Help.
+          <div className="grid grid-cols-3 items-center">
             <Tab to="/waitlist" icon={Hourglass} label="Waitlist" />
             <Tab to="/shift" icon={ClipboardCheck} label="Service" />
+            <Tab to="/help" icon={HelpCircle} label="Help" />
           </div>
         )}
       </nav>
