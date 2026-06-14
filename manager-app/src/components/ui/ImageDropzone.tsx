@@ -32,9 +32,10 @@ export function ImageDropzone({ value, onChange, folder = 'specials' }: ImageDro
         <img src={value} alt="Upload preview" className="w-full h-48 object-cover" />
         <button
           onClick={() => onChange(null)}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Remove image"
+          className="absolute top-2 right-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-black/60 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity active:scale-95"
         >
-          <X size={14} />
+          <X size={16} />
         </button>
       </div>
     );

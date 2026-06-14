@@ -108,7 +108,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative ${maxWidth} w-full bg-surface rounded-t-xl sm:rounded-xl shadow-modal border border-border max-h-[85vh] sm:max-h-[90vh] flex flex-col focus:outline-none`}
+        className={`relative ${maxWidth} w-full bg-surface rounded-t-xl sm:rounded-xl shadow-modal border border-border max-h-[85dvh] sm:max-h-[90dvh] flex flex-col focus:outline-none`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 id={titleId} className="text-lg font-semibold text-text-primary">{title}</h2>

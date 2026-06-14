@@ -175,7 +175,7 @@ export function QuickPostModal({ open, onClose, onSaved }: QuickPostModalProps) 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative w-full max-w-md bg-surface rounded-2xl shadow-modal overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-md bg-surface rounded-2xl shadow-modal overflow-hidden max-h-[90dvh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <h2 className="text-lg font-semibold text-text-primary">Quick Post</h2>

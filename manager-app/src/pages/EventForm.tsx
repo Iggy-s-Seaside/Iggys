@@ -179,7 +179,7 @@ export function EventForm() {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Date *">
               <input
                 type="date"
@@ -199,7 +199,7 @@ export function EventForm() {
           </div>
 
           {!form.all_day && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Start *">
                 {({ id }) => (
                   <TimeSelect

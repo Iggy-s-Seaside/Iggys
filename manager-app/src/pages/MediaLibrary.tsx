@@ -140,30 +140,30 @@ export function MediaLibraryPage() {
                 onClick={() => setActiveCard(isActive ? null : cardKey)}
               >
                 <img src={item.url} alt={formatFilename(item.name)} className="w-full h-full object-cover" loading="lazy" />
-                <div className={`absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 ${isActive ? '!bg-black/40 !opacity-100' : ''}`}>
+                <div className={`absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 ${isActive ? '!bg-black/40 !opacity-100' : ''}`}>
                   <button
                     onClick={(e) => { e.stopPropagation(); copyUrl(item.url); }}
-                    className="p-2 rounded-lg bg-black/60 text-white hover:bg-primary transition-colors"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-black/60 text-white hover:bg-primary active:scale-95 transition-colors"
                     aria-label="Copy URL"
                   >
-                    <Copy size={14} />
+                    <Copy size={18} />
                   </button>
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="p-2 rounded-lg bg-black/60 text-white hover:bg-primary transition-colors"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-black/60 text-white hover:bg-primary active:scale-95 transition-colors"
                     aria-label="Open in new tab"
                   >
-                    <ExternalLink size={14} />
+                    <ExternalLink size={18} />
                   </a>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                    className="p-2 rounded-lg bg-black/60 text-white hover:bg-danger transition-colors"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-black/60 text-white hover:bg-danger active:scale-95 transition-colors"
                     aria-label="Delete"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>

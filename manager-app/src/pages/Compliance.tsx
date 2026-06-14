@@ -56,10 +56,10 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-modal w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
+      <div className="relative bg-surface border border-border rounded-xl shadow-modal w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface">
           <h2 className="font-semibold text-text-primary">{title}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
             <X size={18} />
           </button>
         </div>
@@ -451,8 +451,8 @@ function CredentialsTab({
     );
   }
   return (
-    <div className="card overflow-hidden">
-      <table className="w-full">
+    <div className="card overflow-x-auto overscroll-x-contain">
+      <table className="w-full min-w-[480px]">
         <thead>
           <tr className="border-b border-border text-left text-xs text-text-muted uppercase tracking-wide">
             <th className="px-5 py-3 font-medium">Credential</th>
@@ -475,11 +475,11 @@ function CredentialsTab({
               <td className="px-5 py-3 text-center"><ExpiryChip expiresOn={c.expires_on} /></td>
               {!readOnly && (
                 <td className="px-5 py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => onEdit(c)} className="p-2 rounded-lg hover:bg-surface-active text-text-muted hover:text-text-primary" title="Edit">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button onClick={() => onEdit(c)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-active text-text-muted hover:text-text-primary" title="Edit" aria-label="Edit credential">
                       <Pencil size={16} />
                     </button>
-                    <button onClick={() => onRemove(c.id)} className="p-2 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger" title="Remove">
+                    <button onClick={() => onRemove(c.id)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger" title="Remove" aria-label="Remove credential">
                       <Trash2 size={16} />
                     </button>
                   </div>

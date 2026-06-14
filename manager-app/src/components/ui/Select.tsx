@@ -42,7 +42,7 @@ const triggerClasses = (variant: 'glass' | 'manager', className?: string) =>
     'disabled:opacity-50 disabled:cursor-not-allowed',
     variant === 'manager'
       // Compose the manager's own input style so the closed trigger reads as a normal input field.
-      ? 'input-field flex items-center min-h-[42px] hover:border-primary/40'
+      ? 'input-field flex items-center min-h-[44px] hover:border-primary/40'
       : 'rounded-xl bg-surface border border-border px-4 py-3 min-h-[48px] text-text-primary hover:border-primary/40',
     className,
   ].filter(Boolean).join(' ');

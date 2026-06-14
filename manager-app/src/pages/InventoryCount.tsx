@@ -188,7 +188,7 @@ export function InventoryCount() {
   const allCounted = totals.countedLines === totals.totalLines && totals.totalLines > 0;
 
   return (
-    <div className="pb-32">
+    <div className="pb-[calc(160px+env(safe-area-inset-bottom,0px))]">
       <PageHeader
         title="Count Stock"
         icon={ClipboardCheck}

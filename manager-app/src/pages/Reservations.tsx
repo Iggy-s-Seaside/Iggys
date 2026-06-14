@@ -325,7 +325,7 @@ function WaitlistRow({
         </div>
       )}
 
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border flex-wrap">
+      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border flex-wrap">
         <button
           onClick={onNotify}
           disabled={notifying}
@@ -335,8 +335,8 @@ function WaitlistRow({
           {notifying ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
           {isNotified ? 'Re-notify' : 'Notify'}
         </button>
-        <button onClick={onSeat} className="btn-primary text-xs py-1.5">
-          <Armchair size={14} /> Seat
+        <button onClick={onSeat} className="btn-primary text-sm px-4 min-h-[48px]">
+          <Armchair size={16} /> Seat
         </button>
         <button
           onClick={onNoShow}

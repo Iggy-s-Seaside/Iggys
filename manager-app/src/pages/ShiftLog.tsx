@@ -483,21 +483,21 @@ function EightySixSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-t-2xl sm:rounded-xl shadow-lg w-full sm:max-w-md max-h-[85vh] flex flex-col">
+      <div className="relative bg-surface border border-border rounded-t-2xl sm:rounded-xl shadow-lg w-full sm:max-w-md max-h-[85dvh] flex flex-col pb-[max(0px,env(safe-area-inset-bottom,0px))]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
             <Ban size={18} className="text-danger" /> 86 an item
           </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-surface-hover min-h-[40px]"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"
             aria-label="Close"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className="p-5 space-y-4 overflow-y-auto overscroll-contain">
           {/* Currently 86'd — quick un-86 */}
           {eightySixedItems.length > 0 && (
             <div>
@@ -546,7 +546,6 @@ function EightySixSheet({
                 placeholder="Search menu…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                autoFocus
               />
             </div>
             {menuItems.length === 0 ? (

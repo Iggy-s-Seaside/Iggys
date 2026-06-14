@@ -110,12 +110,12 @@ export function Events() {
                     />
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1.5">
                       <AddToCalendarButton event={event} />
-                      <Link to={`/events/${event.id}/edit`} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                      <Link to={`/events/${event.id}/edit`} aria-label="Edit event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
                         <Edit2 size={15} />
                       </Link>
-                      <button onClick={() => setDeleteId(event.id)} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
+                      <button onClick={() => setDeleteId(event.id)} aria-label="Delete event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
                         <Trash2 size={15} />
                       </button>
                     </div>

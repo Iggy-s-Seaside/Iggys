@@ -255,7 +255,7 @@ export function Marketing() {
                 <p className="text-sm text-text-muted">No customers in this segment</p>
               </div>
             ) : (
-              <div className="divide-y divide-border max-h-[60vh] overflow-y-auto">
+              <div className="divide-y divide-border max-h-[60dvh] overflow-y-auto">
                 {filtered.map((c) => (
                   <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-surface-hover transition-colors">
                     <div className="min-w-0">
@@ -312,7 +312,7 @@ export function Marketing() {
               </button>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-0.5">
+            <div className="space-y-2 max-h-[70dvh] overflow-y-auto pr-0.5">
               {campaigns.map((c) => (
                 <CampaignCard key={c.id} campaign={c} />
               ))}
@@ -532,12 +532,12 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[92vh] overflow-y-auto mx-4">
+      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[92dvh] overflow-y-auto mx-4">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface z-10">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
             <Sparkles size={16} className="text-primary" /> New Campaign
           </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
             <X size={18} />
           </button>
         </div>

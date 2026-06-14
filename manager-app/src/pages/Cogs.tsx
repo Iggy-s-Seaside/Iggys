@@ -146,10 +146,10 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
+      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface">
           <h2 className="font-semibold text-text-primary">{initial ? 'Edit Recipe' : 'New Recipe'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
             <X size={18} />
           </button>
         </div>
@@ -159,7 +159,7 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
             <input className="input-field" required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label="Type">
               <Select<string>
                 variant="manager"
@@ -672,8 +672,8 @@ export function Cogs() {
                 <p className="text-text-muted">No cocktails on the menu yet. Add cocktails + name-matched recipes to see profitability.</p>
               </div>
             ) : (
-              <div className="card overflow-hidden">
-                <table className="w-full">
+              <div className="card overflow-x-auto overscroll-x-contain">
+                <table className="w-full min-w-[480px]">
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-text-muted uppercase tracking-wide">
                       <th className="px-5 py-3 font-medium">Menu item</th>
@@ -767,8 +767,8 @@ export function Cogs() {
             {orders.length > 0 && (
               <>
                 <h3 className="text-sm font-semibold text-text-secondary mb-2">Purchase orders</h3>
-                <div className="card overflow-hidden">
-                  <table className="w-full">
+                <div className="card overflow-x-auto overscroll-x-contain">
+                  <table className="w-full min-w-[480px]">
                     <thead>
                       <tr className="border-b border-border text-left text-xs text-text-muted uppercase tracking-wide">
                         <th className="px-5 py-3 font-medium">PO</th>
@@ -820,8 +820,9 @@ export function Cogs() {
                               )}
                               <button
                                 onClick={() => removePo(po.id)}
-                                className="p-2 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger"
+                                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger"
                                 title="Delete"
+                                aria-label="Delete purchase order"
                               >
                                 <Trash2 size={16} />
                               </button>

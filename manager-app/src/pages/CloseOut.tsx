@@ -40,8 +40,8 @@ function DenomRow({
 }) {
   const lineTotal = cents * count;
   return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="w-16 shrink-0 text-base font-semibold text-text-primary tabular-nums">{label}</div>
+    <div className="flex items-center gap-2 sm:gap-3 py-2">
+      <div className="w-12 sm:w-16 shrink-0 text-base font-semibold text-text-primary tabular-nums">{label}</div>
       <button
         type="button"
         onClick={() => onChange(Math.max(0, count - 1))}
@@ -57,7 +57,7 @@ function DenomRow({
         value={count === 0 ? '' : count}
         onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
         placeholder="0"
-        className="input-field h-12 w-16 shrink-0 text-center text-lg tabular-nums"
+        className="input-field h-12 w-12 sm:w-16 shrink-0 text-center text-lg tabular-nums"
         aria-label={`Count of ${label}`}
       />
       <button
@@ -68,7 +68,7 @@ function DenomRow({
       >
         +
       </button>
-      <div className="ml-auto w-24 text-right text-sm tabular-nums text-text-muted">
+      <div className="ml-auto min-w-0 flex-1 text-right text-sm tabular-nums text-text-muted">
         {lineTotal > 0 ? formatCents(lineTotal) : '—'}
       </div>
     </div>
@@ -212,7 +212,7 @@ export function CloseOut({ shiftId }: CloseOutProps) {
                 value={expectedDollars}
                 onChange={(e) => setExpectedDollars(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-transparent text-2xl font-bold tabular-nums text-text-primary outline-none"
+                className="w-full min-h-[44px] py-1 bg-transparent text-2xl font-bold tabular-nums text-text-primary outline-none"
               />
             </div>
           </div>
@@ -304,7 +304,7 @@ export function CloseOut({ shiftId }: CloseOutProps) {
               <button
                 onClick={handlePreview}
                 disabled={previewing || generating}
-                className="text-xs text-primary hover:underline disabled:opacity-50 flex items-center gap-1"
+                className="min-h-[44px] px-2 -mr-2 text-xs text-primary hover:underline disabled:opacity-50 inline-flex items-center gap-1"
               >
                 <RefreshCw size={12} className={previewing ? 'animate-spin' : ''} />
                 Refresh

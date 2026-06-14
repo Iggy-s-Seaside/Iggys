@@ -341,34 +341,35 @@ export function Messages() {
   const unreadCount = messages.filter(m => m.status === 'unread').length;
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex flex-col -m-6 lg:-m-8">
+    <div className="flex flex-col min-h-0 h-[calc(100dvh-4rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] -mx-6 lg:h-[calc(100dvh-3rem)] lg:-mx-8 lg:-my-8">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 lg:px-6 py-3 bg-surface border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 px-4 lg:px-6 py-3 bg-surface border-b border-border shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           {showMobileDetail && (
             <button
               onClick={() => setShowMobileDetail(false)}
-              className="md:hidden p-1.5 rounded-lg hover:bg-surface-hover"
+              className="md:hidden min-h-[44px] min-w-[44px] -ml-1.5 inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"
+              aria-label="Back to messages"
             >
               <ArrowLeft size={18} className="text-text-primary" />
             </button>
           )}
-          <h1 className="text-lg font-bold text-text-primary">Messages</h1>
+          <h1 className="text-lg font-bold text-text-primary truncate">Messages</h1>
           {unreadCount > 0 && (
-            <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full shrink-0">
               {unreadCount}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 flex-wrap justify-end">
           {selectedIds.size > 0 && (
             <>
-              <span className="text-xs text-text-muted">{selectedIds.size} selected</span>
-              <button onClick={() => handleBulkAction('read')} className="btn-ghost text-xs py-1 px-2">
-                <Check size={14} /> Mark Read
+              <span className="text-xs text-text-muted hidden sm:inline">{selectedIds.size} selected</span>
+              <button onClick={() => handleBulkAction('read')} className="btn-ghost text-xs py-1 px-2" aria-label="Mark read">
+                <Check size={14} /> <span className="hidden sm:inline">Mark Read</span>
               </button>
-              <button onClick={() => handleBulkAction('archive')} className="btn-ghost text-xs py-1 px-2">
-                <Archive size={14} /> Archive
+              <button onClick={() => handleBulkAction('archive')} className="btn-ghost text-xs py-1 px-2" aria-label="Archive">
+                <Archive size={14} /> <span className="hidden sm:inline">Archive</span>
               </button>
             </>
           )}
@@ -377,11 +378,12 @@ export function Messages() {
             disabled={syncing}
             title="Pull new emails from the Gmail inbox"
             className="btn-ghost text-xs py-1 px-2"
+            aria-label="Sync Gmail"
           >
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync Gmail
+            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} <span className="hidden sm:inline">Sync Gmail</span>
           </button>
-          <button onClick={() => setTemplatesOpen(true)} className="btn-ghost text-xs py-1 px-2">
-            <FileText size={14} /> Templates
+          <button onClick={() => setTemplatesOpen(true)} className="btn-ghost text-xs py-1 px-2" aria-label="Templates">
+            <FileText size={14} /> <span className="hidden sm:inline">Templates</span>
           </button>
         </div>
       </div>
@@ -490,27 +492,27 @@ export function Messages() {
             <>
               {/* Detail Header */}
               <div className="px-4 lg:px-6 py-4 bg-surface border-b border-border shrink-0">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <h2 className="text-lg font-semibold text-text-primary truncate">{selected.subject}</h2>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="flex items-center gap-1 text-sm text-text-secondary">
-                        <User size={13} /> {selected.name}
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 mt-1 min-w-0">
+                      <span className="flex items-center gap-1 text-sm text-text-secondary min-w-0">
+                        <User size={13} className="shrink-0" /> <span className="truncate">{selected.name}</span>
                       </span>
-                      <span className="text-sm text-text-muted">{selected.email}</span>
+                      <span className="text-sm text-text-muted truncate max-w-full">{selected.email}</span>
                       {selected.source === 'gmail' && (
-                        <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded self-start shrink-0">
                           via Gmail
                         </span>
                       )}
                       {selected.phone && (
                         <span className="flex items-center gap-1 text-sm text-text-muted">
-                          <Phone size={13} /> {selected.phone}
+                          <Phone size={13} className="shrink-0" /> {selected.phone}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
                     {statusBadge(selected.status)}
                     <button
                       onClick={handleMakeParty}

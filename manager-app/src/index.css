@@ -73,11 +73,14 @@
   .card-hover {
     @apply card transition-shadow hover:shadow-card-hover;
   }
+  /* min-h-[44px]: every button clears the iOS/Material touch floor regardless of
+     per-button text-xs/py-1.5 overrides. active:scale gives the <100ms pressed
+     feedback that hover: never provides on touch (rushed bartender needs it). */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 min-h-[44px] text-sm font-medium transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-primary text-white hover:bg-primary-hover focus:ring-primary;
+    @apply btn bg-primary text-white hover:bg-primary-hover active:bg-primary-hover focus:ring-primary;
   }
   /* Light mode: bright teal + white label is only ~1.86:1. Darken the bg to
      teal-700/800 so the white label clears WCAG AA (5.47:1) without changing
@@ -89,16 +92,18 @@
     background-color: #115e59;
   }
   .btn-secondary {
-    @apply btn bg-surface border border-border text-text-secondary hover:bg-surface-hover focus:ring-primary;
+    @apply btn bg-surface border border-border text-text-secondary hover:bg-surface-hover active:bg-surface-active focus:ring-primary;
   }
   .btn-danger {
-    @apply btn bg-danger text-white hover:bg-danger-hover focus:ring-danger;
+    @apply btn bg-danger text-white hover:bg-danger-hover active:bg-danger-hover focus:ring-danger;
   }
   .btn-ghost {
-    @apply btn text-text-secondary hover:bg-surface-hover focus:ring-primary;
+    @apply btn text-text-secondary hover:bg-surface-hover active:bg-surface-active focus:ring-primary;
   }
+  /* text-base on phone (16px) prevents iOS Safari's zoom-and-pan on focus; can
+     stay dense (text-sm) at sm:+ where there's no auto-zoom. */
   .input-field {
-    @apply w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors;
+    @apply w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-base sm:text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors;
   }
   .label {
     @apply block text-sm font-medium text-text-secondary mb-1.5;
@@ -166,6 +171,10 @@
   input[type="tel"],
   input[type="url"],
   input[type="search"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="password"],
   textarea,
   select {
     font-size: 16px !important;

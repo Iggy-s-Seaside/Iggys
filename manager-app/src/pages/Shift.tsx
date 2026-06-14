@@ -125,7 +125,7 @@ export function Shift() {
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-text-primary">Service</h1>
-          <span className={isOpen ? 'badge-success' : 'badge'}>
+          <span className={`${isOpen ? 'badge-success' : 'badge'} text-sm px-3 py-1 font-semibold`}>
             {isOpen ? 'Bar is OPEN' : 'Bar is closed'}
           </span>
         </div>

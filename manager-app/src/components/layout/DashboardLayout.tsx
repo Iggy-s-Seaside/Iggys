@@ -29,7 +29,7 @@ export function DashboardLayout() {
     // Fixed app-shell on mobile: the shell fills the viewport and never scrolls;
     // the inner content div is the ONE scroller (no body rubber-band). Desktop
     // (lg) reverts to normal in-flow layout + body scroll.
-    <div className="flex h-[100dvh] overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible">
+    <div className="flex h-[100dvh] overflow-hidden lg:h-auto lg:min-h-[100dvh] lg:overflow-visible">
       <Sidebar />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden lg:overflow-visible">
         {/* The single scroll container. overscroll-contain stops scroll-chaining;

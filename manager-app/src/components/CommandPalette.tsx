@@ -328,7 +328,7 @@ export function CommandPalette() {
 
       {/* Panel — full-screen sheet on mobile, centered card on desktop */}
       <div
-        className="relative w-full sm:max-w-xl bg-surface border border-border shadow-modal flex flex-col overflow-hidden h-[92vh] sm:h-auto sm:max-h-[70vh] rounded-t-2xl sm:rounded-2xl"
+        className="relative w-full sm:max-w-xl bg-surface border border-border shadow-modal flex flex-col overflow-hidden h-[92dvh] sm:h-auto sm:max-h-[70dvh] rounded-t-2xl sm:rounded-2xl"
         style={{ animation: 'fadeSlideUp 200ms cubic-bezier(0.32,0.72,0,1)' }}
         onKeyDown={onKeyDown}
       >

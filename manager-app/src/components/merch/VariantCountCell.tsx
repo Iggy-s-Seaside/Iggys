@@ -57,7 +57,7 @@ export function VariantCountCell({ variant, onSet, onAdjust }: VariantCountCellP
           onClick={() => onAdjust(variant.id, -1)}
           disabled={!variant.active || variant.stock <= 0}
           aria-label={`Decrease ${variantLabel(variant)}`}
-          className="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-hover hover:bg-red-500/10 hover:text-danger transition-colors disabled:opacity-40 disabled:hover:bg-surface-hover disabled:hover:text-current"
+          className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface-hover hover:bg-red-500/10 hover:text-danger active:scale-95 transition-colors disabled:opacity-40 disabled:hover:bg-surface-hover disabled:hover:text-current"
         >
           <Minus size={14} />
         </button>
@@ -85,7 +85,7 @@ export function VariantCountCell({ variant, onSet, onAdjust }: VariantCountCellP
             }
           }}
           aria-label={`${variantLabel(variant)} count`}
-          className={`w-12 h-9 text-center font-semibold tabular-nums bg-surface border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+          className={`w-12 h-11 text-center font-semibold tabular-nums bg-surface border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
             low ? 'border-accent/40' : 'border-border'
           } ${countColor} disabled:opacity-40`}
         />
@@ -94,7 +94,7 @@ export function VariantCountCell({ variant, onSet, onAdjust }: VariantCountCellP
           onClick={() => onAdjust(variant.id, 1)}
           disabled={!variant.active}
           aria-label={`Increase ${variantLabel(variant)}`}
-          className="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-hover hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors disabled:opacity-40"
+          className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface-hover hover:bg-emerald-500/10 hover:text-emerald-500 active:scale-95 transition-colors disabled:opacity-40"
         >
           <Plus size={14} />
         </button>
