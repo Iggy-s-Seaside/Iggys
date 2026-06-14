@@ -115,7 +115,9 @@ serve(async (req: Request) => {
       const { data, error } = await admin
         .from("contacts")
         .insert({
-          name: name ?? null,
+          // contacts.name is NOT NULL — the footer signup rarely collects a name,
+          // so fall back to the email local-part / phone so the insert can't fail.
+          name: name ?? (email ? email.split("@")[0] : null) ?? rawPhone ?? "Subscriber",
           email,
           phone: rawPhone,
           normalized_phone: normalizedPhone,

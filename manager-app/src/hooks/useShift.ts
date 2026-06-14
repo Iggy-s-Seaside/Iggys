@@ -76,11 +76,31 @@ export function useShift() {
    */
   const openShift = useCallback(
     async (userEmail?: string | null): Promise<ShiftSession | null> => {
-      // Guard against a double-open: `current` already resolves to today's
-      // service session, so this also blocks re-opening the same business day.
-      if (current) {
+      // `current` is today's service session of ANY status (it drives the
+      // checklists day). Only block when it's actually OPEN. If today's session
+      // was already closed, re-open THAT row (same business day = same checklists)
+      // rather than creating a duplicate business_day row.
+      if (current?.status === 'open') {
         toast.error('A shift is already open');
         return current;
+      }
+      if (current && current.status === 'closed') {
+        const { data, error } = await supabase
+          .from('shift_sessions')
+          .update({ status: 'open', closed_at: null, closed_by: null })
+          .eq('id', current.id)
+          .select()
+          .single();
+        if (error) {
+          toast.error('Failed to re-open the bar');
+          console.error('[shift_sessions] reopen error:', error.message);
+          return null;
+        }
+        toast.success('Bar re-opened');
+        const row = data as ShiftSession;
+        setCurrent(row);
+        await refresh();
+        return row;
       }
       const { data, error } = await supabase
         .from('shift_sessions')
@@ -138,5 +158,8 @@ export function useShift() {
     [refresh]
   );
 
-  return { current, recent, loading, refresh, openShift, closeShift, updateNotes };
+  // `current` = today's service session (any status, drives checklists).
+  // `isOpen` = the bar is actually open right now — use THIS for open/closed UI.
+  const isOpen = current?.status === 'open';
+  return { current, isOpen, recent, loading, refresh, openShift, closeShift, updateNotes };
 }

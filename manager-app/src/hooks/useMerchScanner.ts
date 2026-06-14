@@ -242,48 +242,51 @@ export function useMerchScanner(merch: UseMerch) {
       let createdProducts = 0;
       let skipped = 0;
 
+      // Pre-aggregate by target BEFORE applying so two invoice lines that hit the
+      // same variant don't (a) lost-update each other off a stale stock read
+      // [matched], or (b) collide on UNIQUE(product_id,size,variant_label)
+      // [new_variant]. SKUs read by OCR are unreliable for uniqueness, so scan-
+      // created rows are inserted with sku:null to avoid UNIQUE(sku) violations.
+      const matchedTotals = new Map<number, number>();
+      const newVariantGroups = new Map<string, { product_id: string; size: string | null; label: string | null; qty: number }>();
+      const newProducts: typeof result.items = [];
+
       for (const line of result.items) {
         if (line.status === 'skipped' || line.status === 'unreadable' || line.quantity <= 0) {
           skipped++;
           continue;
         }
-
         if (line.status === 'matched' && line.matched_variant_id) {
-          const ok = await merch.incrementVariantStock(
-            line.matched_variant_id,
-            line.quantity,
-            'scan_intake'
-          );
-          if (ok !== null) restocked++;
+          matchedTotals.set(line.matched_variant_id, (matchedTotals.get(line.matched_variant_id) ?? 0) + line.quantity);
         } else if (line.status === 'new_variant' && line.matched_product_id) {
-          const added = await merch.addVariants(line.matched_product_id, [
-            {
-              variant_type: line.new_size ? 'size' : 'style',
-              size: line.new_size ?? null,
-              variant_label: line.new_label ?? null,
-              sku: line.sku ?? null,
-              stock: line.quantity,
-              par_level: 0,
-            },
-          ]);
-          if (added.length) createdVariants++;
+          const size = line.new_size ?? null;
+          const label = line.new_label ?? null;
+          const key = `${line.matched_product_id}|${size ?? ''}|${label ?? ''}`;
+          const g = newVariantGroups.get(key) ?? { product_id: line.matched_product_id, size, label, qty: 0 };
+          g.qty += line.quantity;
+          newVariantGroups.set(key, g);
         } else if (line.status === 'new_product') {
-          const wantSize = line.new_size ?? null;
-          const id = await merch.createProductWithVariants(
-            { name: line.description },
-            [
-              {
-                variant_type: wantSize ? 'size' : 'style',
-                size: wantSize,
-                variant_label: wantSize ? null : line.size || 'Default',
-                sku: line.sku ?? null,
-                stock: line.quantity,
-                par_level: 0,
-              },
-            ]
-          );
-          if (id) createdProducts++;
+          newProducts.push(line);
         }
+      }
+
+      for (const [variantId, qty] of matchedTotals) {
+        const ok = await merch.incrementVariantStock(variantId, qty, 'scan_intake');
+        if (ok !== null) restocked++;
+      }
+      for (const g of newVariantGroups.values()) {
+        const added = await merch.addVariants(g.product_id, [
+          { variant_type: g.size ? 'size' : 'style', size: g.size, variant_label: g.label, sku: null, stock: g.qty, par_level: 0 },
+        ]);
+        if (added.length) createdVariants++;
+      }
+      for (const line of newProducts) {
+        const wantSize = line.new_size ?? null;
+        const id = await merch.createProductWithVariants(
+          { name: line.description },
+          [{ variant_type: wantSize ? 'size' : 'style', size: wantSize, variant_label: wantSize ? null : line.size || 'Default', sku: null, stock: line.quantity, par_level: 0 }]
+        );
+        if (id) createdProducts++;
       }
 
       const parts: string[] = [];

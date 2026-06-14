@@ -154,8 +154,10 @@ export function useReservations() {
           body: { to: entry.phone, body, source: 'waitlist', ref_id: entry.id },
         });
         if (error) throw error;
-        // The function returns { sent: boolean, disabled?: boolean } when present.
-        smsDelivered = !error && !(data && data.disabled) && !(data && data.error);
+        // send-sms returns { sent:true } only on a real Twilio send; while the
+        // rail is off it returns { blocked:true }. Treat ONLY sent:true as
+        // delivered so a disabled rail doesn't show a false "Texted" toast.
+        smsDelivered = !error && data?.sent === true;
       } catch (e) {
         // Tolerate a missing/disabled send-sms function — never block the host.
         console.warn('[waitlist] send-sms unavailable:', e instanceof Error ? e.message : e);

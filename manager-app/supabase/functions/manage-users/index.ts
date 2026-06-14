@@ -84,6 +84,24 @@ serve(async (req: Request) => {
 
     const { action, email, user_id, role } = await req.json();
 
+    // ── SERVER-SIDE ROLE GATE ──
+    // The app's UI gates Team to owners, but a UI gate is not security: this fn
+    // runs on the service role, so without a check here any authenticated
+    // employee could POST {action:'create', role:'owner'} and escalate. Resolve
+    // the caller's real role from the allowlist and enforce: employees blocked
+    // entirely; managers may 'list'; only the owner may create/delete/reset.
+    const { data: callerRow } = await admin
+      .from("manager_allowlist")
+      .select("role")
+      .ilike("email", caller.email ?? "")
+      .maybeSingle();
+    const callerRole: Role = isRole(callerRow?.role) ? callerRow.role : "employee";
+    const isManagerPlus = callerRole === "owner" || callerRole === "manager";
+    if (!isManagerPlus) return json({ error: "Forbidden" }, 403);
+    if (action !== "list" && callerRole !== "owner") {
+      return json({ error: "Only the owner can manage team accounts." }, 403);
+    }
+
     // ── LIST ──
     if (action === "list") {
       const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });

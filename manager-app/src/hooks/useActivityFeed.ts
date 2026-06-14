@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getLowStockItems } from './useInventory';
-import { todayBounds } from './useReservations';
 import type {
   Party,
   Message,
@@ -31,7 +30,7 @@ export type ActivityKind =
   | 'message'
   | 'insight'
   | 'inventory'
-  | 'reservation'
+  | 'waitlist'
   | 'review';
 
 export interface ActivityItem {
@@ -67,8 +66,8 @@ export function useActivityFeed() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [insights, setInsights] = useState<LunaInsight[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [reservations, setReservations] = useState<
-    { id: number; guest_name: string; party_size: number; reserved_for: string; created_at: string }[]
+  const [waitlist, setWaitlist] = useState<
+    { id: number; guest_name: string; party_size: number; created_at: string }[]
   >([]);
   const [reviews, setReviews] = useState<Review[]>([]);
 
@@ -77,7 +76,6 @@ export function useActivityFeed() {
   const [lastSeen, setLastSeen] = useState<number>(() => readLastSeen());
 
   const refresh = useCallback(async () => {
-    const { startISO, endISO } = todayBounds();
     const [partyRes, msgRes, insightRes, invRes, resvRes, revRes] = await Promise.all([
       supabase
         .from('parties')
@@ -102,10 +100,9 @@ export function useActivityFeed() {
         .select('id, name, current_quantity, par_level, unit, active, created_at, category_id')
         .eq('active', true),
       supabase
-        .from('reservations')
-        .select('id, guest_name, party_size, reserved_for, created_at')
-        .gte('reserved_for', startISO)
-        .lt('reserved_for', endISO)
+        .from('waitlist_entries')
+        .select('id, guest_name, party_size, status, created_at')
+        .in('status', ['waiting', 'notified'])
         .order('created_at', { ascending: false })
         .limit(PER_SOURCE_LIMIT),
       supabase
@@ -120,12 +117,11 @@ export function useActivityFeed() {
     if (!insightRes.error) setInsights((insightRes.data as LunaInsight[]) || []);
     if (!invRes.error) setInventory((invRes.data as InventoryItem[]) || []);
     if (!resvRes.error)
-      setReservations(
+      setWaitlist(
         (resvRes.data as {
           id: number;
           guest_name: string;
           party_size: number;
-          reserved_for: string;
           created_at: string;
         }[]) || []
       );
@@ -145,7 +141,7 @@ export function useActivityFeed() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'luna_insights' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, () => refresh())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist_entries' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => refresh())
       .subscribe();
     return () => {
@@ -197,14 +193,14 @@ export function useActivityFeed() {
       });
     }
 
-    for (const r of reservations) {
+    for (const r of waitlist) {
       out.push({
-        id: `reservation-${r.id}`,
-        kind: 'reservation',
-        title: `Reservation: ${r.guest_name}`,
+        id: `waitlist-${r.id}`,
+        kind: 'waitlist',
+        title: `Waitlist: ${r.guest_name}`,
         subtitle: `Party of ${r.party_size}`,
-        time: r.created_at ?? r.reserved_for,
-        to: '/reservations',
+        time: r.created_at,
+        to: '/waitlist',
         read: false,
       });
     }
@@ -242,7 +238,7 @@ export function useActivityFeed() {
       ...it,
       read: Date.parse(it.time) <= lastSeen,
     }));
-  }, [parties, messages, insights, reservations, reviews, inventory, lastSeen]);
+  }, [parties, messages, insights, waitlist, reviews, inventory, lastSeen]);
 
   const unseenCount = useMemo(() => items.filter((it) => !it.read).length, [items]);
 

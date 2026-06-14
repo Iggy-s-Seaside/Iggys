@@ -28,7 +28,7 @@ const KIND_ICON: Record<ActivityKind, LucideIcon> = {
   message: MessageSquare,
   insight: Moon,
   inventory: Package,
-  reservation: CalendarClock,
+  waitlist: CalendarClock,
   review: Star,
 };
 
@@ -38,7 +38,7 @@ const KIND_CHIP: Record<ActivityKind, string> = {
   message: 'bg-primary-50 text-primary',
   insight: 'bg-primary-50 text-primary',
   inventory: 'bg-warning-light text-accent-hover',
-  reservation: 'bg-primary-50 text-primary',
+  waitlist: 'bg-primary-50 text-primary',
   review: 'bg-warning-light text-accent-hover',
 };
 

@@ -85,16 +85,16 @@ function fmtRange(s: ShiftSession): string {
 export function Shift() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { current, recent, loading, openShift } = useShift();
+  const { current, isOpen, recent, loading, openShift } = useShift();
   const [opening, setOpening] = useState(false);
   const [, setTick] = useState(0);
 
-  // Tick the live clock once a second while a shift is open.
+  // Tick the live clock once a second only while the bar is actually open.
   useEffect(() => {
-    if (!current) return;
+    if (!isOpen) return;
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
-  }, [current]);
+  }, [isOpen]);
 
   const handleOpen = async () => {
     setOpening(true);
@@ -124,15 +124,15 @@ export function Shift() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-text-primary">Shift</h1>
-          <span className={current ? 'badge-success' : 'badge'}>
-            {current ? 'Bar is OPEN' : 'Bar is closed'}
+          <h1 className="text-2xl font-bold text-text-primary">Service</h1>
+          <span className={isOpen ? 'badge-success' : 'badge'}>
+            {isOpen ? 'Bar is OPEN' : 'Bar is closed'}
           </span>
         </div>
         <p className="text-sm text-text-muted mt-1">Open the bar, run your checks, close out the night.</p>
       </div>
 
-      {!current ? (
+      {!(isOpen && current) ? (
         /* ── CLOSED: one big "Open the Bar" ── */
         <div className="card p-8 sm:p-12 text-center">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-5">
