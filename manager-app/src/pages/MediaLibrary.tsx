@@ -3,6 +3,8 @@ import { Upload, Trash2, Search, Loader2, RefreshCw, ExternalLink, Copy } from '
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Skeleton } from '../components/ui/Skeleton';
 import toast from 'react-hot-toast';
 import type { MediaItem } from '../types';
 
@@ -69,22 +71,16 @@ export function MediaLibraryPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Media Library</h1>
-          <p className="text-sm text-text-muted mt-1">{items.length} images</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => refresh()} className="btn-secondary" disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} className="btn-primary" disabled={uploading}>
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            Upload
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
-        </div>
-      </div>
+      <PageHeader title="Media Library" subtitle={`${items.length} images`}>
+        <button onClick={() => refresh()} className="btn-secondary" disabled={loading}>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} className="btn-primary" disabled={uploading}>
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+          Upload
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
+      </PageHeader>
 
       {/* Search + Tabs */}
       <div className="card p-4 mb-6 space-y-3">
@@ -119,11 +115,11 @@ export function MediaLibraryPage() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="card overflow-hidden animate-pulse">
-              <div className="aspect-square bg-surface-hover" />
+            <div key={i} className="card overflow-hidden">
+              <Skeleton className="aspect-square rounded-none" />
               <div className="px-3 py-2">
-                <div className="h-3 bg-surface-hover rounded w-2/3 mb-1.5" />
-                <div className="h-2.5 bg-surface-hover rounded w-1/3" />
+                <Skeleton className="h-3 w-2/3 mb-1.5" />
+                <Skeleton className="h-2.5 w-1/3" />
               </div>
             </div>
           ))}

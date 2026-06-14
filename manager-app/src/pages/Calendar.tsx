@@ -25,6 +25,9 @@ import { useParties } from '../hooks/useParties';
 import { PromoteEventModal } from '../components/calendar/PromoteEventModal';
 import { MonthGrid, type DayChip } from '../components/calendar/MonthGrid';
 import { Sheet } from '../components/ui/Sheet';
+import { PageHeader } from '../components/ui/PageHeader';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { safeFmtDate } from '../utils/format';
 import { PARTY_STATUS_LABELS, type Party, type PartyStatus } from '../types';
 
 const STATUS_BADGE: Record<PartyStatus, string> = {
@@ -163,39 +166,28 @@ export function Calendar() {
     navigate(`/events/new?date=${chooserDay}`);
   };
 
-  const chooserLabel = chooserDay
-    ? format(parseISO(chooserDay), 'EEEE, MMMM d')
-    : '';
+  const chooserLabel = safeFmtDate(chooserDay, 'EEEE, MMMM d');
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Calendar</h1>
-          <p className="text-sm text-text-muted mt-1">Events, parties &amp; the Iggy's Google Calendar</p>
-        </div>
+      <PageHeader title="Calendar" subtitle="Events, parties & the Iggy's Google Calendar">
         <button onClick={loadEvents} disabled={calLoading} className="btn-secondary text-sm">
           {calLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Refresh
         </button>
-      </div>
+      </PageHeader>
 
       {/* View toggle */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="inline-flex gap-1" role="tablist" aria-label="Calendar view">
-          {(['month', 'list'] as const).map((v) => (
-            <button
-              key={v}
-              role="tab"
-              aria-selected={view === v}
-              onClick={() => setView(v)}
-              className={`px-3.5 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${
-                view === v ? 'bg-primary text-white' : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<View>
+          ariaLabel="Calendar view"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'month', label: 'Month' },
+            { value: 'list', label: 'List' },
+          ]}
+        />
+
 
         {view === 'month' && (
           <div className="flex items-center gap-1">
@@ -291,7 +283,7 @@ export function Calendar() {
                   return (
                     <div key={key} className="px-5 py-3">
                       <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${today ? 'text-primary' : 'text-text-muted'}`}>
-                        {format(date, 'EEE, MMM d')}{today ? ' · Today' : ''}
+                        {safeFmtDate(date, 'EEE, MMM d')}{today ? ' · Today' : ''}
                       </p>
                       <div className="space-y-2">
                         {dayEvents.map((ev) => (
@@ -344,7 +336,7 @@ export function Calendar() {
                         <span className={STATUS_BADGE[p.status]}>{PARTY_STATUS_LABELS[p.status]}</span>
                       </div>
                       <p className="text-xs text-text-muted mt-0.5">
-                        {p.event_date ? format(parseISO(p.event_date), 'EEE, MMM d, yyyy') : ''}
+                        {safeFmtDate(p.event_date, 'EEE, MMM d, yyyy')}
                         {p.start_time ? ` · ${p.start_time}` : ''}
                       </p>
                     </div>

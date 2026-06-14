@@ -61,6 +61,7 @@ import { StatTrend } from '../components/charts/StatTrend';
 import { Sparkline } from '../components/charts/Sparkline';
 import { BarChart } from '../components/charts/BarChart';
 import Select from '../components/ui/Select';
+import { Field } from '../components/ui/Field';
 import type { InventoryItem } from '../types';
 
 const TARGET_POUR_COST = 20; // % — bar industry rule of thumb for liquor pour cost
@@ -154,14 +155,12 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="label">Name *</label>
+          <Field label="Name *">
             <input className="input-field" required value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
+          </Field>
 
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="label">Type</label>
+            <Field label="Type">
               <Select<string>
                 variant="manager"
                 value={category}
@@ -171,9 +170,8 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
                   { value: 'food', label: 'Food' },
                 ]}
               />
-            </div>
-            <div>
-              <label className="label">Menu price ($)</label>
+            </Field>
+            <Field label="Menu price ($)">
               <input
                 type="number"
                 step="0.01"
@@ -182,9 +180,8 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
                 onChange={(e) => setMenuPrice(e.target.value)}
                 placeholder="0.00"
               />
-            </div>
-            <div>
-              <label className="label">Yield (servings)</label>
+            </Field>
+            <Field label="Yield (servings)">
               <input
                 type="number"
                 step="any"
@@ -193,7 +190,7 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
                 value={yieldQty}
                 onChange={(e) => setYieldQty(Number(e.target.value))}
               />
-            </div>
+            </Field>
           </div>
 
           <div>

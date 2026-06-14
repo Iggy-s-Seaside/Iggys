@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, PartyPopper, ChevronRight, Users, CalendarClock, Clock, AlertTriangle } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { useParties } from '../hooks/useParties';
 import { ErrorState } from '../components/ui/ErrorState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Skeleton } from '../components/ui/Skeleton';
+import { safeFmtDate } from '../utils/format';
 import { PartyForm } from '../components/parties/PartyForm';
 import { PARTY_STATUS_LABELS, PARTY_SOURCE_LABELS, type Party, type PartyStatus } from '../types';
-
-function fmtDate(d: string | null, fmt = 'MMM d, yyyy') {
-  if (!d) return null;
-  try { return format(parseISO(d), fmt); } catch { return d; }
-}
 
 const STATUS_BADGE: Record<PartyStatus, string> = {
   inquiry: 'badge-accent',
@@ -80,15 +78,11 @@ export function Parties() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Parties</h1>
-          <p className="text-sm text-text-muted mt-1">Private event inquiries, bookings &amp; follow-ups</p>
-        </div>
+      <PageHeader title="Parties" subtitle="Private event inquiries, bookings & follow-ups">
         <button onClick={() => setFormOpen(true)} className="btn-primary">
           <Plus size={18} /> New Party
         </button>
-      </div>
+      </PageHeader>
 
       {/* Status tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto scrollbar-hide">
@@ -119,29 +113,25 @@ export function Parties() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card p-4 animate-pulse">
-              <div className="h-5 bg-surface-hover rounded w-1/3 mb-2" />
-              <div className="h-4 bg-surface-hover rounded w-1/4" />
+            <div key={i} className="card p-4">
+              <Skeleton className="h-5 w-1/3 mb-2" />
+              <Skeleton className="h-4 w-1/4" />
             </div>
           ))}
         </div>
       ) : error && parties.length === 0 ? (
         <ErrorState onRetry={refresh} description="We couldn't load your parties. Your bookings are safe." />
       ) : filtered.length === 0 ? (
-        <div className="card p-12 text-center">
-          <PartyPopper size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">
-            {tab === 'inquiry' ? 'No requests yet' : tab === 'confirmed' ? 'No confirmed parties yet' : 'No cancelled parties'}
-          </p>
-          <p className="text-sm text-text-muted mt-1">
-            {tab === 'inquiry' ? 'Website requests and ones you log will show up here.' : `Parties marked ${tab} will appear here.`}
-          </p>
-          {tab === 'inquiry' && (
-            <button onClick={() => setFormOpen(true)} className="btn-primary mt-4 inline-flex">
+        <EmptyState
+          icon={PartyPopper}
+          title={tab === 'inquiry' ? 'No requests yet' : tab === 'confirmed' ? 'No confirmed parties yet' : 'No cancelled parties'}
+          description={tab === 'inquiry' ? 'Website requests and ones you log will show up here.' : `Parties marked ${tab} will appear here.`}
+          action={tab === 'inquiry' ? (
+            <button onClick={() => setFormOpen(true)} className="btn-primary inline-flex">
               <Plus size={18} /> New Party
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <div className="card divide-y divide-border overflow-hidden">
           {filtered.map((p) => (
@@ -174,13 +164,13 @@ export function Parties() {
                   {p.title?.trim() && <span>{p.contact_name}</span>}
                   {p.company && <span>{p.company}</span>}
                   {p.event_date && (
-                    <span className="flex items-center gap-1"><CalendarClock size={11} /> {fmtDate(p.event_date)}</span>
+                    <span className="flex items-center gap-1"><CalendarClock size={11} /> {safeFmtDate(p.event_date)}</span>
                   )}
                   {p.guest_count != null && (
                     <span className="flex items-center gap-1"><Users size={11} /> {p.guest_count}</span>
                   )}
                   {p.status === 'inquiry' && p.follow_up_date && (
-                    <span className="flex items-center gap-1 text-accent"><Clock size={11} /> follow up {fmtDate(p.follow_up_date, 'MMM d')}</span>
+                    <span className="flex items-center gap-1 text-accent"><Clock size={11} /> follow up {safeFmtDate(p.follow_up_date, 'MMM d')}</span>
                   )}
                   {p.event_date && dateCounts[p.event_date] > 1 && (
                     <span className="flex items-center gap-1 text-accent"><AlertTriangle size={11} /> shared date</span>

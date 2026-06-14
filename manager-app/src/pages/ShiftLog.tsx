@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import {
   Ban,
   AlertTriangle,
@@ -21,6 +21,8 @@ import { useShiftLog } from '../hooks/useShiftLog';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../hooks/useConfirm';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Field } from '../components/ui/Field';
 import type { ShiftLogEntry, ShiftLogTag } from '../types';
 import toast from 'react-hot-toast';
 
@@ -319,17 +321,15 @@ export function ShiftLog({ shiftId }: ShiftLogProps = {}) {
           ))}
         </div>
       ) : visible.length === 0 ? (
-        <div className="card p-12 text-center">
-          <ClipboardList size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">
-            {search || filterTag ? 'Nothing matches your filters' : 'Nothing logged yet'}
-          </p>
-          <p className="text-sm text-text-muted mt-1">
-            {search || filterTag
+        <EmptyState
+          icon={ClipboardList}
+          title={search || filterTag ? 'Nothing matches your filters' : 'Nothing logged yet'}
+          description={
+            search || filterTag
               ? 'Try clearing the search or tag filter.'
-              : 'Tag the first thing that happens on this shift.'}
-          </p>
-        </div>
+              : 'Tag the first thing that happens on this shift.'
+          }
+        />
       ) : (
         <div className="space-y-3">
           {visible.map((entry) => {
@@ -468,6 +468,7 @@ function EightySixSheet({
   const [query, setQuery] = useState('');
   const [note, setNote] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
+  const pickItemId = useId();
 
   const available = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -526,21 +527,21 @@ function EightySixSheet({
             </div>
           )}
 
-          <div>
-            <label className="label">Reason (optional)</label>
+          <Field label="Reason (optional)">
             <input
               className="input-field"
               placeholder="Out of stock, equipment down…"
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
-          </div>
+          </Field>
 
           <div>
-            <label className="label">Pick an item</label>
+            <label className="label" htmlFor={pickItemId}>Pick an item</label>
             <div className="relative mb-2">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
+                id={pickItemId}
                 className="input-field pl-9"
                 placeholder="Search menu…"
                 value={query}

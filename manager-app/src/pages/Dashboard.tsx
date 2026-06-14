@@ -14,6 +14,7 @@ import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
+import { PageHeader } from '../components/ui/PageHeader';
 import type { IggyEvent, Special } from '../types';
 import { format, parseISO, isFuture } from 'date-fns';
 
@@ -47,23 +48,19 @@ export function Dashboard() {
     { label: 'Total Events', value: events.length, icon: TrendingUp, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-500/10' },
   ];
 
+  const greetingSubtitle = (() => {
+    const h = new Date().getHours();
+    const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    return unreadMessages.length > 0
+      ? `${greeting} — ${unreadMessages.length} unread message${unreadMessages.length === 1 ? '' : 's'}`
+      : `${greeting}`;
+  })();
+
   return (
     <div>
       <OnboardingChecklist />
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
-          <p className="text-sm text-text-muted mt-1">
-            {(() => {
-              const h = new Date().getHours();
-              const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-              return unreadMessages.length > 0
-                ? `${greeting} — ${unreadMessages.length} unread message${unreadMessages.length === 1 ? '' : 's'}`
-                : `${greeting}`;
-            })()}
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Dashboard" subtitle={greetingSubtitle} />
+
 
       {/* Bar open/closed status — links to the Shift cockpit */}
       <Link

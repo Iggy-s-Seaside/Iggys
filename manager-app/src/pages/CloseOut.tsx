@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   RefreshCw,
 } from 'lucide-react';
-import { format } from 'date-fns';
 import {
   useCloseOut,
   DENOMINATIONS,
@@ -18,6 +17,8 @@ import {
   formatCents,
 } from '../hooks/useCloseOut';
 import { useConfirm } from '../hooks/useConfirm';
+import { PageHeader } from '../components/ui/PageHeader';
+import { safeFmtDate } from '../utils/format';
 import type { EonReport } from '../types';
 
 interface CloseOutProps {
@@ -164,12 +165,10 @@ export function CloseOut({ shiftId }: CloseOutProps) {
 
   return (
     <div className="max-w-3xl pb-24">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text-primary">Close-Out</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Count the till, compose the night, send it to the owner.
-        </p>
-      </div>
+      <PageHeader
+        title="Close-Out"
+        subtitle="Count the till, compose the night, send it to the owner."
+      />
 
       {/* ── Cash Count panel ── */}
       <section className="card p-5 mb-6">
@@ -251,7 +250,7 @@ export function CloseOut({ shiftId }: CloseOutProps) {
               {counts.slice(0, 4).map((c) => (
                 <div key={c.id} className="flex items-center justify-between text-sm">
                   <span className="text-text-muted">
-                    {format(new Date(c.created_at), 'MMM d, h:mm a')}
+                    {safeFmtDate(c.created_at, 'MMM d, h:mm a')}
                     {c.counted_by ? ` · ${c.counted_by.split('@')[0]}` : ''}
                   </span>
                   <span
@@ -318,7 +317,7 @@ export function CloseOut({ shiftId }: CloseOutProps) {
             {latestSavedReport?.emailed_at && (
               <p className="mt-3 flex items-center gap-1.5 text-sm text-success">
                 <CheckCircle2 size={15} />
-                Emailed to owner {format(new Date(latestSavedReport.emailed_at), 'MMM d, h:mm a')}
+                Emailed to owner {safeFmtDate(latestSavedReport.emailed_at, 'MMM d, h:mm a')}
               </p>
             )}
 

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Plus, Trash2, CheckSquare, Square, Loader2, Flag } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { useTodos } from '../hooks/useTodos';
 import { ErrorState } from '../components/ui/ErrorState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import Select from '../components/ui/Select';
 import { TODO_PRIORITIES, type Todo, type TodoPriority } from '../types';
@@ -32,6 +34,8 @@ export function Todos() {
   const [priority, setPriority] = useState<TodoPriority>('normal');
   const [dueDate, setDueDate] = useState('');
   const [adding, setAdding] = useState(false);
+  const priorityId = useId();
+  const dueId = useId();
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,12 +61,10 @@ export function Todos() {
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text-primary">To-Do</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Shared task list{openCount > 0 ? ` — ${openCount} open` : ''}
-        </p>
-      </div>
+      <PageHeader
+        title="To-Do"
+        subtitle={`Shared task list${openCount > 0 ? ` — ${openCount} open` : ''}`}
+      />
 
       {/* Add task */}
       <form onSubmit={handleAdd} className="card p-4 mb-5 space-y-3">
@@ -72,8 +74,9 @@ export function Todos() {
           onChange={(e) => setDetails(e.target.value)} />
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="label">Priority</label>
+            <label htmlFor={priorityId} className="label">Priority</label>
             <Select<TodoPriority>
+              id={priorityId}
               variant="manager"
               leadingIcon={Flag}
               value={priority}
@@ -82,8 +85,8 @@ export function Todos() {
             />
           </div>
           <div>
-            <label className="label">Due</label>
-            <input type="date" className="input-field" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <label htmlFor={dueId} className="label">Due</label>
+            <input id={dueId} type="date" className="input-field" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
           <div className="flex-1" />
           <button type="submit" disabled={adding || !title.trim()} className="btn-primary">
@@ -97,11 +100,11 @@ export function Todos() {
       ) : error && todos.length === 0 ? (
         <ErrorState onRetry={refresh} description="We couldn't load the task list. Your tasks are safe." />
       ) : todos.length === 0 ? (
-        <div className="card p-12 text-center">
-          <CheckSquare size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">Nothing on the list</p>
-          <p className="text-sm text-text-muted mt-1">Add a task above to get started.</p>
-        </div>
+        <EmptyState
+          icon={CheckSquare}
+          title="Nothing on the list"
+          description="Add a task above to get started."
+        />
       ) : (
         <div className="card divide-y divide-border overflow-hidden">
           {todos.map((t) => (

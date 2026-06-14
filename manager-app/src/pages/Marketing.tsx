@@ -6,7 +6,8 @@ import {
 import { useCampaigns, useMarketingContacts } from '../hooks/useCampaigns';
 import { supabase } from '../lib/supabase';
 import { StatTrend } from '../components/charts/StatTrend';
-import { format, parseISO, formatDistanceToNow } from 'date-fns';
+import { parseISO, formatDistanceToNow } from 'date-fns';
+import { safeFmtDate } from '../utils/format';
 import type { Campaign, CampaignChannel, MarketingContact, SegmentRule } from '../types';
 import { CAMPAIGN_STATUS_LABELS } from '../types';
 import toast from 'react-hot-toast';
@@ -372,7 +373,7 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
           <p className="flex items-center gap-1 text-[11px] text-text-muted mt-0.5">
             <ChannelIcon size={11} /> {campaign.channel.toUpperCase()}
             {' · '}
-            {format(parseISO(campaign.created_at), 'MMM d')}
+            {safeFmtDate(campaign.created_at, 'MMM d')}
           </p>
         </div>
         <span className={`${statusTone[campaign.status] ?? 'badge-accent'} shrink-0`}>

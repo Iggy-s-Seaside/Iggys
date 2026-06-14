@@ -11,7 +11,8 @@ import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
 import { createPartyFromLead } from '../utils/partyUpsell';
-import { format, parseISO, formatDistanceToNow } from 'date-fns';
+import { parseISO, formatDistanceToNow } from 'date-fns';
+import { safeFmtDate } from '../utils/format';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
@@ -54,7 +55,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
               {m.from_me ? "Iggy's Seaside" : (m.from_name || m.from_email)}
             </span>
             <span className="text-[11px] text-text-muted shrink-0">
-              {m.date ? format(parseISO(m.date), 'MMM d, h:mm a') : ''}
+              {safeFmtDate(m.date, 'MMM d, h:mm a')}
             </span>
           </div>
           <p className="text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">{m.body}</p>
@@ -532,7 +533,7 @@ export function Messages() {
                 </div>
                 <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">
                   <Clock size={12} />
-                  {format(parseISO(selected.created_at), 'MMM d, yyyy h:mm a')}
+                  {safeFmtDate(selected.created_at, 'MMM d, yyyy h:mm a')}
                 </div>
               </div>
 
@@ -555,7 +556,7 @@ export function Messages() {
                     <div className="flex items-center gap-2 mb-3">
                       <CheckCheck size={14} className="text-green-500" />
                       <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                        Replied {selected.replied_at && format(parseISO(selected.replied_at), 'MMM d, yyyy h:mm a')}
+                        Replied {selected.replied_at && safeFmtDate(selected.replied_at, 'MMM d, yyyy h:mm a')}
                         {selected.replied_by && ` by ${selected.replied_by}`}
                       </span>
                     </div>

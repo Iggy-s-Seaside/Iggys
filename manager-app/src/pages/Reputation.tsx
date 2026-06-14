@@ -6,7 +6,8 @@ import {
 import { useReviews } from '../hooks/useReviews';
 import { ErrorState } from '../components/ui/ErrorState';
 import { StatTrend } from '../components/charts/StatTrend';
-import { formatDistanceToNow, parseISO, format } from 'date-fns';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { safeFmtDate } from '../utils/format';
 import type { Review } from '../types';
 
 // ── Local reply drafter — three tones, no external AI call ──
@@ -430,7 +431,7 @@ export function Reputation() {
                         {f.area && <span className="badge text-text-muted capitalize">{f.area}</span>}
                       </div>
                       <span className="text-[11px] text-text-muted shrink-0">
-                        {format(parseISO(f.created_at), 'MMM d, h:mm a')}
+                        {safeFmtDate(f.created_at, 'MMM d, h:mm a')}
                       </span>
                     </div>
                     {f.comment && (

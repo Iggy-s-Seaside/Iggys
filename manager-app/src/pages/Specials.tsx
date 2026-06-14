@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit, Share2 } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
 import { CreateSocialPostModal } from '../components/social/CreateSocialPostModal';
 import { getAllDrafts, clearDraftByKey } from '../hooks/useDraftPersistence';
 import { getSpecialLifecycle, SPECIAL_LIFECYCLE_LABELS } from '../utils/specialsWindow';
@@ -54,20 +57,14 @@ export function Specials() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Specials</h1>
-          <p className="text-sm text-text-muted mt-1">{specials.length} total specials</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowTemplates(!showTemplates)} className="btn-secondary">
-            <Palette size={18} /> Templates
-          </button>
-          <Link to="/specials/editor" className="btn-primary">
-            <Plus size={18} /> New Special
-          </Link>
-        </div>
-      </div>
+      <PageHeader title="Specials" subtitle={`${specials.length} total specials`}>
+        <button onClick={() => setShowTemplates(!showTemplates)} className="btn-secondary">
+          <Palette size={18} /> Templates
+        </button>
+        <Link to="/specials/editor" className="btn-primary">
+          <Plus size={18} /> New Special
+        </Link>
+      </PageHeader>
 
       {/* Drafts Section */}
       {drafts.length > 0 && (
@@ -133,22 +130,24 @@ export function Specials() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card p-4 animate-pulse">
-              <div className="h-40 bg-surface-hover rounded-lg mb-3" />
-              <div className="h-5 bg-surface-hover rounded w-2/3 mb-2" />
-              <div className="h-4 bg-surface-hover rounded w-1/2" />
+            <div key={i} className="card p-4">
+              <Skeleton className="h-40 mb-3 rounded-lg" />
+              <Skeleton className="h-5 w-2/3 mb-2" />
+              <Skeleton className="h-4 w-1/2" />
             </div>
           ))}
         </div>
       ) : specials.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Sparkles size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">No specials yet</p>
-          <p className="text-sm text-text-muted mt-1">Create your first special or start from a template</p>
-          <Link to="/specials/editor" className="btn-primary mt-4 inline-flex">
-            <Plus size={18} /> Create Special
-          </Link>
-        </div>
+        <EmptyState
+          icon={Sparkles}
+          title="No specials yet"
+          description="Create your first special or start from a template"
+          action={
+            <Link to="/specials/editor" className="btn-primary inline-flex">
+              <Plus size={18} /> Create Special
+            </Link>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {specials.map((special) => (

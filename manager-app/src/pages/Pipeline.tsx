@@ -12,6 +12,8 @@ import {
   type PipelineStage,
 } from '../hooks/usePipeline';
 import { money } from '../utils/format';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
 import { PipelineCard } from '../components/pipeline/PipelineCard';
 import type { Party } from '../types';
 
@@ -226,20 +228,14 @@ export function Pipeline() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-            <KanbanSquare size={22} className="text-primary" /> Pipeline
-          </h1>
-          <p className="text-sm text-text-muted mt-1">Your private-events sales board, inquiry to paid</p>
-        </div>
+      <PageHeader icon={KanbanSquare} title="Pipeline" subtitle="Your private-events sales board, inquiry to paid">
         {!loading && openValue > 0 && (
           <div className="card px-4 py-2.5 flex items-center gap-3 sm:gap-2">
             <span className="text-xs text-text-secondary">Open pipeline</span>
             <span className="text-lg font-bold text-text-primary tabular-nums">{money(openValue)}</span>
           </div>
         )}
-      </div>
+      </PageHeader>
 
       {loading ? (
         <div className="flex gap-4 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -256,13 +252,11 @@ export function Pipeline() {
           ))}
         </div>
       ) : isEmpty ? (
-        <div className="card p-12 text-center">
-          <PartyPopper size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">No parties in the pipeline yet</p>
-          <p className="text-sm text-text-muted mt-1">
-            New inquiries land here automatically — track each one from request to paid.
-          </p>
-        </div>
+        <EmptyState
+          icon={PartyPopper}
+          title="No parties in the pipeline yet"
+          description="New inquiries land here automatically — track each one from request to paid."
+        />
       ) : (
         <div
           className="flex gap-4 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x snap-mandatory"

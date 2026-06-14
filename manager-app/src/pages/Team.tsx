@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useConfirm } from '../hooks/useConfirm';
 import { usePushSubscription } from '../hooks/usePushSubscription';
+import { Skeleton } from '../components/ui/Skeleton';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 interface ManagerUser {
@@ -304,7 +305,7 @@ export function Team() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (
-              <div key={i} className="h-12 rounded-lg bg-surface-hover animate-pulse" />
+              <Skeleton key={i} className="h-12 rounded-lg" />
             ))}
           </div>
         ) : (

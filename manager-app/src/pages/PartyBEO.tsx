@@ -4,13 +4,14 @@ import {
   ArrowLeft, Loader2, Printer, Users, Clock, MapPin, Utensils, Wine,
   Mail, Phone, Building2, CalendarDays, Wrench, Sparkles, StickyNote, Maximize2, Minimize2,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { useParty } from '../hooks/useParties';
 import { usePartyPackages } from '../hooks/usePackages';
 import { computeInvoice, partyToInvoiceInputs } from '../utils/invoice';
+import { money as fmtMoney, safeFmtDate } from '../utils/format';
 import { formatRange, spaceLabel, type Space } from '../lib/timeWindows';
 import { PARTY_STATUS_LABELS, PAYMENT_STATUS_LABELS, type PartyStatus } from '../types';
 import { RunOfShow, readRunOfShow } from '../components/parties/RunOfShow';
+import { EmptyState } from '../components/ui/EmptyState';
 
 const STATUS_BADGE: Record<PartyStatus, string> = {
   inquiry: 'badge-accent',
@@ -18,11 +19,13 @@ const STATUS_BADGE: Record<PartyStatus, string> = {
   cancelled: 'badge-danger',
 };
 
-const money = (n: number) => `$${(n || 0).toFixed(2)}`;
+// BEO renders every total to the cent, like an invoice. Route through the shared
+// formatter (canonical thousands-separated currency) with cents forced on.
+const money = (n: number) => fmtMoney(n, { cents: true });
 
 function fmtDate(d: string | null, fmt = 'EEEE, MMMM d, yyyy') {
   if (!d) return null;
-  try { return format(parseISO(d), fmt); } catch { return d; }
+  return safeFmtDate(d, fmt);
 }
 
 /** A labelled fact in the BEO grid; renders nothing when empty. */
@@ -67,12 +70,14 @@ export function PartyBEO() {
   }
   if (!party) {
     return (
-      <div className="card p-12 text-center">
-        <p className="text-text-secondary font-medium">Party not found</p>
-        <button onClick={() => navigate('/parties')} className="btn-secondary mt-4 inline-flex">
-          <ArrowLeft size={16} /> Back to Parties
-        </button>
-      </div>
+      <EmptyState
+        title="Party not found"
+        action={(
+          <button onClick={() => navigate('/parties')} className="btn-secondary inline-flex">
+            <ArrowLeft size={16} /> Back to Parties
+          </button>
+        )}
+      />
     );
   }
 

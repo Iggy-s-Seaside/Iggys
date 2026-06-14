@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarClock,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import toast from 'react-hot-toast';
+import { safeFmtDate } from '../utils/format';
 import { createPartyFromLead } from '../utils/partyUpsell';
 import {
   useReservations,
@@ -84,6 +85,8 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
     deposit_status: 'none' as ReservationDepositStatus,
   });
   const [saving, setSaving] = useState(false);
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
 
   if (!open) return null;
 
@@ -132,8 +135,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="label">Guest name *</label>
+            <label htmlFor={fieldId('guest_name')} className="label">Guest name *</label>
             <input
+              id={fieldId('guest_name')}
               className="input-field"
               required
               value={form.guest_name}
@@ -144,8 +148,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">Phone</label>
+              <label htmlFor={fieldId('phone')} className="label">Phone</label>
               <input
+                id={fieldId('phone')}
                 className="input-field"
                 type="tel"
                 value={form.phone}
@@ -154,8 +159,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
               />
             </div>
             <div>
-              <label className="label">Party size</label>
+              <label htmlFor={fieldId('party_size')} className="label">Party size</label>
               <input
+                id={fieldId('party_size')}
                 className="input-field"
                 type="number"
                 min={1}
@@ -166,8 +172,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
           </div>
 
           <div>
-            <label className="label">Reserved for</label>
+            <label htmlFor={fieldId('reserved_for')} className="label">Reserved for</label>
             <input
+              id={fieldId('reserved_for')}
               className="input-field"
               type="datetime-local"
               value={form.reserved_for}
@@ -177,8 +184,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">Table</label>
+              <label htmlFor={fieldId('table_id')} className="label">Table</label>
               <select
+                id={fieldId('table_id')}
                 className="input-field"
                 value={form.table_id ?? ''}
                 onChange={(e) => setForm({ ...form, table_id: e.target.value ? Number(e.target.value) : null })}
@@ -195,8 +203,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
               </select>
             </div>
             <div>
-              <label className="label">Deposit</label>
+              <label htmlFor={fieldId('deposit_status')} className="label">Deposit</label>
               <select
+                id={fieldId('deposit_status')}
                 className="input-field"
                 value={form.deposit_status}
                 onChange={(e) => setForm({ ...form, deposit_status: e.target.value as ReservationDepositStatus })}
@@ -211,8 +220,9 @@ function ReservationModal({ open, onClose, tables, sectionName, onSubmit }: Rese
           </div>
 
           <div>
-            <label className="label">Notes</label>
+            <label htmlFor={fieldId('notes')} className="label">Notes</label>
             <textarea
+              id={fieldId('notes')}
               className="input-field"
               rows={2}
               value={form.notes}
@@ -247,6 +257,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
   const [phone, setPhone] = useState('');
   const [size, setSize] = useState(2);
   const [saving, setSaving] = useState(false);
+  const sizeId = useId();
 
   const quote = useMemo(() => suggestWaitQuote(partiesWaiting, size), [partiesWaiting, size]);
 
@@ -290,8 +301,9 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
       </div>
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-text-muted shrink-0">Party</label>
+          <label htmlFor={sizeId} className="text-xs text-text-muted shrink-0">Party</label>
           <input
+            id={sizeId}
             className="input-field w-16 text-center"
             type="number"
             min={1}
@@ -382,7 +394,7 @@ export function Reservations() {
           <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
             <CalendarClock size={24} className="text-primary" /> Host Board
           </h1>
-          <span className="badge text-text-muted">{format(new Date(), 'EEE, MMM d')}</span>
+          <span className="badge text-text-muted">{safeFmtDate(new Date(), 'EEE, MMM d')}</span>
         </div>
         <button onClick={() => setModalOpen(true)} className="btn-primary flex items-center gap-2 shrink-0">
           <Plus size={16} />
@@ -541,7 +553,7 @@ function ReservationRow({ reservation: r, table, converting, onStartParty, onSea
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-text-primary">{format(when, 'h:mm a')}</span>
+            <span className="text-sm font-semibold text-text-primary">{safeFmtDate(when, 'h:mm a')}</span>
             <span className="text-sm text-text-primary truncate">{r.guest_name}</span>
             <span className="flex items-center gap-1 text-xs text-text-muted">
               <Users size={12} /> {r.party_size}

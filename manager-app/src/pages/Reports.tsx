@@ -17,6 +17,7 @@ import { StatTrend } from '../components/charts/StatTrend';
 import { BarChart } from '../components/charts/BarChart';
 import { Sparkline } from '../components/charts/Sparkline';
 import { money, safeFmtDate } from '../utils/format';
+import { Skeleton } from '../components/ui/Skeleton';
 import { toCsv, downloadCsv } from '../utils/exportCsv';
 import '../styles/reports-print.css';
 
@@ -117,8 +118,8 @@ export function Reports() {
     return (
       <div>
         <div className="mb-6">
-          <div className="h-8 w-40 bg-surface-hover rounded animate-pulse" />
-          <div className="h-4 w-64 bg-surface-hover rounded animate-pulse mt-2" />
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-4 w-64 mt-2" />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[1, 2, 3, 4].map((i) => (

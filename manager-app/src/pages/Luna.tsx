@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLunaMessages, useLunaInsights } from '../hooks/useLuna';
 import { useCoarsePointer } from '../hooks/useCoarsePointer';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import type { LunaInsight, LunaInsightKind, LunaMessage, LunaActionState } from '../types';
 import { LUNA_INSIGHT_KIND_LABELS, INSIGHT_ACTION_DEFAULT_LABELS, parseInsightData } from '../types';
@@ -368,39 +369,21 @@ export function Luna() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 mb-5" role="tablist" aria-label="Luna sections">
-        <button
-          onClick={() => setTab('chat')}
-          role="tab"
-          aria-selected={tab === 'chat'}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            tab === 'chat'
-              ? 'bg-primary text-white'
-              : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-          }`}
-        >
-          <MessageCircle size={14} /> Chat
-        </button>
-        <button
-          onClick={() => setTab('insights')}
-          role="tab"
-          aria-selected={tab === 'insights'}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            tab === 'insights'
-              ? 'bg-primary text-white'
-              : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-          }`}
-        >
-          <Lightbulb size={14} /> Insights
-          {newInsightCount > 0 && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
-              tab === 'insights' ? 'bg-white/25 text-white' : 'bg-primary text-white'
-            }`}>
-              {newInsightCount > 9 ? '9+' : newInsightCount}
-            </span>
-          )}
-        </button>
-      </div>
+      <SegmentedControl<LunaTab>
+        className="mb-5"
+        ariaLabel="Luna sections"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'chat', label: 'Chat', icon: MessageCircle },
+          {
+            value: 'insights',
+            label: 'Insights',
+            icon: Lightbulb,
+            badge: newInsightCount > 0 ? (newInsightCount > 9 ? '9+' : newInsightCount) : undefined,
+          },
+        ]}
+      />
 
       {tab === 'insights' ? (
         <div className="pb-8">

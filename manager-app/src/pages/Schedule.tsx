@@ -23,9 +23,9 @@ import {
   TIP_METHODS, TIP_METHOD_LABELS, type TipMethod, type TipAllocation,
 } from '../hooks/useSchedule';
 import { useConfirm } from '../hooks/useConfirm';
+import { money } from '../utils/format';
 import type { Staff, Shift, TimeOffRequest, TipPool } from '../types';
 
-const money = (n: number) => `$${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const money2 = (n: number) => `$${(n || 0).toFixed(2)}`;
 const centsToDollars = (c: number) => money2(c / 100);
 
@@ -543,7 +543,7 @@ export function Schedule() {
             {gauge.laborPct.toFixed(1)}%
           </p>
           <p className="text-xs text-text-muted mt-1.5">
-            {money(labor.laborCost)} labor ÷ {money(forecast)} forecast
+            {money(labor.laborCost, { cents: false })} labor ÷ {money(forecast, { cents: false })} forecast
           </p>
           <div className="mt-4">
             <GaugeBar pct={gauge.laborPct} status={gauge.status} />
@@ -561,7 +561,7 @@ export function Schedule() {
 
         <StatTrend
           label="Scheduled labor"
-          value={money(labor.laborCost)}
+          value={money(labor.laborCost, { cents: false })}
           caption={`${labor.scheduledHours.toFixed(1)} hours this week`}
           icon={<DollarSign size={16} />}
         />
@@ -570,7 +570,7 @@ export function Schedule() {
             <span className="text-text-muted shrink-0"><Coins size={16} /></span>
             <p className="text-xs sm:text-sm text-text-muted truncate">Labor cost by day</p>
           </div>
-          <BarChart data={perDayBars} formatValue={(n) => money(n)} highlightMax height={120} />
+          <BarChart data={perDayBars} formatValue={(n) => money(n, { cents: false })} highlightMax height={120} />
         </div>
       </div>
 

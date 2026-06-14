@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, CheckCircle2, XCircle, RotateCcw, Pencil, Send,
   CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine, FileText,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useParty } from '../hooks/useParties';
+import { EmptyState } from '../components/ui/EmptyState';
+import { safeFmtDate } from '../utils/format';
 import { usePartyPackages } from '../hooks/usePackages';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { PackagePicker } from '../components/packages/PackagePicker';
@@ -29,11 +30,11 @@ const STATUS_BADGE: Record<PartyStatus, string> = {
 
 function fmtDate(d: string | null, fmt = 'EEEE, MMMM d, yyyy') {
   if (!d) return null;
-  try { return format(parseISO(d), fmt); } catch { return d; }
+  return safeFmtDate(d, fmt);
 }
 function fmtStamp(d: string | null) {
   if (!d) return null;
-  try { return format(parseISO(d), 'MMM d, yyyy h:mm a'); } catch { return d; }
+  return safeFmtDate(d, 'MMM d, yyyy h:mm a');
 }
 
 function Field({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
@@ -68,6 +69,9 @@ export function PartyProfile() {
   const [followNotes, setFollowNotes] = useState('');
   const [followDate, setFollowDate] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+
+  const followDateId = useId();
+  const followNotesId = useId();
 
   useEffect(() => {
     if (party) {
@@ -104,12 +108,14 @@ export function PartyProfile() {
   }
   if (!party) {
     return (
-      <div className="card p-12 text-center">
-        <p className="text-text-secondary font-medium">Party not found</p>
-        <button onClick={() => navigate('/parties')} className="btn-secondary mt-4 inline-flex">
-          <ArrowLeft size={16} /> Back to Parties
-        </button>
-      </div>
+      <EmptyState
+        title="Party not found"
+        action={(
+          <button onClick={() => navigate('/parties')} className="btn-secondary inline-flex">
+            <ArrowLeft size={16} /> Back to Parties
+          </button>
+        )}
+      />
     );
   }
 
@@ -276,13 +282,13 @@ export function PartyProfile() {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div className="sm:col-span-1">
-                <label className="label">Follow up by</label>
-                <input type="date" className="input-field" value={followDate}
+                <label htmlFor={followDateId} className="label">Follow up by</label>
+                <input id={followDateId} type="date" className="input-field" value={followDate}
                   onChange={(e) => setFollowDate(e.target.value)} />
               </div>
             </div>
-            <label className="label">Notes</label>
-            <textarea className="input-field min-h-[70px] resize-y mb-3" value={followNotes}
+            <label htmlFor={followNotesId} className="label">Notes</label>
+            <textarea id={followNotesId} className="input-field min-h-[70px] resize-y mb-3" value={followNotes}
               onChange={(e) => setFollowNotes(e.target.value)} placeholder="What's pending, what to send next…" />
             <button
               onClick={() => update({ follow_up_notes: followNotes || null, follow_up_date: followDate || null })}

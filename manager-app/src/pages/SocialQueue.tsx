@@ -13,6 +13,9 @@ import { useAuth } from '../context/AuthContext';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { ConfirmDialog } from '../components/ui/Modal';
 import { CreateSocialPostModal } from '../components/social/CreateSocialPostModal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
+import { safeFmtDate } from '../utils/format';
 
 const PLATFORM_ICONS: Record<SocialPlatform, typeof Instagram> = {
   instagram: Instagram,
@@ -81,7 +84,7 @@ function PostCard({
         {post.scheduled_at && (
           <p className="flex items-center gap-1.5 text-xs text-text-muted mt-3">
             <CalendarClock size={13} />
-            {format(parseISO(post.scheduled_at), "EEE MMM d 'at' h:mm a")}
+            {safeFmtDate(post.scheduled_at, "EEE MMM d 'at' h:mm a")}
           </p>
         )}
 
@@ -173,17 +176,14 @@ export function SocialQueue() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Social</h1>
-          <p className="text-sm text-text-muted mt-1">
-            {queued.length} {queued.length === 1 ? 'post' : 'posts'} awaiting approval
-          </p>
-        </div>
+      <PageHeader
+        title="Social"
+        subtitle={`${queued.length} ${queued.length === 1 ? 'post' : 'posts'} awaiting approval`}
+      >
         <button onClick={() => setShowCreate(true)} className="btn-primary">
           <Plus size={18} /> Queue post
         </button>
-      </div>
+      </PageHeader>
 
       {/* Live-posting status banner */}
       <div className="card p-4 mb-6 border-amber-500/30 flex items-start gap-3">
@@ -209,18 +209,16 @@ export function SocialQueue() {
           ))}
         </div>
       ) : queued.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Share2 size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">Your queue is empty</p>
-          <p className="text-sm text-text-muted mt-1 max-w-md mx-auto">
-            Draft a post from a special or event, then approve it here. Live posting to Instagram,
-            Facebook and Google Business is pending Meta App Review — for now the queue is your safe
-            staging area.
-          </p>
-          <button onClick={() => setShowCreate(true)} className="btn-primary mt-4 inline-flex">
-            <Plus size={18} /> Queue your first post
-          </button>
-        </div>
+        <EmptyState
+          icon={Share2}
+          title="Your queue is empty"
+          description="Draft a post from a special or event, then approve it here. Live posting to Instagram, Facebook and Google Business is pending Meta App Review — for now the queue is your safe staging area."
+          action={
+            <button onClick={() => setShowCreate(true)} className="btn-primary inline-flex">
+              <Plus size={18} /> Queue your first post
+            </button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {queued.map((post) => (

@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../hooks/useConfirm';
 import { useOrderScanner } from '../hooks/useOrderScanner';
 import Select from '../components/ui/Select';
+import { Field } from '../components/ui/Field';
 import { QuickAdjust } from '../components/inventory/QuickAdjust';
 import { InventoryLogDrawer } from '../components/inventory/InventoryLogDrawer';
 import { ScanOrderButton } from '../components/inventory/ScanOrderButton';
@@ -82,19 +83,17 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="label">Name *</label>
+          <Field label="Name *">
             <input
               className="input-field"
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Category</label>
+            <Field label="Category">
               <Select<number>
                 variant="manager"
                 value={form.category_id}
@@ -102,21 +101,19 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
                 options={[{ value: -1, label: 'None' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
                 placeholder="None"
               />
-            </div>
-            <div>
-              <label className="label">Unit</label>
+            </Field>
+            <Field label="Unit">
               <Select<string>
                 variant="manager"
                 value={form.unit}
                 onChange={(v) => setForm({ ...form, unit: v })}
                 options={INVENTORY_UNITS.map((u) => ({ value: u, label: u }))}
               />
-            </div>
+            </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Current Quantity</label>
+            <Field label="Current Quantity">
               <input
                 type="number"
                 step="any"
@@ -124,9 +121,8 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
                 value={form.current_quantity}
                 onChange={(e) => setForm({ ...form, current_quantity: Number(e.target.value) })}
               />
-            </div>
-            <div>
-              <label className="label">Par Level</label>
+            </Field>
+            <Field label="Par Level">
               <input
                 type="number"
                 step="any"
@@ -134,12 +130,11 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
                 value={form.par_level}
                 onChange={(e) => setForm({ ...form, par_level: Number(e.target.value) })}
               />
-            </div>
+            </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Cost per Unit ($)</label>
+            <Field label="Cost per Unit ($)">
               <input
                 type="number"
                 step="0.01"
@@ -149,26 +144,24 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
                   setForm({ ...form, cost_per_unit: e.target.value ? Number(e.target.value) : null })
                 }
               />
-            </div>
-            <div>
-              <label className="label">Supplier</label>
+            </Field>
+            <Field label="Supplier">
               <input
                 className="input-field"
                 value={form.supplier}
                 onChange={(e) => setForm({ ...form, supplier: e.target.value })}
               />
-            </div>
+            </Field>
           </div>
 
-          <div>
-            <label className="label">Notes</label>
+          <Field label="Notes">
             <textarea
               className="input-field"
               rows={2}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
-          </div>
+          </Field>
 
           <div className="flex items-center gap-2">
             <input

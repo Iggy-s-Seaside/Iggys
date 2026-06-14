@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { safeFmtDate } from '../utils/format';
 import {
   useCompliance,
   expiryStatus,
@@ -39,7 +39,7 @@ const TABS: { id: Tab; label: string; icon: typeof Ban }[] = [
   { id: 'credentials', label: 'Licenses & Certs', icon: BadgeCheck },
 ];
 
-const fmtDateTime = (iso: string) => format(parseISO(iso), 'MMM d, yyyy h:mm a');
+const fmtDateTime = (iso: string) => safeFmtDate(iso, 'MMM d, yyyy h:mm a');
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 // ── Shared modal shell ─────────────────────────────────────────────────────────
@@ -470,7 +470,7 @@ function CredentialsTab({
               <td className="px-5 py-3"><span className="badge-primary">{titleCase(c.type)}</span></td>
               <td className="px-5 py-3 text-sm text-text-secondary hidden sm:table-cell">{c.holder ?? '—'}</td>
               <td className="px-5 py-3 text-sm text-text-secondary hidden sm:table-cell">
-                {c.expires_on ? format(parseISO(c.expires_on), 'MMM d, yyyy') : '—'}
+                {c.expires_on ? safeFmtDate(c.expires_on, 'MMM d, yyyy') : '—'}
               </td>
               <td className="px-5 py-3 text-center"><ExpiryChip expiresOn={c.expires_on} /></td>
               {!readOnly && (
@@ -503,7 +503,7 @@ function InspectorView({ data }: { data: ReturnType<typeof useCompliance> }) {
         <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
           <ShieldCheck size={20} className="text-primary" /> Iggy's Seaside — Compliance Snapshot
         </h2>
-        <p className="text-sm text-text-muted mt-1">Generated {format(new Date(), 'MMM d, yyyy h:mm a')}</p>
+        <p className="text-sm text-text-muted mt-1">Generated {safeFmtDate(new Date(), 'MMM d, yyyy h:mm a')}</p>
       </div>
 
       <section>
