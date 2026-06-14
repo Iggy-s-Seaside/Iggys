@@ -228,7 +228,7 @@ export function InventoryCount() {
           Mobile: sits above the BottomNav (lg:hidden, ~64px tall) so the two
           don't overlap. Desktop (lg): no BottomNav, and the w-64 sidebar means
           we offset the bar by left-64 and drop it to bottom-0. */}
-      <div className="fixed bottom-[72px] lg:bottom-0 inset-x-0 lg:left-64 z-30 border-t border-border bg-surface/95 backdrop-blur-sm">
+      <div className="fixed bottom-[calc(72px+env(safe-area-inset-bottom,0px))] lg:bottom-0 inset-x-0 lg:left-64 z-30 border-t border-border bg-surface/95 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-sm">

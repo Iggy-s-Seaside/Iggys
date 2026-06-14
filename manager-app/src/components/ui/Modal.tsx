@@ -116,7 +116,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
             <X size={18} />
           </button>
         </div>
-        <div className="px-6 py-4 overflow-y-auto">{children}</div>
+        <div className="px-6 py-4 overflow-y-auto overscroll-contain">{children}</div>
       </div>
     </div>,
     document.body
