@@ -26,11 +26,15 @@ export function DashboardLayout() {
   }, [navigate]);
 
   return (
-    <div className="flex min-h-screen">
+    // Fixed app-shell on mobile: the shell fills the viewport and never scrolls;
+    // the inner content div is the ONE scroller (no body rubber-band). Desktop
+    // (lg) reverts to normal in-flow layout + body scroll.
+    <div className="flex h-[100dvh] overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible">
       <Sidebar />
-      <main className="flex-1 min-w-0">
-        {/* pt-16 clears the mobile hamburger bar; pb-24 clears the mobile bottom nav */}
-        <div className="p-6 pt-16 pb-24 lg:p-8 lg:pt-8 lg:pb-8">
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden lg:overflow-visible">
+        {/* The single scroll container. overscroll-contain stops scroll-chaining;
+            safe-area padding clears the notch (top) + bottom nav + home indicator. */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
           <OfflineBanner />
           <Outlet />
         </div>

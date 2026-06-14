@@ -44,6 +44,26 @@
   body {
     @apply bg-background text-text-primary font-body antialiased transition-colors duration-200;
   }
+
+  /* ── Mobile app-shell scroll lock ──────────────────────────────────────────
+     The bug: with the BODY as the scroller + a fixed top bar/bottom nav, the
+     whole page rubber-bands ("pulls up when you scroll down") on iOS/Android.
+     Fix: lock the document and move ALL scrolling into one inner container
+     (DashboardLayout's content div). overscroll-behavior:none kills the bounce
+     + pull-to-refresh. On desktop (lg+) we revert to normal body scrolling. */
+  html, body, #root { height: 100%; }
+  html { overscroll-behavior: none; }
+  body {
+    overscroll-behavior: none;
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+  @media (min-width: 1024px) {
+    html, #root { height: auto; }
+    body { position: static; overflow: auto; height: auto; inset: auto; }
+  }
 }
 
 @layer components {
