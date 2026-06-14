@@ -18,6 +18,8 @@ const SpecialEditor = lazy(() => import('./pages/SpecialEditor').then((m) => ({ 
 const MenuManager = lazy(() => import('./pages/MenuManager').then((m) => ({ default: m.MenuManager })));
 const MediaLibraryPage = lazy(() => import('./pages/MediaLibrary').then((m) => ({ default: m.MediaLibraryPage })));
 const Inventory = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.Inventory })));
+const InventoryCount = lazy(() => import('./pages/InventoryCount').then((m) => ({ default: m.InventoryCount })));
+const Merch = lazy(() => import('./pages/Merch').then((m) => ({ default: m.Merch })));
 const Messages = lazy(() => import('./pages/Messages').then((m) => ({ default: m.Messages })));
 const Parties = lazy(() => import('./pages/Parties').then((m) => ({ default: m.Parties })));
 const PartyProfile = lazy(() => import('./pages/PartyProfile').then((m) => ({ default: m.PartyProfile })));
@@ -88,6 +90,8 @@ export default function App() {
           <Route path="/menu/:table" element={<Ops><MenuManager /></Ops>} />
           <Route path="/media" element={<Ops><MediaLibraryPage /></Ops>} />
           <Route path="/inventory" element={<Ops><Inventory /></Ops>} />
+          <Route path="/inventory/count" element={<Ops><InventoryCount /></Ops>} />
+          <Route path="/merch" element={<Ops><Merch /></Ops>} />
           <Route path="/messages" element={<Ops><Messages /></Ops>} />
           <Route path="/parties" element={<Ops><Parties /></Ops>} />
           <Route path="/parties/:id" element={<Ops><PartyProfile /></Ops>} />

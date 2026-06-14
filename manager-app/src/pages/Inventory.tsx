@@ -10,6 +10,7 @@ import {
   Loader2,
   X,
   ClipboardList,
+  Clock,
 } from 'lucide-react';
 import { ErrorState } from '../components/ui/ErrorState';
 import {
@@ -17,6 +18,12 @@ import {
   useInventoryCategories,
   adjustQuantity,
   getLowStockItems,
+  compareByStockState,
+  stockStateOf,
+  isMarkedLow,
+  isStale,
+  type StockState,
+  type InventoryItemState,
 } from '../hooks/useInventory';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../hooks/useConfirm';
@@ -190,8 +197,26 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
 
 // ── Main Inventory Page ──
 
+// ── Stock-state visual vocabulary (color by qualitative signal, not the count) ──
+// Out = red, one_left/low = amber, half = neutral, ok = green.
+const STATE_DOT: Record<StockState, string> = {
+  out: 'bg-danger',
+  one_left: 'bg-accent',
+  low: 'bg-accent',
+  half: 'bg-text-muted',
+  ok: 'bg-emerald-500',
+};
+
+const STATE_LABEL: Record<StockState, string> = {
+  out: 'Out',
+  one_left: '1 left',
+  low: 'Low',
+  half: '~Half',
+  ok: 'OK',
+};
+
 export function Inventory() {
-  const { items, loading, error, refresh, create, update, remove } = useInventoryItems();
+  const { items, loading, error, refresh, create, update, remove, setState } = useInventoryItems();
   const { data: categories } = useInventoryCategories();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -228,15 +253,32 @@ export function Inventory() {
           i.inventory_categories?.name.toLowerCase().includes(q)
       );
     }
-    return result;
+    // Sort by qualitative signal (most urgent first), not by the count.
+    return [...result].sort(compareByStockState);
   }, [items, categoryFilter, search]);
 
   const lowStockCount = useMemo(() => getLowStockItems(items).length, [items]);
+
+  // ── "Needs attention" board: split into "marked" vs the staleness safety net ──
+  const attention = useMemo(() => {
+    const now = new Date();
+    const active = (items as InventoryItemState[]).filter((i) => i.active);
+    const marked = active.filter((i) => isMarkedLow(i)).sort(compareByStockState);
+    // Stale = nobody touched it past its interval, AND it isn't already flagged
+    // (a marked item is already accounted for in the first group).
+    const stale = active
+      .filter((i) => !isMarkedLow(i) && isStale(i, now))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { marked, stale };
+  }, [items]);
 
   const handleAdjust = async (item: InventoryItem, newQty: number, reason: string) => {
     const ok = await adjustQuantity(item.id, item.current_quantity, newQty, reason, user?.email ?? 'unknown');
     if (ok) await refresh();
   };
+
+  const handleMark = (item: InventoryItem, state: StockState) =>
+    setState(item.id, state, user?.email ?? 'unknown');
 
   const handleCreate = async (data: Omit<InventoryItem, 'id' | 'created_at' | 'inventory_categories'>) => {
     return create(data);
@@ -344,6 +386,81 @@ export function Inventory() {
         ))}
       </div>
 
+      {/* Needs attention board — two groups: someone-flagged vs the staleness safety net */}
+      {!loading && (attention.marked.length > 0 || attention.stale.length > 0) && (
+        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+          {/* Marked low / out */}
+          {attention.marked.length > 0 && (
+            <div className="card">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                <AlertTriangle size={16} className="text-danger" />
+                <h2 className="text-sm font-semibold text-text-primary">Marked low / out</h2>
+                <span className="badge-danger ml-auto">{attention.marked.length}</span>
+              </div>
+              <div className="divide-y divide-border">
+                {attention.marked.map((item) => {
+                  const st = stockStateOf(item);
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${STATE_DOT[st]}`} />
+                      <span className="text-sm font-medium text-text-primary truncate flex-1">
+                        {item.name}
+                      </span>
+                      <span className="text-xs font-medium text-text-secondary shrink-0">
+                        {STATE_LABEL[st]}
+                      </span>
+                      <button
+                        onClick={() => handleMark(item, 'ok')}
+                        className="min-h-[2rem] px-2.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:border-emerald-500 hover:text-emerald-500 transition-colors shrink-0"
+                        title="Mark restocked"
+                      >
+                        Mark OK
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Untracked / stale — the safety net for items nobody marked */}
+          {attention.stale.length > 0 && (
+            <div className="card">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                <Clock size={16} className="text-text-muted" />
+                <h2 className="text-sm font-semibold text-text-primary">Untracked / stale</h2>
+                <span className="badge ml-auto text-text-muted">{attention.stale.length}</span>
+              </div>
+              <div className="divide-y divide-border">
+                {attention.stale.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-text-muted/50" />
+                    <span className="text-sm font-medium text-text-primary truncate flex-1">
+                      {item.name}
+                    </span>
+                    <span className="text-xs text-text-muted shrink-0">no recent check</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleMark(item, 'low')}
+                        className="min-h-[2rem] px-2.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:border-accent hover:text-accent transition-colors"
+                      >
+                        Low
+                      </button>
+                      <button
+                        onClick={() => handleMark(item, 'ok')}
+                        className="min-h-[2rem] px-2.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:border-emerald-500 hover:text-emerald-500 transition-colors"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="card p-16 flex items-center justify-center">
@@ -375,7 +492,7 @@ export function Inventory() {
                 <tr className="border-b border-border text-left text-xs text-text-muted uppercase tracking-wide">
                   <th className="px-5 py-3 font-medium">Name</th>
                   <th className="px-5 py-3 font-medium">Category</th>
-                  <th className="px-5 py-3 font-medium text-center">Quantity</th>
+                  <th className="px-5 py-3 font-medium">Stock</th>
                   <th className="px-5 py-3 font-medium text-center">Par</th>
                   <th className="px-5 py-3 font-medium">Unit</th>
                   <th className="px-5 py-3 font-medium hidden lg:table-cell">Supplier</th>
@@ -386,10 +503,18 @@ export function Inventory() {
                 {filtered.map((item) => (
                   <tr key={item.id} className={`hover:bg-surface-hover transition-colors ${!item.active ? 'opacity-50' : ''}`}>
                     <td className="px-5 py-3">
-                      <p className="text-sm font-medium text-text-primary">{item.name}</p>
-                      {item.notes && (
-                        <p className="text-xs text-text-muted truncate max-w-[200px]">{item.notes}</p>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${STATE_DOT[stockStateOf(item)]}`}
+                          title={STATE_LABEL[stockStateOf(item)]}
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">{item.name}</p>
+                          {item.notes && (
+                            <p className="text-xs text-text-muted truncate max-w-[200px]">{item.notes}</p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-3">
                       {item.inventory_categories?.name ? (
@@ -401,6 +526,7 @@ export function Inventory() {
                     <td className="px-5 py-3">
                       <QuickAdjust
                         item={item}
+                        onMarkState={(state) => handleMark(item, state)}
                         onAdjust={(newQty, reason) => handleAdjust(item, newQty, reason)}
                       />
                     </td>
@@ -451,13 +577,18 @@ export function Inventory() {
             {filtered.map((item) => (
               <div key={item.id} className={`card p-4 ${!item.active ? 'opacity-50' : ''}`}>
                 <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{item.name}</p>
-                    {item.inventory_categories?.name && (
-                      <span className="badge-primary mt-1 inline-block">{item.inventory_categories.name}</span>
-                    )}
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${STATE_DOT[stockStateOf(item)]}`}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text-primary">{item.name}</p>
+                      {item.inventory_categories?.name && (
+                        <span className="badge-primary mt-1 inline-block">{item.inventory_categories.name}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() =>
                         setLogDrawer({ open: true, itemId: item.id, itemName: item.name })
@@ -480,15 +611,14 @@ export function Inventory() {
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-text-muted">
-                    Par: {item.par_level} {item.unit}
-                  </div>
-                  <QuickAdjust
-                    item={item}
-                    onAdjust={(newQty, reason) => handleAdjust(item, newQty, reason)}
-                  />
+                <div className="text-xs text-text-muted mb-2">
+                  Par: {item.par_level} {item.unit}
                 </div>
+                <QuickAdjust
+                  item={item}
+                  onMarkState={(state) => handleMark(item, state)}
+                  onAdjust={(newQty, reason) => handleAdjust(item, newQty, reason)}
+                />
               </div>
             ))}
           </div>

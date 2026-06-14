@@ -1,29 +1,84 @@
 import { useState, useRef, useCallback } from 'react';
-import { Minus, Plus, Check } from 'lucide-react';
+import { Minus, Plus, Check, SlidersHorizontal } from 'lucide-react';
 import type { InventoryItem } from '../../types';
 import { LOG_REASONS } from '../../types';
+import {
+  STOCK_STATES,
+  stockStateOf,
+  type StockState,
+  type InventoryItemState,
+} from '../../hooks/useInventory';
 import { useClickOutside } from '../../hooks/useClickOutside';
 
 interface QuickAdjustProps {
   item: InventoryItem;
+  /**
+   * One-tap qualitative mark — the PRIMARY control. Returns the optimistic
+   * setState promise so the chip can show a brief pending state while it saves.
+   */
+  onMarkState: (state: StockState) => Promise<unknown> | void;
+  /** Rare exact numeric entry, behind the "…/Count" affordance. */
   onAdjust: (newQty: number, reason: string) => Promise<void>;
 }
 
-export function QuickAdjust({ item, onAdjust }: QuickAdjustProps) {
-  const [open, setOpen] = useState(false);
+// Per-state chip styling. Active chip is filled; inactive chips are quiet so the
+// row reads as "tap the one that's true right now". Dark-mode safe via semantic
+// tokens / *-500 with low-alpha fills.
+const CHIP_STYLES: Record<
+  StockState,
+  { active: string; idle: string }
+> = {
+  out: {
+    active: 'bg-danger text-white border-danger',
+    idle: 'border-border text-text-secondary hover:border-danger hover:text-danger',
+  },
+  one_left: {
+    active: 'bg-accent text-white border-accent',
+    idle: 'border-border text-text-secondary hover:border-accent hover:text-accent',
+  },
+  low: {
+    active: 'bg-accent text-white border-accent',
+    idle: 'border-border text-text-secondary hover:border-accent hover:text-accent',
+  },
+  half: {
+    active: 'bg-surface-active text-text-primary border-border',
+    idle: 'border-border text-text-secondary hover:bg-surface-hover',
+  },
+  ok: {
+    active: 'bg-emerald-500 text-white border-emerald-500',
+    idle: 'border-border text-text-secondary hover:border-emerald-500 hover:text-emerald-500',
+  },
+};
+
+export function QuickAdjust({ item, onMarkState, onAdjust }: QuickAdjustProps) {
+  const current = stockStateOf(item as InventoryItemState);
+  const [marking, setMarking] = useState<StockState | null>(null);
+
+  // Exact-count popover (rare path)
+  const [countOpen, setCountOpen] = useState(false);
   const [direction, setDirection] = useState<'+' | '-'>('+');
   const [amount, setAmount] = useState('1');
   const [reason, setReason] = useState<string>('restock');
   const [submitting, setSubmitting] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  useClickOutside(popoverRef, useCallback(() => setOpen(false), []), open);
+  useClickOutside(popoverRef, useCallback(() => setCountOpen(false), []), countOpen);
 
-  const handleOpen = (dir: '+' | '-') => {
+  const handleMark = async (state: StockState) => {
+    if (state === current) return;
+    setMarking(state);
+    try {
+      await onMarkState(state);
+    } finally {
+      setMarking(null);
+    }
+  };
+
+  const openCount = (dir: '+' | '-') => {
     setDirection(dir);
     setReason(dir === '+' ? 'restock' : 'usage');
     setAmount('1');
-    setOpen(true);
+    setCountOpen(true);
   };
 
   const handleConfirm = async () => {
@@ -34,53 +89,87 @@ export function QuickAdjust({ item, onAdjust }: QuickAdjustProps) {
     setSubmitting(true);
     await onAdjust(newQty, reason);
     setSubmitting(false);
-    setOpen(false);
+    setCountOpen(false);
   };
-
-  // Quantity color
-  const qtyColor =
-    item.current_quantity < item.par_level * 0.5
-      ? 'text-danger'
-      : item.current_quantity < item.par_level
-        ? 'text-accent'
-        : 'text-emerald-500';
 
   return (
     <div className="relative" ref={popoverRef}>
-      <div className="flex items-center gap-1">
+      {/* PRIMARY: one-tap qualitative chip row */}
+      <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Mark stock level">
+        {STOCK_STATES.map(({ value, label }) => {
+          const isActive = value === current;
+          const styles = CHIP_STYLES[value];
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => handleMark(value)}
+              disabled={marking !== null}
+              aria-pressed={isActive}
+              className={`min-h-[2.5rem] px-3 rounded-lg border text-sm font-medium transition-colors disabled:opacity-60 ${
+                isActive ? styles.active : styles.idle
+              }`}
+            >
+              {marking === value ? '…' : label}
+            </button>
+          );
+        })}
+
+        {/* Rare exact-count affordance */}
         <button
-          onClick={() => handleOpen('-')}
-          className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface-hover hover:bg-red-500/10 hover:text-danger transition-colors"
-          aria-label="Decrease quantity"
+          type="button"
+          onClick={() => openCount('+')}
+          className="min-h-[2.5rem] w-10 flex items-center justify-center rounded-lg border border-border text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+          aria-label="Enter exact count"
+          title="Enter exact count"
         >
-          <Minus size={16} />
-        </button>
-        <span className={`min-w-[3rem] text-center font-semibold tabular-nums ${qtyColor}`}>
-          {item.current_quantity}
-        </span>
-        <button
-          onClick={() => handleOpen('+')}
-          className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface-hover hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
-          aria-label="Increase quantity"
-        >
-          <Plus size={16} />
+          <SlidersHorizontal size={16} />
         </button>
       </div>
 
-      {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-30 w-56 card p-3 shadow-lg space-y-3">
-          <p className="text-xs font-medium text-text-muted">
-            {direction === '+' ? 'Add to' : 'Remove from'} stock
-          </p>
-          <input
-            type="number"
-            min="0.01"
-            step="any"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="input-field text-center"
-            autoFocus
-          />
+      {countOpen && (
+        <div className="absolute top-full left-0 mt-2 z-30 w-60 card p-3 shadow-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-text-muted">Exact count</p>
+            <span className="text-xs text-text-muted tabular-nums">
+              on hand: {item.current_quantity} {item.unit}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDirection('-')}
+              className={`w-10 h-10 flex items-center justify-center rounded-lg border transition-colors ${
+                direction === '-'
+                  ? 'bg-danger/10 border-danger text-danger'
+                  : 'border-border text-text-muted hover:bg-surface-hover'
+              }`}
+              aria-label="Remove from stock"
+            >
+              <Minus size={16} />
+            </button>
+            <input
+              type="number"
+              min="0.01"
+              step="any"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="input-field text-center flex-1"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setDirection('+')}
+              className={`w-10 h-10 flex items-center justify-center rounded-lg border transition-colors ${
+                direction === '+'
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500'
+                  : 'border-border text-text-muted hover:bg-surface-hover'
+              }`}
+              aria-label="Add to stock"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -98,7 +187,7 @@ export function QuickAdjust({ item, onAdjust }: QuickAdjustProps) {
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
             <Check size={14} />
-            {submitting ? 'Saving...' : 'Confirm'}
+            {submitting ? 'Saving...' : `${direction === '+' ? 'Add' : 'Remove'} ${amount || '0'}`}
           </button>
         </div>
       )}

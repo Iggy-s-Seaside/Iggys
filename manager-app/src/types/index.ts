@@ -439,6 +439,14 @@ export interface InventoryItem {
   supplier: string | null;
   notes: string | null;
   active: boolean;
+  // "Mark, don't count" qualitative state + count safety-net (add-inventory-state.sql).
+  // Optional: the DB supplies NOT NULL defaults, so create payloads omit them.
+  stock_state?: 'ok' | 'low' | 'half' | 'one_left' | 'out' | null;
+  state_set_at?: string | null;
+  state_set_by?: string | null;
+  last_counted_at?: string | null;
+  reorder_point?: number | null;
+  count_interval_days?: number | null;
   // Joined field
   inventory_categories?: { name: string } | null;
 }
@@ -455,7 +463,7 @@ export interface InventoryLog {
 }
 
 export const INVENTORY_UNITS = ['units', 'bottles', 'cases', 'lbs', 'oz', 'kegs', 'bags', 'cans'] as const;
-export const LOG_REASONS = ['restock', 'usage', 'waste', 'count_adjustment', 'order_scan'] as const;
+export const LOG_REASONS = ['restock', 'usage', 'waste', 'count_adjustment', 'order_scan', 'mark_low', 'mark_out', 'mark_state'] as const;
 
 // ── Messages / Inbox ──
 

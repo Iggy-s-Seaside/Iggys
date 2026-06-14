@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, CalendarRange, Calculator, ShieldCheck, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
@@ -56,6 +56,8 @@ const navSections: NavSection[] = [
     items: [
       { to: '/menu', icon: UtensilsCrossed, label: 'Menu', roles: OPS },
       { to: '/inventory', icon: Package, label: 'Inventory', roles: OPS },
+      { to: '/inventory/count', icon: ClipboardCheck, label: 'Count Stock', roles: OPS },
+      { to: '/merch', icon: Shirt, label: 'Merch', roles: OPS },
       { to: '/cogs', icon: Calculator, label: 'COGS', roles: OPS },
     ],
   },
