@@ -1,13 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
-  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw
+  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw,
+  PartyPopper
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { ErrorState } from '../components/ui/ErrorState';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
+import { createPartyFromLead } from '../utils/partyUpsell';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
@@ -67,7 +70,9 @@ export function Messages() {
     archiveMessage, updateNotes, bulkMarkRead, bulkArchive
   } = useMessages();
   const handoff = useLunaHandoff();
+  const navigate = useNavigate();
   const [syncing, setSyncing] = useState(false);
+  const [convertingParty, setConvertingParty] = useState(false);
 
   const handleSyncGmail = async () => {
     if (syncing) return;
@@ -270,6 +275,26 @@ export function Messages() {
     if (!selected) return;
     await updateNotes(selected.id, notes);
     toast.success('Notes saved');
+  };
+
+  // Convert an inbox lead into a private-party inquiry, pre-filled from the
+  // sender and subject. Reuses the app's standard party-create path and sends no
+  // email — the message stays in the inbox; this is purely additive.
+  const handleMakeParty = async () => {
+    if (!selected || convertingParty) return;
+    setConvertingParty(true);
+    const party = await createPartyFromLead({
+      contactName: selected.name,
+      contactEmail: selected.email,
+      contactPhone: selected.phone,
+      title: selected.subject?.trim() || `Party — ${selected.name}`,
+      internalNotes: `Started from an inbox message${
+        selected.subject?.trim() ? ` (“${selected.subject.trim()}”)` : ''
+      }.${selected.message?.trim() ? `\n\n${selected.message.trim()}` : ''}`,
+      source: selected.source === 'gmail' ? 'email' : 'website',
+    });
+    setConvertingParty(false);
+    if (party) navigate(`/parties/${party.id}`);
   };
 
   const handleBulkAction = async (action: 'read' | 'archive') => {
@@ -486,6 +511,15 @@ export function Messages() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {statusBadge(selected.status)}
+                    <button
+                      onClick={handleMakeParty}
+                      disabled={convertingParty}
+                      title="Turn this inquiry into a private-party lead (no email sent)"
+                      className="btn-secondary text-xs py-1 px-2"
+                    >
+                      {convertingParty ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
+                      Make a party
+                    </button>
                     {selected.status !== 'archived' && (
                       <button
                         onClick={() => archiveMessage(selected.id)}

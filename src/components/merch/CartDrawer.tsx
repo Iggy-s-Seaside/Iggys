@@ -37,8 +37,8 @@ export default function CartDrawer() {
             size: i.size ?? null,
             quantity: i.quantity,
           })),
-          success_url: `${window.location.origin}/shop?checkout=success`,
-          cancel_url: `${window.location.origin}/shop?checkout=cancelled`,
+          success_url: `${window.location.origin}/checkout/success?purpose=merch`,
+          cancel_url: `${window.location.origin}/checkout/cancel`,
         }),
       });
       const data = await res.json();

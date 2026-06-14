@@ -13,6 +13,7 @@ import { MessageWidget } from '../components/messages/MessageWidget';
 import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
+import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import type { IggyEvent, Special } from '../types';
 import { format, parseISO, isFuture } from 'date-fns';
 
@@ -48,6 +49,7 @@ export function Dashboard() {
 
   return (
     <div>
+      <OnboardingChecklist />
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>

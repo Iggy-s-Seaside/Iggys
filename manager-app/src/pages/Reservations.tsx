@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CalendarClock,
   Plus,
@@ -13,9 +14,11 @@ import {
   Hourglass,
   CircleDollarSign,
   Trash2,
+  PartyPopper,
 } from 'lucide-react';
 import { format, parseISO, formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import toast from 'react-hot-toast';
+import { createPartyFromLead } from '../utils/partyUpsell';
 import {
   useReservations,
   suggestWaitQuote,
@@ -331,8 +334,32 @@ export function Reservations() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [notifyingId, setNotifyingId] = useState<number | null>(null);
+  const [convertingId, setConvertingId] = useState<number | null>(null);
 
   const confirm = useConfirm();
+  const navigate = useNavigate();
+
+  // Turn a reservation (especially a large one) into a private-party inquiry,
+  // pre-filled from what we already know. Reuses the app's standard party-create
+  // path; sends no email. The reservation stays put — this is purely additive.
+  const handleStartParty = async (r: Reservation) => {
+    if (convertingId != null) return;
+    setConvertingId(r.id);
+    const party = await createPartyFromLead({
+      contactName: r.guest_name,
+      contactPhone: r.phone,
+      title: `Party — ${r.guest_name}`,
+      eventDate: format(parseISO(r.reserved_for), 'yyyy-MM-dd'),
+      guestCount: r.party_size,
+      internalNotes: `Started from a reservation for ${r.party_size} on ${format(
+        parseISO(r.reserved_for),
+        'MMM d, yyyy h:mm a'
+      )}.${r.notes ? ` Reservation notes: ${r.notes}` : ''}`,
+      source: 'phone',
+    });
+    setConvertingId(null);
+    if (party) navigate(`/parties/${party.id}`);
+  };
 
   const activeReservations = useMemo(
     () => reservations.filter((r) => ACTIVE_RES_STATUSES.includes(r.status)),
@@ -413,6 +440,8 @@ export function Reservations() {
                   key={r.id}
                   reservation={r}
                   table={r.table_id != null ? tableById.get(r.table_id) ?? null : null}
+                  converting={convertingId === r.id}
+                  onStartParty={() => handleStartParty(r)}
                   onSeat={() => seatReservation(r.id)}
                   onStatus={(s) => setReservationStatus(r.id, s)}
                   onDelete={async () => {
@@ -489,17 +518,23 @@ export function Reservations() {
 interface ReservationRowProps {
   reservation: Reservation;
   table: FloorTable | null;
+  converting: boolean;
+  onStartParty: () => void;
   onSeat: () => void;
   onStatus: (status: ReservationStatus) => void;
   onDelete: () => void;
 }
 
-function ReservationRow({ reservation: r, table, onSeat, onStatus, onDelete }: ReservationRowProps) {
+/** Large reservations are the strongest private-party upsell candidates. */
+const LARGE_PARTY_THRESHOLD = 6;
+
+function ReservationRow({ reservation: r, table, converting, onStartParty, onSeat, onStatus, onDelete }: ReservationRowProps) {
   const when = parseISO(r.reserved_for);
   const minsAway = differenceInMinutes(when, new Date());
   const isSeated = r.status === 'seated';
   const isSoon = !isSeated && minsAway >= 0 && minsAway <= 15;
   const isLate = !isSeated && minsAway < 0;
+  const isLargeParty = r.party_size >= LARGE_PARTY_THRESHOLD;
 
   return (
     <li className={`card p-4 ${isSoon ? 'border-primary/40' : ''} ${isLate ? 'border-amber-400/50' : ''}`}>
@@ -553,6 +588,23 @@ function ReservationRow({ reservation: r, table, onSeat, onStatus, onDelete }: R
         </button>
       </div>
 
+      {isLargeParty && (
+        <div className="flex items-center gap-2 mt-3 rounded-lg bg-accent/[0.07] border border-accent/20 px-3 py-2">
+          <PartyPopper size={14} className="text-accent shrink-0" />
+          <p className="text-xs text-text-secondary">
+            Big group ({r.party_size}) — could this be a private party?
+          </p>
+          <button
+            onClick={onStartParty}
+            disabled={converting}
+            className="btn-secondary text-xs py-1.5 ml-auto shrink-0"
+          >
+            {converting ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
+            Start a party
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
         {!isSeated ? (
           <button onClick={onSeat} className="btn-primary text-xs py-1.5">
@@ -566,6 +618,17 @@ function ReservationRow({ reservation: r, table, onSeat, onStatus, onDelete }: R
         {r.status === 'booked' && (
           <button onClick={() => onStatus('confirmed')} className="btn-ghost text-xs py-1.5">
             <Check size={14} /> Confirm
+          </button>
+        )}
+        {!isLargeParty && (
+          <button
+            onClick={onStartParty}
+            disabled={converting}
+            title="Convert this reservation into a private-party inquiry"
+            className="btn-ghost text-xs py-1.5 text-text-muted"
+          >
+            {converting ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
+            Start a party
           </button>
         )}
         {!isSeated && (
