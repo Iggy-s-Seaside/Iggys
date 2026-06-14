@@ -17,6 +17,7 @@ import {
   totalFromDenominations,
   formatCents,
 } from '../hooks/useCloseOut';
+import { useConfirm } from '../hooks/useConfirm';
 import type { EonReport } from '../types';
 
 interface CloseOutProps {
@@ -86,6 +87,8 @@ export function CloseOut({ shiftId }: CloseOutProps) {
     closeTheBar,
   } = useCloseOut(shiftId);
 
+  const confirm = useConfirm();
+
   // ── Cash count state ──
   const [denoms, setDenoms] = useState<Record<string, number>>({});
   const [expectedDollars, setExpectedDollars] = useState('');
@@ -141,7 +144,13 @@ export function CloseOut({ shiftId }: CloseOutProps) {
   const [closing, setClosing] = useState(false);
   const [closed, setClosed] = useState(false);
   const handleClose = async () => {
-    if (!window.confirm('Close the bar for the night? This ends the shift.')) return;
+    const confirmed = await confirm({
+      title: 'Close the bar',
+      message: 'Close the bar for the night? This ends the shift.',
+      confirmLabel: 'Close the bar',
+      danger: true,
+    });
+    if (!confirmed) return;
     setClosing(true);
     const ok = await closeTheBar();
     setClosing(false);

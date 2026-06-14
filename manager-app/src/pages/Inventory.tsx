@@ -18,6 +18,7 @@ import {
   getLowStockItems,
 } from '../hooks/useInventory';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../hooks/useConfirm';
 import { useOrderScanner } from '../hooks/useOrderScanner';
 import Select from '../components/ui/Select';
 import { QuickAdjust } from '../components/inventory/QuickAdjust';
@@ -199,6 +200,7 @@ export function Inventory() {
   const { items, loading, refresh, create, update, remove } = useInventoryItems();
   const { data: categories } = useInventoryCategories();
   const { user } = useAuth();
+  const confirm = useConfirm();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
@@ -252,7 +254,13 @@ export function Inventory() {
   };
 
   const handleDelete = async (item: InventoryItem) => {
-    if (!window.confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete item',
+      message: `Delete "${item.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     await remove(item.id);
   };
 

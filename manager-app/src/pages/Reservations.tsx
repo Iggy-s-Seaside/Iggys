@@ -27,6 +27,7 @@ import {
   type ReservationStatus,
   type ReservationDepositStatus,
 } from '../hooks/useReservations';
+import { useConfirm } from '../hooks/useConfirm';
 
 // ── helpers ──
 
@@ -328,6 +329,8 @@ export function Reservations() {
   const [modalOpen, setModalOpen] = useState(false);
   const [notifyingId, setNotifyingId] = useState<number | null>(null);
 
+  const confirm = useConfirm();
+
   const activeReservations = useMemo(
     () => reservations.filter((r) => ACTIVE_RES_STATUSES.includes(r.status)),
     [reservations]
@@ -406,8 +409,14 @@ export function Reservations() {
                   table={r.table_id != null ? tableById.get(r.table_id) ?? null : null}
                   onSeat={() => seatReservation(r.id)}
                   onStatus={(s) => setReservationStatus(r.id, s)}
-                  onDelete={() => {
-                    if (window.confirm(`Remove ${r.guest_name}'s reservation?`)) deleteReservation(r.id);
+                  onDelete={async () => {
+                    const ok = await confirm({
+                      title: 'Remove reservation',
+                      message: `Remove ${r.guest_name}'s reservation?`,
+                      confirmLabel: 'Remove',
+                      danger: true,
+                    });
+                    if (ok) deleteReservation(r.id);
                   }}
                 />
               ))}

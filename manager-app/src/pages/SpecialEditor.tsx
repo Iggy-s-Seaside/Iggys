@@ -21,6 +21,7 @@ import { Modal, ConfirmDialog } from '../components/ui/Modal';
 import Select from '../components/ui/Select';
 import { useEditorState } from '../hooks/useEditorState';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useDraftPersistence } from '../hooks/useDraftPersistence';
 import { TEMPLATES } from '../data/templates';
@@ -42,6 +43,7 @@ export function SpecialEditor() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const handoff = useLunaHandoff();
   const canvasRef = useRef<DomCanvasHandle>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const imageLayerInputRef = useRef<HTMLInputElement>(null);
@@ -256,6 +258,36 @@ export function SpecialEditor() {
       }
     }
   }, [isEdit, id, specials, dispatch]);
+
+  // Luna handoff: a draft_special insight deep-links here with drafted copy in
+  // `draft` (the caption/description) plus optional structured fields in
+  // `payload`. Seed the Save form and open it so the manager reviews and
+  // publishes themselves — nothing is saved or posted automatically.
+  const handoffApplied = useRef(false);
+  useEffect(() => {
+    if (handoffApplied.current) return;
+    if (isEdit) return; // editing an existing special — never overwrite its form
+    if (!handoff.draft && !handoff.payload) return;
+    handoffApplied.current = true;
+
+    const p = handoff.payload ?? {};
+    const title = typeof p.title === 'string' ? p.title : undefined;
+    const description =
+      typeof p.description === 'string' ? p.description : handoff.draft;
+    const type =
+      p.type === 'drink' || p.type === 'food' || p.type === 'seasonal' ? p.type : undefined;
+    const price = typeof p.price === 'string' ? p.price : undefined;
+
+    setSaveForm((f) => ({
+      ...f,
+      ...(title !== undefined ? { title } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(type !== undefined ? { type } : {}),
+      ...(price !== undefined ? { price } : {}),
+    }));
+    setSaveModalOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handoff]);
 
   const handleBgUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

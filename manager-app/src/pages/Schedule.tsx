@@ -22,6 +22,7 @@ import {
   fmtDate, DEFAULT_DAY_SALES_TARGET, STAFF_ROLES,
   TIP_METHODS, TIP_METHOD_LABELS, type TipMethod, type TipAllocation,
 } from '../hooks/useSchedule';
+import { useConfirm } from '../hooks/useConfirm';
 import type { Staff, Shift, TimeOffRequest, TipPool } from '../types';
 
 const money = (n: number) => `$${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -466,6 +467,8 @@ export function Schedule() {
   );
   const [salesMult, setSalesMult] = useState(1);
 
+  const confirm = useConfirm();
+
   const activeStaff = useMemo(() => staff.filter((s) => s.active), [staff]);
 
   // Shift lookup: `${staffId}|${date}` -> shifts (a person can have a split shift).
@@ -691,7 +694,15 @@ export function Schedule() {
                 <button onClick={() => updateStaff(s.id, { active: true })} className="hover:text-primary" title="Reactivate">
                   <Check size={12} />
                 </button>
-                <button onClick={() => { if (window.confirm(`Permanently delete ${s.name}?`)) removeStaff(s.id); }}
+                <button onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Delete staff member',
+                      message: `Permanently delete ${s.name}?`,
+                      confirmLabel: 'Delete',
+                      danger: true,
+                    });
+                    if (ok) removeStaff(s.id);
+                  }}
                   className="hover:text-danger" title="Delete">
                   <Trash2 size={12} />
                 </button>

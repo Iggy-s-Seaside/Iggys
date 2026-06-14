@@ -33,6 +33,7 @@ import {
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../hooks/useConfirm';
 import { useInventoryItems } from '../hooks/useInventory';
 import {
   useVendors,
@@ -277,6 +278,7 @@ export function Cogs() {
   const { catalog } = useVendorCatalog();
   const { orders, refresh: refreshOrders, createDraft, remove: removePo } = usePurchaseOrders();
   const { history } = usePriceHistory();
+  const confirm = useConfirm();
   const [cocktails, setCocktails] = useState<CocktailRow[]>([]);
 
   const [recipeModal, setRecipeModal] = useState<{ open: boolean; initial: Recipe | null }>({ open: false, initial: null });
@@ -420,7 +422,13 @@ export function Cogs() {
   };
 
   const handleDeleteRecipe = async (r: Recipe) => {
-    if (!window.confirm(`Delete recipe "${r.name}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete recipe',
+      message: `Delete recipe "${r.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     await removeRecipe(r.id);
   };
 

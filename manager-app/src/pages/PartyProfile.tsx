@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, CheckCircle2, XCircle, RotateCcw, Pencil, Send,
@@ -8,6 +8,7 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useParty } from '../hooks/useParties';
 import { usePartyPackages } from '../hooks/usePackages';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { PackagePicker } from '../components/packages/PackagePicker';
 import { InvoicePanel } from '../components/parties/InvoicePanel';
 import { DepositPanel } from '../components/parties/DepositPanel';
@@ -52,6 +53,7 @@ export function PartyProfile() {
   const { id } = useParams();
   const pid = id ? Number(id) : null;
   const navigate = useNavigate();
+  const handoff = useLunaHandoff();
   const { party, loading, update, refresh } = useParty(pid);
   const { items, addPackage, updateLine, removeLine } = usePartyPackages(pid);
 
@@ -74,6 +76,24 @@ export function PartyProfile() {
       setInternalNotes(party.internal_notes ?? '');
     }
   }, [party]);
+
+  // Luna handoff: a party_email insight deep-links here with Luna's drafted
+  // follow-up. Open the email composer ready to send, copy the draft to the
+  // clipboard, and stash it in the follow-up notes as a durable reference. The
+  // composer loads the template; the manager pastes/edits and sends themselves —
+  // nothing is ever sent automatically.
+  const handoffApplied = useRef(false);
+  useEffect(() => {
+    if (handoffApplied.current) return;
+    if (!party) return;
+    if (!handoff.draft) return;
+    handoffApplied.current = true;
+    setFollowNotes(handoff.draft);
+    setFollowUpOpen(true);
+    navigator.clipboard?.writeText(handoff.draft)
+      .then(() => toast.success("Luna's draft copied — paste it into the email"))
+      .catch(() => { /* clipboard blocked — draft is still saved in the notes field */ });
+  }, [party, handoff]);
 
   if (loading) {
     return (

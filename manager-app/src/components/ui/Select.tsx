@@ -38,12 +38,12 @@ export interface SelectProps<T extends string | number> {
 const triggerClasses = (variant: 'glass' | 'manager', className?: string) =>
   [
     'group w-full flex items-center gap-2.5 text-left transition outline-none',
-    'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f0f]',
+    'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     'disabled:opacity-50 disabled:cursor-not-allowed',
     variant === 'manager'
       // Compose the manager's own input style so the closed trigger reads as a normal input field.
       ? 'input-field flex items-center min-h-[42px] hover:border-primary/40'
-      : 'rounded-xl bg-white/5 border border-white/10 px-4 py-3 min-h-[48px] text-white hover:border-white/20',
+      : 'rounded-xl bg-surface border border-border px-4 py-3 min-h-[48px] text-text-primary hover:border-primary/40',
     className,
   ].filter(Boolean).join(' ');
 
@@ -53,8 +53,8 @@ function itemClasses(active: boolean, selected: boolean, disabled?: boolean) {
   const it = `${base} cursor-pointer transition-colors`;
   if (selected && active) return `${it} bg-primary/[0.14] text-primary font-medium`;
   if (selected) return `${it} bg-primary/[0.06] text-primary font-medium`;
-  if (active) return `${it} bg-primary/10 text-white`;
-  return `${it} text-white/90`;
+  if (active) return `${it} bg-primary/10 text-text-primary`;
+  return `${it} text-text-primary`;
 }
 
 function HintChip({ hint }: { hint: string }) {
@@ -229,7 +229,7 @@ function DesktopSelect<T extends string | number>({
               <div
                 ref={scrollRef}
                 style={{ ...transStyles, transformOrigin: origin, maxHeight: 'var(--sel-max-h, 20rem)' }}
-                className="relative overflow-y-auto overscroll-contain rounded-xl border border-white/[0.08] bg-[#111827]/95 backdrop-blur-xl p-1.5 scrollbar-hide shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)]"
+                className="relative overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/95 backdrop-blur-xl p-1.5 scrollbar-hide shadow-modal"
               >
                 {options.map((opt, i) => {
                   const showHeader = !!opt.group && opt.group !== lastGroup;

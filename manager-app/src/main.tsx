@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ConfirmProvider } from './hooks/useConfirm';
 import App from './App';
 import { registerSW } from './pwa/registerSW';
 import './index.css';
@@ -13,7 +15,11 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
             <ThemeProvider>
                 <AuthProvider>
-                    <App />
+                    <ErrorBoundary>
+                        <ConfirmProvider>
+                            <App />
+                        </ConfirmProvider>
+                    </ErrorBoundary>
                     <Toaster
                         position="bottom-center"
                         containerStyle={{ bottom: 130 }}

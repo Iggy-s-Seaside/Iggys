@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
   Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
@@ -64,6 +65,7 @@ export function Messages() {
     messages, loading, refresh, markAsRead, markAsReplied,
     archiveMessage, updateNotes, bulkMarkRead, bulkArchive
   } = useMessages();
+  const handoff = useLunaHandoff();
   const [syncing, setSyncing] = useState(false);
 
   const handleSyncGmail = async () => {
@@ -151,6 +153,34 @@ export function Messages() {
     setNotes(selected?.notes || '');
     setReplyText('');
   }, [selected]);
+
+  // Luna handoff: a draft_reply insight deep-links here with the target message
+  // id in the payload and Luna's drafted reply. Select that message and pre-fill
+  // the reply box — the manager always reviews and taps Send themselves.
+  const handoffMsgId = useMemo(() => {
+    const raw = handoff.payload?.messageId ?? handoff.payload?.message_id;
+    return typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : null;
+  }, [handoff.payload]);
+  const replySeeded = useRef(false);
+
+  // Step 1: once messages load, open the target conversation from the handoff.
+  useEffect(() => {
+    if (replySeeded.current) return;
+    if (handoffMsgId == null) return;
+    if (!messages.some((m) => m.id === handoffMsgId)) return;
+    setSelectedId(handoffMsgId);
+    setShowMobileDetail(true);
+  }, [handoffMsgId, messages]);
+
+  // Step 2: when the target conversation is the active one, seed the drafted
+  // reply. Runs after the selection-reset effect above, so the draft survives.
+  useEffect(() => {
+    if (replySeeded.current) return;
+    if (!handoff.draft || handoffMsgId == null) return;
+    if (selected?.id !== handoffMsgId) return;
+    replySeeded.current = true;
+    setReplyText(handoff.draft);
+  }, [handoff.draft, handoffMsgId, selected]);
 
   // Load the Gmail conversation for the selected message (when it's from Gmail).
   const refetchThread = async () => {

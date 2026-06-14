@@ -20,6 +20,7 @@ import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import { useShiftLog } from '../hooks/useShiftLog';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../hooks/useConfirm';
 import type { ShiftLogEntry, ShiftLogTag } from '../types';
 import toast from 'react-hot-toast';
 
@@ -81,6 +82,7 @@ export function ShiftLog({ shiftId }: ShiftLogProps = {}) {
   } = useShiftLog(shiftId);
   const { upload, uploading } = useImageUpload();
   const { user } = useAuth();
+  const confirm = useConfirm();
 
   // Composer state
   const [tag, setTag] = useState<ShiftLogTag>('note');
@@ -132,7 +134,13 @@ export function ShiftLog({ shiftId }: ShiftLogProps = {}) {
   };
 
   const handleDelete = async (entry: ShiftLogEntry) => {
-    if (!window.confirm('Delete this entry? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete entry',
+      message: 'Delete this entry? This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     await remove(entry.id);
   };
 

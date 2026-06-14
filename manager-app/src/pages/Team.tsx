@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
+import { useConfirm } from '../hooks/useConfirm';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 interface ManagerUser {
@@ -94,6 +95,8 @@ export function Team() {
   const [pw2, setPw2] = useState('');
   const [changingPw, setChangingPw] = useState(false);
 
+  const confirm = useConfirm();
+
   const fetchUsers = useCallback(async () => {
     try {
       const data = await callManageUsers({ action: 'list' });
@@ -127,7 +130,13 @@ export function Team() {
 
   const handleReset = async (u: ManagerUser) => {
     if (busyId) return;
-    if (!window.confirm(`Reset the password for ${u.email}? Their current password stops working immediately.`)) return;
+    const ok = await confirm({
+      title: 'Reset password',
+      message: `Reset the password for ${u.email}? Their current password stops working immediately.`,
+      confirmLabel: 'Reset password',
+      danger: true,
+    });
+    if (!ok) return;
     setBusyId(u.id);
     try {
       const data = await callManageUsers({ action: 'reset_password', user_id: u.id });
@@ -141,7 +150,13 @@ export function Team() {
 
   const handleRemove = async (u: ManagerUser) => {
     if (busyId) return;
-    if (!window.confirm(`Remove ${u.email}? They lose dashboard access immediately.`)) return;
+    const ok = await confirm({
+      title: 'Remove manager',
+      message: `Remove ${u.email}? They lose dashboard access immediately.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     setBusyId(u.id);
     try {
       await callManageUsers({ action: 'delete', user_id: u.id });

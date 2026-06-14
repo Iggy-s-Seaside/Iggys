@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
+import toast from 'react-hot-toast';
 import {
   Share2, Instagram, Facebook, MapPin, Image as ImageIcon, Check, X, Clock,
   CalendarClock, ShieldCheck, Send, AlertTriangle, Plus,
@@ -9,6 +10,7 @@ import {
   type SocialPost, type SocialPlatform, type SocialPostStatus,
 } from '../hooks/useSocialPosts';
 import { useAuth } from '../context/AuthContext';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { ConfirmDialog } from '../components/ui/Modal';
 import { CreateSocialPostModal } from '../components/social/CreateSocialPostModal';
 
@@ -126,10 +128,27 @@ function PostCard({
 export function SocialQueue() {
   const { posts, loading, schedule, approve, cancel } = useSocialPosts();
   const { user } = useAuth();
+  const handoff = useLunaHandoff();
   const [showCreate, setShowCreate] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<SocialPost | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<SocialPost | null>(null);
   const [scheduleValue, setScheduleValue] = useState('');
+
+  // Luna handoff: arriving from an insight's caption draft opens the composer
+  // with the drafted caption on the clipboard so it's one paste away. Nothing is
+  // posted until the manager approves it in the queue.
+  const handoffApplied = useRef(false);
+  useEffect(() => {
+    if (handoffApplied.current) return;
+    if (!handoff.draft && !handoff.payload) return;
+    handoffApplied.current = true;
+    setShowCreate(true);
+    if (handoff.draft) {
+      navigator.clipboard?.writeText(handoff.draft)
+        .then(() => toast.success("Luna's caption copied — paste it in"))
+        .catch(() => { /* clipboard blocked — manager can still type the caption */ });
+    }
+  }, [handoff]);
 
   // The queue page shows what's pending a human decision; posted/cancelled drop off.
   const queued = useMemo(

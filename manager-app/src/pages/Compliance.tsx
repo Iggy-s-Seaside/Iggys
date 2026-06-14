@@ -28,6 +28,7 @@ import {
   type Credential,
   type ExpiryTier,
 } from '../hooks/useCompliance';
+import { useConfirm } from '../hooks/useConfirm';
 
 type Tab = 'refusals' | 'incidents' | 'temps' | 'credentials';
 
@@ -546,6 +547,8 @@ export function Compliance() {
   const [modal, setModal] = useState<null | 'refusal' | 'incident' | 'unit' | 'credential'>(null);
   const [editingCred, setEditingCred] = useState<Credential | null>(null);
 
+  const confirm = useConfirm();
+
   const outOfRangeCount = useMemo(
     () => units.filter((u) => latestTempByUnit.get(u.id)?.in_range === false).length,
     [units, latestTempByUnit]
@@ -557,12 +560,24 @@ export function Compliance() {
   };
 
   const removeCredential = async (id: number) => {
-    if (!window.confirm('Remove this credential? Expiry tracking for it will stop.')) return;
+    const ok = await confirm({
+      title: 'Remove credential',
+      message: 'Remove this credential? Expiry tracking for it will stop.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     await data.removeCredential(id);
   };
 
   const removeUnit = async (id: number) => {
-    if (!window.confirm('Remove this unit? Past readings are kept for the record.')) return;
+    const ok = await confirm({
+      title: 'Remove unit',
+      message: 'Remove this unit? Past readings are kept for the record.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     await data.removeUnit(id);
   };
 
