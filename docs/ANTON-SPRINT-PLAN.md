@@ -42,3 +42,5 @@ Make the **manager app** (`~/code_projects/Iggys/manager-app`, live at https://i
 - 2026-06-14 — Bradley: STOP playwright. Use luna-eye (bin/hid + bin/screenvision) for ALL GUI/touch interaction. Test login: antonsprint@example.com / AntonSprint2026! (disposable, allowlisted). Review backlog -> docs/MANAGER-REVIEW-BACKLOG.md.
 
 - 2026-06-14 — PIVOT COMPLETE: luna-eye hands+eyes on real Firefox (logged in as bradleybird3, his session). Made special "Slushie Hour" via touch (Slushie template) -> saved as DRAFT/Inactive (not published, no price). Desktop SpecialEditor toolbar tucks under the app header (toolbar findable via Cmd+S->save modal). Backlog ready (docs/MANAGER-REVIEW-BACKLOG.md, Top 20). Launching build wave 1.
+
+- 2026-06-14 — WAVE 1 SHIPPED+DEPLOYED+verified live (ErrorBoundary, optimistic+undo CRUD, lazy routes 1.25MB->385KB, useConfirm x8 pages, a11y contrast+Select, EmptyState/Skeleton/format primitives, Luna handoff x4). commit on feature/anton-mode. Launching wave 2.

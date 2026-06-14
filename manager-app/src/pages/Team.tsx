@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Users, UserPlus, KeyRound, Trash2, Copy, Check, Loader2, ShieldCheck,
+  Users, UserPlus, KeyRound, Trash2, Copy, Check, Loader2, ShieldCheck, Bell,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useConfirm } from '../hooks/useConfirm';
+import { usePushSubscription } from '../hooks/usePushSubscription';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 interface ManagerUser {
@@ -79,6 +80,93 @@ function CredentialReveal({ cred, onDone }: { cred: TempCredential; onDone: () =
       <button onClick={onDone} className="text-xs font-medium text-text-muted hover:text-text-primary mt-3">
         Done — hide this
       </button>
+    </div>
+  );
+}
+
+/**
+ * Per-device push toggle. Subscribes THIS browser to Web Push and stores the
+ * subscription so the server can reach it. Safe no-op until VITE_VAPID_PUBLIC_KEY is
+ * set — in that case it shows a quiet setup hint instead of a live switch.
+ */
+function NotificationsToggle() {
+  const { supported, needsConfig, permission, subscribed, busy, enable, disable } = usePushSubscription();
+
+  const toggle = async () => {
+    if (busy) return;
+    if (subscribed) {
+      const res = await disable();
+      if (res.ok) toast.success('Notifications off for this device');
+      else toast.error(res.reason || 'Could not turn off notifications');
+      return;
+    }
+    const res = await enable();
+    if (res.ok) toast.success('Notifications on for this device');
+    else if (res.reason === 'permission denied') {
+      toast.error('Notifications are blocked — allow them in your browser settings');
+    } else if (res.reason === 'permission dismissed') {
+      // User closed the prompt without choosing; no need to nag.
+    } else {
+      toast.error(res.reason || 'Could not turn on notifications');
+    }
+  };
+
+  return (
+    <div className="card p-5 mb-6">
+      <h2 className="text-sm font-semibold text-text-primary mb-1 flex items-center gap-2">
+        <Bell size={15} className="text-primary" /> Notifications on this device
+      </h2>
+      <p className="text-xs text-text-muted mb-4">
+        Get a push alert on this phone or browser for new inquiries, low stock, and Luna's heads-ups.
+        This is per-device — turn it on wherever you want to be reached.
+      </p>
+
+      {needsConfig ? (
+        <p className="text-xs text-text-muted bg-surface-hover border border-border rounded-lg px-3 py-2.5">
+          Set <code className="font-mono text-text-secondary">VITE_VAPID_PUBLIC_KEY</code> to enable.
+        </p>
+      ) : !supported ? (
+        <p className="text-xs text-text-muted bg-surface-hover border border-border rounded-lg px-3 py-2.5">
+          This browser doesn't support push notifications.
+        </p>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text-primary">
+              {subscribed ? 'On for this device' : 'Off for this device'}
+            </p>
+            {permission === 'denied' && (
+              <p className="text-xs text-danger mt-0.5">
+                Blocked in browser settings — allow notifications, then try again.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={subscribed}
+            aria-label="Notifications on this device"
+            aria-busy={busy}
+            onClick={toggle}
+            disabled={busy}
+            className="relative inline-flex items-center justify-center shrink-0 min-h-[44px] min-w-[44px] disabled:opacity-60"
+          >
+            <span
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                subscribed ? 'bg-primary' : 'bg-surface-active'
+              }`}
+            >
+              <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full bg-white transition-transform shadow-sm ${
+                  subscribed ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              >
+                {busy && <Loader2 size={10} className="animate-spin text-text-muted" />}
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -283,6 +371,9 @@ export function Team() {
           </button>
         </form>
       </div>
+
+      {/* Notifications on this device */}
+      <NotificationsToggle />
 
       {/* Change my password */}
       <div className="card p-5">
