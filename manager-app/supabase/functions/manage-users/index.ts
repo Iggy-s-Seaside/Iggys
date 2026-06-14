@@ -37,6 +37,16 @@ type Role = "owner" | "manager" | "employee";
 const ROLES: Role[] = ["owner", "manager", "employee"];
 const isRole = (v: unknown): v is Role => typeof v === "string" && (ROLES as string[]).includes(v);
 
+/** Hash a 4-digit PIN with PBKDF2-SHA256 + per-row salt (verified by pin-login). */
+async function hashPin(pin: string): Promise<string> {
+  const iters = 120000;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: iters, hash: "SHA-256" }, key, 256);
+  const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
+  return `pbkdf2$${iters}$${b64(salt)}$${b64(new Uint8Array(bits))}`;
+}
+
 /** Read the role an existing auth user carries (app_metadata first, allowlist fallback). */
 function roleFromMetadata(meta: Record<string, unknown> | null | undefined): Role | null {
   const r = meta?.role;
@@ -82,7 +92,7 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { action, email, user_id, role } = await req.json();
+    const { action, email, user_id, role, pin, name } = await req.json();
 
     // ── SERVER-SIDE ROLE GATE ──
     // The app's UI gates Team to owners, but a UI gate is not security: this fn
@@ -97,9 +107,15 @@ serve(async (req: Request) => {
       .maybeSingle();
     const callerRole: Role = isRole(callerRow?.role) ? callerRow.role : "employee";
     const isManagerPlus = callerRole === "owner" || callerRole === "manager";
-    if (!isManagerPlus) return json({ error: "Forbidden" }, 403);
-    if (action !== "list" && callerRole !== "owner") {
+    // set_pin is special: a user may set their OWN pin (self-service), and the
+    // owner may set anyone's. Everything else is owner-only (list is manager+).
+    const isSelfPinSet = action === "set_pin" && typeof user_id === "string" && user_id === caller.id;
+    if (!isManagerPlus && !isSelfPinSet) return json({ error: "Forbidden" }, 403);
+    if (action !== "list" && action !== "set_pin" && callerRole !== "owner") {
       return json({ error: "Only the owner can manage team accounts." }, 403);
+    }
+    if (action === "set_pin" && callerRole !== "owner" && !isSelfPinSet) {
+      return json({ error: "Only the owner can set another teammate's PIN." }, 403);
     }
 
     // ── LIST ──
@@ -127,6 +143,31 @@ serve(async (req: Request) => {
           "employee",
       }));
       return json({ users });
+    }
+
+    // ── SET PIN ── (owner sets anyone's; a user may set their own)
+    if (action === "set_pin") {
+      const targetId = typeof user_id === "string" ? user_id : "";
+      if (!targetId) return json({ error: "Missing user." }, 400);
+      if (!/^\d{4}$/.test(String(pin ?? ""))) return json({ error: "PIN must be exactly 4 digits." }, 400);
+      // Block trivially-guessable PINs so a money-guarding code isn't 0000/1234.
+      if (["0000", "1234", "1111", "2222", "9999"].includes(String(pin))) {
+        return json({ error: "Pick a less obvious PIN." }, 400);
+      }
+      const { data: u, error: uErr } = await admin.auth.admin.getUserById(targetId);
+      if (uErr || !u?.user?.email) return json({ error: "User not found." }, 404);
+      const targetEmail = u.user.email.toLowerCase();
+      const displayName =
+        (typeof name === "string" && name.trim()) || targetEmail.split("@")[0];
+      const pin_hash = await hashPin(String(pin));
+      const { error: upErr } = await admin
+        .from("staff_pins")
+        .upsert(
+          { email: targetEmail, name: displayName, pin_hash, failed_attempts: 0, locked_until: null, updated_at: new Date().toISOString() },
+          { onConflict: "email" },
+        );
+      if (upErr) throw new Error(upErr.message);
+      return json({ success: true });
     }
 
     // ── CREATE ──

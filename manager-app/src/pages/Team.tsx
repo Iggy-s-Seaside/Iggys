@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Users, UserPlus, KeyRound, Trash2, Copy, Check, Loader2, ShieldCheck, Bell,
+  Users, UserPlus, KeyRound, Trash2, Copy, Check, Loader2, ShieldCheck, Bell, Hash,
 } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useConfirm } from '../hooks/useConfirm';
@@ -217,7 +218,29 @@ export function Team() {
   const [pw2, setPw2] = useState('');
   const [changingPw, setChangingPw] = useState(false);
 
+  // Set-PIN modal
+  const [pinFor, setPinFor] = useState<ManagerUser | null>(null);
+  const [pinValue, setPinValue] = useState('');
+  const [pinName, setPinName] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
+
   const confirm = useConfirm();
+
+  const handleSetPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinSaving || !pinFor) return;
+    if (!/^\d{4}$/.test(pinValue)) { toast.error('PIN must be exactly 4 digits.'); return; }
+    setPinSaving(true);
+    try {
+      await callManageUsers({ action: 'set_pin', user_id: pinFor.id, pin: pinValue, name: pinName.trim() || undefined });
+      toast.success(`PIN set for ${pinName.trim() || pinFor.email}`);
+      setPinFor(null);
+      setPinValue('');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to set PIN');
+    }
+    setPinSaving(false);
+  };
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -366,6 +389,15 @@ export function Team() {
                   <p className="text-xs text-text-muted">Last sign-in {relativeTime(u.last_sign_in_at)}</p>
                 </div>
                 <button
+                  onClick={() => { setPinFor(u); setPinValue(''); setPinName((u.email ?? '').split('@')[0]); }}
+                  disabled={busyId === u.id}
+                  title="Set 4-digit PIN"
+                  aria-label={`Set PIN for ${u.email}`}
+                  className="p-2 rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  <Hash size={16} />
+                </button>
+                <button
                   onClick={() => handleReset(u)}
                   disabled={busyId === u.id}
                   title="Reset password"
@@ -460,6 +492,32 @@ export function Team() {
           </button>
         </form>
       </div>
+
+      {/* Set 4-digit PIN */}
+      <Modal open={!!pinFor} onClose={() => setPinFor(null)} title="Set a 4-digit PIN">
+        <form onSubmit={handleSetPin} className="space-y-4">
+          <p className="text-sm text-text-muted">
+            {pinFor?.email} signs in by tapping their name and entering this PIN. They can change it later.
+          </p>
+          <div>
+            <label className="label" htmlFor="pin-name">Display name (shown on the sign-in pad)</label>
+            <input id="pin-name" value={pinName} onChange={(e) => setPinName(e.target.value)}
+              className="input-field" placeholder="e.g. Jasmine" />
+          </div>
+          <div>
+            <label className="label" htmlFor="pin-value">4-digit PIN</label>
+            <input id="pin-value" inputMode="numeric" autoComplete="off" maxLength={4}
+              value={pinValue} onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="input-field tracking-[0.5em] text-center text-lg" placeholder="••••" />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={() => setPinFor(null)} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={pinSaving || pinValue.length !== 4} className="btn-primary">
+              {pinSaving ? <Loader2 size={16} className="animate-spin" /> : 'Save PIN'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
