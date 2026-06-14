@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Calculator, Check, Loader2, Minus, Plus, Sparkles, UtensilsCrossed, Wine, DoorOpen, Gift, ArrowRight } from 'lucide-react';
 import { usePublicPackages, type PublicPackage, type PublicPackageCategory } from '../../hooks/usePublicPackages';
 
@@ -154,7 +154,15 @@ function PackageCard({ pkg, selected, amount, onToggle }: PackageCardProps) {
 }
 
 interface PackageEstimatorProps {
-  /** Carry the live selection into the booking form so nothing is re-entered. */
+  /** Shared, controlled state — BookEvent owns it so the estimator and the
+   *  booking form are ONE configurator (single source of truth, no re-entry). */
+  guests: number;
+  hours: number;
+  selectedIds: Set<number>;
+  onGuestsChange: (n: number) => void;
+  onHoursChange: (n: number) => void;
+  onToggle: (id: number) => void;
+  /** Continue to the booking form (carries a recap snapshot for the banner). */
   onContinue?: (sel: {
     guests: number;
     hours: number;
@@ -165,18 +173,11 @@ interface PackageEstimatorProps {
   }) => void;
 }
 
-export default function PackageEstimator({ onContinue }: PackageEstimatorProps) {
+export default function PackageEstimator({
+  guests, hours, selectedIds, onGuestsChange, onHoursChange, onToggle, onContinue,
+}: PackageEstimatorProps) {
   const { packages, loading } = usePublicPackages();
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [guests, setGuests] = useState(30);
-  const [hours, setHours] = useState(3);
-
-  const toggle = (id: number) =>
-    setSelected((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+  const selected = selectedIds;
 
   const selectedPackages = useMemo(
     () => packages.filter((p) => selected.has(p.id)),
@@ -245,8 +246,8 @@ export default function PackageEstimator({ onContinue }: PackageEstimatorProps) 
       {/* Guests + hours */}
       <div className="glass-card p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <Stepper label="Guests" value={guests} onChange={setGuests} min={1} max={500} suffix="people" />
-          <Stepper label="Hours" value={hours} onChange={setHours} min={1} max={24} suffix="hours" />
+          <Stepper label="Guests" value={guests} onChange={onGuestsChange} min={1} max={500} suffix="people" />
+          <Stepper label="Hours" value={hours} onChange={onHoursChange} min={1} max={24} suffix="hours" />
         </div>
       </div>
 
@@ -266,7 +267,7 @@ export default function PackageEstimator({ onContinue }: PackageEstimatorProps) 
                   pkg={p}
                   selected={selected.has(p.id)}
                   amount={lineAmount(p, guests, hours)}
-                  onToggle={() => toggle(p.id)}
+                  onToggle={() => onToggle(p.id)}
                 />
               ))}
             </div>
