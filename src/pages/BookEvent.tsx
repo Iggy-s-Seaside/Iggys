@@ -43,7 +43,9 @@ export default function BookEvent() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
-  const [carried, setCarried] = useState<{ packages: number; guests: number } | null>(null);
+  const [carried, setCarried] = useState<
+    { packages: number; guests: number; hours: number; names: string[]; total: number; unpriced: number } | null
+  >(null);
   const [pendingHours, setPendingHours] = useState<number | null>(null);
 
   useEffect(() => {
@@ -68,16 +70,34 @@ export default function BookEvent() {
 
   // "Love it? Let's set a date" — carry the estimator's selections into the form
   // so nothing is re-entered, then smooth-scroll down to it.
-  const handleEstimatorContinue = ({ guests, hours, packageIds }: { guests: number; hours: number; packageIds: number[] }) => {
+  const handleEstimatorContinue = (sel: {
+    guests: number; hours: number; packageIds: number[]; packageNames: string[]; estimateTotal: number; unpriced: number;
+  }) => {
+    const { guests, hours, packageIds, packageNames, estimateTotal, unpriced } = sel;
     if (guests > 0) set('guest_count', String(guests));
     if (packageIds.length) setSelectedPkgs(new Set(packageIds));
     setIsPrivate(true);
     setPendingHours(hours > 0 ? hours : null);
-    if (guests > 0 || packageIds.length > 0) setCarried({ packages: packageIds.length, guests });
+    if (guests > 0 || packageIds.length > 0) {
+      setCarried({ packages: packageIds.length, guests, hours, names: packageNames, total: estimateTotal, unpriced });
+    }
     requestAnimationFrame(() => {
       document.getElementById('book-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
+
+  // One-line recap of what the estimator carried over — reused in the banner,
+  // the submit button context, the confirmation, and the lead the staff receive.
+  const carriedSummary = carried
+    ? [
+        carried.guests > 0 ? `${carried.guests} guests` : '',
+        carried.hours > 0 ? `${carried.hours} hr${carried.hours === 1 ? '' : 's'}` : '',
+        carried.names.length ? carried.names.slice(0, 3).join(', ') + (carried.names.length > 3 ? ` +${carried.names.length - 3}` : '') : '',
+        carried.total > 0
+          ? `~$${Math.round(carried.total).toLocaleString('en-US')}${carried.unpriced > 0 ? '+' : ''}`
+          : (carried.packages > 0 ? 'custom quote' : ''),
+      ].filter(Boolean).join(' · ')
+    : '';
 
   // Fully blocked + busy days for the chosen space (PRIVATE mode).
   const taken = useMemo(
@@ -154,7 +174,7 @@ export default function BookEvent() {
           end_time: legacyEndTime,
           guest_count: form.guest_count || null,
           party_type: form.party_type || null,
-          notes: form.notes || null,
+          notes: [form.notes.trim(), carriedSummary ? `Estimate shown to guest: ${carriedSummary}` : ''].filter(Boolean).join('\n\n') || null,
           package_ids: Array.from(selectedPkgs),
           is_private: isPrivate,
           space: isPrivate ? space : null,
@@ -185,6 +205,7 @@ export default function BookEvent() {
               {date ? ` for ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}.
               We'll reach out shortly to lock in the details.
             </p>
+            {carriedSummary && <p className="text-text-dim text-sm mt-3">{carriedSummary}</p>}
             <p className="text-text-muted text-sm mt-4">Need us sooner? Call (503) 738-0672.</p>
           </div>
         </div>
@@ -222,9 +243,7 @@ export default function BookEvent() {
                 <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-white font-medium text-sm">We kept your selections — just add a date &amp; your details.</p>
-                  <p className="text-text-muted text-xs mt-0.5">
-                    {[carried.guests > 0 ? `${carried.guests} guests` : '', carried.packages > 0 ? `${carried.packages} package${carried.packages === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')} carried over from your estimate.
-                  </p>
+                  <p className="text-text-muted text-xs mt-0.5">{carriedSummary} — carried over from your estimate.</p>
                 </div>
               </div>
             )}
@@ -234,19 +253,19 @@ export default function BookEvent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Name *</label>
-                  <input className={inputClasses} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your name" required />
+                  <input className={inputClasses} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your name" required autoComplete="name" autoCapitalize="words" />
                 </div>
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Company / group <span className="opacity-60">(optional)</span></label>
-                  <input className={inputClasses} value={form.company} onChange={(e) => set('company', e.target.value)} placeholder="e.g., Seaside School District" />
+                  <input className={inputClasses} value={form.company} onChange={(e) => set('company', e.target.value)} placeholder="e.g., Seaside School District" autoComplete="organization" />
                 </div>
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Email</label>
-                  <input type="email" className={inputClasses} value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
+                  <input type="email" inputMode="email" autoComplete="email" autoCapitalize="off" autoCorrect="off" className={inputClasses} value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
                 </div>
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Phone</label>
-                  <input type="tel" className={inputClasses} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(503) 555-0123" />
+                  <input type="tel" inputMode="tel" autoComplete="tel" className={inputClasses} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(503) 555-0123" />
                 </div>
               </div>
               <p className="text-xs text-text-muted">Leave an email or a phone number so we can reach you.</p>
@@ -431,8 +450,8 @@ export default function BookEvent() {
             {/* Packages */}
             {packages.length > 0 && (
               <div className="glass-card p-6 space-y-3">
-                <h2 className="font-heading text-xl font-bold text-white">Add packages <span className="text-sm text-text-muted font-normal">(optional)</span></h2>
-                <p className="text-sm text-text-muted">Pick anything you're interested in — we'll confirm details with you.</p>
+                <h2 className="font-heading text-xl font-bold text-white">{carried ? 'Your packages' : 'Add packages'} <span className="text-sm text-text-muted font-normal">(optional)</span></h2>
+                <p className="text-sm text-text-muted">{carried ? 'From your estimate — add or remove anything, no need to start over.' : "Pick anything you're interested in — we'll confirm details with you."}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {packages.map((p) => {
                     const on = selectedPkgs.has(p.id);
@@ -475,7 +494,7 @@ export default function BookEvent() {
             {error && <p className="text-amber-400 text-sm">{error}</p>}
 
             <button type="submit" disabled={!canSubmit} className="btn-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed">
-              {submitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Sending…</> : 'Request this date'}
+              {submitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Sending…</> : (carried && carried.guests > 0 ? `Request this date — ${carried.guests} guests` : 'Request this date')}
             </button>
             <p className="text-center text-xs text-text-muted">No deposit needed to ask — this just starts the conversation.</p>
           </form>

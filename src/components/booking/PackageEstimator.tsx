@@ -155,7 +155,14 @@ function PackageCard({ pkg, selected, amount, onToggle }: PackageCardProps) {
 
 interface PackageEstimatorProps {
   /** Carry the live selection into the booking form so nothing is re-entered. */
-  onContinue?: (sel: { guests: number; hours: number; packageIds: number[] }) => void;
+  onContinue?: (sel: {
+    guests: number;
+    hours: number;
+    packageIds: number[];
+    packageNames: string[];
+    estimateTotal: number;
+    unpriced: number;
+  }) => void;
 }
 
 export default function PackageEstimator({ onContinue }: PackageEstimatorProps) {
@@ -355,7 +362,16 @@ export default function PackageEstimator({ onContinue }: PackageEstimatorProps) 
           <>
             <button
               type="button"
-              onClick={() => onContinue({ guests, hours, packageIds: selectedPackages.map((p) => p.id) })}
+              onClick={() =>
+                onContinue({
+                  guests,
+                  hours,
+                  packageIds: selectedPackages.map((p) => p.id),
+                  packageNames: selectedPackages.map((p) => p.name),
+                  estimateTotal: estimate.grandTotal,
+                  unpriced: estimate.unpriced,
+                })
+              }
               className="mt-5 w-full btn-primary text-base py-4 flex items-center justify-center gap-2"
             >
               {hasSelection ? "Love it? Let's set a date" : "Let's set a date"}
