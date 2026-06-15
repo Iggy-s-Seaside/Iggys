@@ -13,6 +13,8 @@ interface TodaysPulseProps {
   unreadCount: number;
   /** Luna's daily demand read (kind='pulse'); when present it replaces the canned line. */
   pulse?: LunaInsight | null;
+  /** Forecast-vs-actual accuracy ("Luna's last N calls: X% right"). */
+  accuracy?: { pct: number; n: number } | null;
 }
 
 // Map a Luna action type to the page that consumes its handoff draft.
@@ -49,7 +51,7 @@ function eventTime(e: IggyEvent): string {
  * shoulder. Pure composition over data already loaded by the Dashboard plus one
  * (free, keyless) weather read. Weather is first-class for a coastal bar.
  */
-export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount, pulse }: TodaysPulseProps) {
+export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount, pulse, accuracy }: TodaysPulseProps) {
   const navigate = useNavigate();
   const { parties } = useParties();
   const { weather } = useWeather();
@@ -163,6 +165,11 @@ export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount
                 >
                   {action.label || 'Do it'} <ArrowRight size={13} />
                 </button>
+              )}
+              {accuracy && accuracy.n >= 2 && (
+                <p className="text-[11px] text-white/70 mt-2">
+                  Luna's last {accuracy.n} calls: {accuracy.pct}% on the money
+                </p>
               )}
             </div>
           );

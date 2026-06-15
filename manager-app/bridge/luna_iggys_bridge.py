@@ -81,6 +81,15 @@ SEASIDE_LAT, SEASIDE_LON = 45.9929, -123.9229
 PORTLAND_LAT, PORTLAND_LON = 45.5152, -122.6784
 SEASIDE_CONVENTION_API = "https://seasideconvention.com/wp-json/tribe/events/v1/events"
 
+# Creative "special of the day": Luna invents a fun NEW drink riffed on a
+# holiday / famous birthday / on-this-day fact (NOT a menu pick). Good use of
+# idle "wake time" — generated once a day on a quiet tick.
+try:
+    SPECIAL_INTERVAL = max(1800, int(os.environ.get("LUNA_SPECIAL_SECONDS", "21600")))  # 6h
+except ValueError:
+    SPECIAL_INTERVAL = 21600
+ON_THIS_DAY_API = "https://en.wikipedia.org/api/rest_v1/feed/onthisday/all"
+
 
 def log(msg: str) -> None:
     """One line to stdout (systemd journal picks it up)."""
@@ -629,6 +638,21 @@ PULSE_PREAMBLE = (
     "- the one-tap version of your action. Keep it to those 2 lines + the ACTION line, nothing else."
 )
 
+SPECIAL_PREAMBLE = (
+    "You are Luna, Iggy's creative bar mind, inventing a FUN drink special of the day for this "
+    "Seaside, Oregon coast bar. Use the 'on this day' facts below - a quirky holiday, a famous "
+    "birthday, or a fun historical event - and INVENT a brand-new special riffed on it. Do NOT "
+    "just name an existing menu drink; CREATE something playful and on-brand (coastal, a little "
+    "cheeky, easy to actually pour from common spirits + mixers). Pick the single most fun hook. "
+    "Plain text, no markdown, EXACTLY:\n"
+    "Line 1: the special NAME + a punchy one-line concept (what's in it / the vibe).\n"
+    "Line 2: 'Why: ' the fun fact it riffs on, in one sentence.\n"
+    "Line 3: 'Build: ' a simple recipe (spirits + mixers + garnish) + a suggested price.\n"
+    "Then a final line 'ACTION:' with compact JSON {action:{type:\"draft_special\", "
+    "label:\"Make this special\", draft:\"<name + concept + build, ready to drop into the special "
+    "designer>\"}}. Keep it tight and genuinely fun."
+)
+
 
 def build_question_prompt(ctx: dict, author_email, content: str,
                           history=None, user_name=None, user_role=None,
@@ -992,6 +1016,7 @@ def run_daemon() -> None:
     backoff = 2
     last_triage = 0.0
     last_pulse = 0.0
+    last_special = 0.0
     while True:
         try:
             if conn is None or conn.closed:
@@ -1009,6 +1034,9 @@ def run_daemon() -> None:
                 elif now - last_pulse >= PULSE_INTERVAL:
                     last_pulse = now
                     run_pulse(conn)
+                elif now - last_special >= SPECIAL_INTERVAL:
+                    last_special = now
+                    run_special(conn)
                 time.sleep(POLL_SECONDS)
         except DB_ERRORS as e:
             log(f"Postgres connection problem: {e}; reconnecting in {backoff}s")
@@ -1460,15 +1488,15 @@ def compute_pulse(w, conventions, d) -> dict:
 
 
 def _candidate_specials(band, w) -> list:
+    # The pulse action leans staffing/prep; the actual creative drink special is a
+    # SEPARATE daily card (run_special). So these are PREP/feature angles, not
+    # named menu drinks.
     out = []
-    code, precip, high = w.get("code"), w.get("precip") or 0, w.get("high")
-    sunny = code is not None and code <= 3 and precip <= 25
     if band in ("BUSY", "PACKED"):
-        out.append("a high-margin seafood feature (Admiral's Plate, Surf & Turf, or the Combination Plate) — fast to fire under a rush")
+        out.append("staff up + prep a high-margin, fast-to-fire feature ahead of the rush")
     else:
-        out.append("a value / move-the-perishables play (chowder + a hot toddy on a cold night, or a steamer-clam or mussel special)")
-    if sunny and high is not None and high >= 65:
-        out.append("a deck drink for golden hour (a Sunset Spritz or the Marionberry Mule) — seat people facing west")
+        out.append("trim labor + a value / move-the-perishables play (chowder + a hot toddy on a cold night, a steamer/mussel feature)")
+    out.append("or feature today's Special Idea card (Luna posts a fresh creative one daily)")
     return out
 
 
@@ -1514,6 +1542,16 @@ def run_pulse(conn) -> None:
                 "VALUES ('pulse', %s, %s, 'new', %s::jsonb)",
                 (title, body or f"{p['band']} tonight.", json.dumps(data)),
             )
+            # Log the prediction for the forecast-vs-actual trust loop. The
+            # manager's nightly close-out fills actual_band on the same row.
+            cur.execute(
+                "INSERT INTO demand_log (business_day, predicted_band, predicted_score, drivers) "
+                "VALUES (%s, %s, %s, %s::jsonb) "
+                "ON CONFLICT (business_day) DO UPDATE SET "
+                "predicted_band = EXCLUDED.predicted_band, predicted_score = EXCLUDED.predicted_score, "
+                "drivers = EXCLUDED.drivers, updated_at = now()",
+                (date.today(), p["band"], p["score"], json.dumps(data["drivers"])),
+            )
         conn.commit()
         log(f"pulse: wrote '{title}' ({len(body)} chars)")
     except DB_ERRORS:
@@ -1542,6 +1580,104 @@ def run_pulse_once() -> int:
 
 
 # --------------------------------------------------------------------------
+# Creative "special of the day" — Luna invents a fun drink from a fun fact
+# --------------------------------------------------------------------------
+
+def fetch_on_this_day() -> dict:
+    """Wikipedia 'on this day' (free, keyless): quirky events, famous births, and
+    observances Luna can riff a fun special off of."""
+    d = date.today()
+    out = {"events": [], "births": [], "holidays": []}
+    try:
+        data = http_get_json(f"{ON_THIS_DAY_API}/{d.month:02d}/{d.day:02d}")
+        for e in (data.get("selected") or data.get("events") or [])[:8]:
+            out["events"].append(f"{e.get('year', '')}: {trunc(e.get('text', ''), 140)}".strip(": "))
+        for b in (data.get("births") or [])[:8]:
+            out["births"].append(f"{b.get('year', '')}: {trunc(b.get('text', ''), 100)}".strip(": "))
+        for h in (data.get("holidays") or [])[:6]:
+            out["holidays"].append(trunc(h.get("text", ""), 120))
+    except Exception as e:
+        log(f"special: on-this-day fetch failed: {e}")
+    return out
+
+
+def build_special_prompt(otd, d) -> str:
+    facts = []
+    if otd["holidays"]:
+        facts.append("Observances today: " + " | ".join(otd["holidays"]))
+    if otd["events"]:
+        facts.append("On this day: " + " | ".join(otd["events"][:6]))
+    if otd["births"]:
+        facts.append("Born today: " + " | ".join(otd["births"][:6]))
+    hol = _major_holiday(d)
+    if hol:
+        facts.append(f"Major holiday: {hol}")
+    return "\n".join([
+        SPECIAL_PREAMBLE, "",
+        f"Today is {d.strftime('%A, %B %d, %Y')}.",
+        ("\n".join(facts) if facts else "(no notable facts found - invent something seasonal + coastal)"),
+        "Invent the special now.",
+    ])
+
+
+def run_special(conn) -> None:
+    """Generate one creative special per day. Skips if today's already exists
+    (the bridge role can INSERT but not DELETE its insights)."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM luna_insights WHERE kind = 'special' "
+                "AND created_at::date = current_date LIMIT 1")
+            if cur.fetchone():
+                conn.rollback()
+                return
+        conn.rollback()
+        otd = fetch_on_this_day()
+        prompt = build_special_prompt(otd, date.today())
+        log("special: inventing today's creative special")
+        reply = plainify(ask_luna(prompt, session_tag=f"special-{date.today().isoformat()}"))
+        body, action = extract_action(reply)
+        if not body:
+            return
+        first = (body.splitlines() or [""])[0]
+        name = re.split(r"[—:\-]", first, maxsplit=1)[0].strip()[:60] or "Today's special"
+        data = {"special": True, "source": "on-this-day"}
+        if action:
+            data.update(action)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO luna_insights (kind, title, body, status, data) "
+                "VALUES ('special', %s, %s, 'new', %s::jsonb)",
+                (f"Special idea: {name}", body, json.dumps(data)),
+            )
+        conn.commit()
+        log(f"special: wrote '{name}'")
+    except DB_ERRORS:
+        raise
+    except LunaUnavailable as e:
+        log(f"special: Luna unavailable ({e})")
+    except Exception as e:
+        log(f"special: failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+
+def run_special_once() -> int:
+    conn = None
+    try:
+        conn = connect_db()
+        run_special(conn)
+        return 0
+    except Exception as e:
+        log(f"special one-shot FAILED: {e}")
+        return 1
+    finally:
+        close_quietly(conn)
+
+
+# --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
 
@@ -1561,6 +1697,8 @@ def main() -> int:
         return run_triage_once()
     if "--pulse" in sys.argv[1:]:
         return run_pulse_once()
+    if "--special" in sys.argv[1:]:
+        return run_special_once()
     run_daemon()
     return 0
 

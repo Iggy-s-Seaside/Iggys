@@ -215,11 +215,12 @@ export function useLunaInsights() {
   const markSeen = useCallback((id: number) => setStatus(id, 'seen'), [setStatus]);
   const dismiss = useCallback((id: number) => setStatus(id, 'dismissed'), [setStatus]);
 
-  // The daily demand pulse is surfaced as its own dashboard card (not in the
-  // insights feed), so expose the most recent one separately.
+  // The daily demand pulse + the creative special-of-the-day each render as
+  // their own dashboard card (not in the insights feed), so expose them separately.
   const latestPulse = insights.find((i) => i.kind === 'pulse') ?? null;
+  const latestSpecial = insights.find((i) => i.kind === 'special') ?? null;
 
-  return { insights, latestPulse, loading, markSeen, dismiss, refresh: fetchInsights };
+  return { insights, latestPulse, latestSpecial, loading, markSeen, dismiss, refresh: fetchInsights };
 }
 
 /** Lightweight count of status='new' insights for nav badges. */
@@ -232,7 +233,8 @@ export function useNewInsightCount() {
         .from('luna_insights')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'new')
-        .neq('kind', 'pulse'); // pulse shows as its own card, not a feed badge
+        .neq('kind', 'pulse')   // pulse + special show as their own cards,
+        .neq('kind', 'special'); // not as feed badges
       if (!error && c !== null) setCount(c);
     };
 

@@ -21,6 +21,7 @@ const KIND_CHIP_CLASSES: Record<LunaInsightKind, string> = {
   suggestion: 'badge-accent',
   note: 'badge bg-surface-hover text-text-muted',
   pulse: 'badge-primary', // pulse renders as the dashboard card, not in this feed
+  special: 'badge-accent', // special-of-the-day renders as its own dashboard card
 };
 
 const EXAMPLE_PROMPTS = [
@@ -304,8 +305,11 @@ export function Luna() {
   const thinking = waiting && waitedMs < STUCK_AFTER_MS;
   const stuck = waiting && waitedMs >= STUCK_AFTER_MS;
 
-  // The daily demand pulse is its own dashboard card — keep it out of the feed.
-  const feedInsights = useMemo(() => insights.filter((i) => i.kind !== 'pulse'), [insights]);
+  // The daily pulse + creative special are their own dashboard cards — keep them out of the feed.
+  const feedInsights = useMemo(
+    () => insights.filter((i) => i.kind !== 'pulse' && i.kind !== 'special'),
+    [insights]
+  );
   const newInsightCount = useMemo(
     () => feedInsights.filter((i) => i.status === 'new').length,
     [feedInsights]

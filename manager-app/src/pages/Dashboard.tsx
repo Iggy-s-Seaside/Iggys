@@ -13,6 +13,9 @@ import { MessageWidget } from '../components/messages/MessageWidget';
 import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
+import { SpecialIdeaCard } from '../components/dashboard/SpecialIdeaCard';
+import { CloseOutCard } from '../components/dashboard/CloseOutCard';
+import { useDemandLog } from '../hooks/useDemandLog';
 import { needsReplyNow } from '../utils/triage';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -26,7 +29,8 @@ export function Dashboard() {
   const lowStockItems = getLowStockItems(inventoryItems);
   const { messages, loading: messagesLoading } = useMessages();
   const { todos, loading: todosLoading, toggle: toggleTodo } = useTodos();
-  const { insights, latestPulse } = useLunaInsights();
+  const { insights, latestPulse, latestSpecial } = useLunaInsights();
+  const demand = useDemandLog();
   const { current: openShift } = useShift();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
@@ -70,7 +74,14 @@ export function Dashboard() {
         lowStockCount={lowStockItems.length}
         unreadCount={unreadMessages.length}
         pulse={latestPulse}
+        accuracy={demand.accuracy}
       />
+
+      {/* Luna's creative special-of-the-day */}
+      <SpecialIdeaCard special={latestSpecial} />
+
+      {/* Nightly close-out — teaches Luna's forecast */}
+      <CloseOutCard todayRow={demand.todayRow} saving={demand.saving} onLog={demand.logActual} />
 
       {/* Needs your attention — parties surfaced first */}
       <PartiesTodayWidget />
