@@ -481,15 +481,18 @@ BRIEFING_PREAMBLE = (
 )
 
 TRIAGE_CLASSIFY_PREAMBLE = (
-    "You are Luna, triaging the Iggy's Seaside inbox. For EACH email below decide: is this a "
-    "customer who needs a human reply (a reservation / table request, a private-event or "
-    "space-rental inquiry, a pricing / menu / availability question, or any genuine question), "
-    "or is it a notification / newsletter / automated / no-reply message that needs nothing? "
-    "Return ONLY a compact JSON array, one object per email, no prose and no markdown:\n"
-    "[{\"id\": <id>, \"importance\": \"high\" or \"normal\", \"category\": one of "
-    "\"reservation\",\"event\",\"request\",\"inquiry\",\"notification\",\"other\", "
-    "\"needs_reply\": true or false, \"reason\": \"8 words max\"}]\n"
-    "Set importance to high exactly when needs_reply is true. Be decisive."
+    "Triage the Iggy's Seaside (Seaside, OR bar/restaurant) inbox emails below. For EACH email "
+    "decide: is it a customer who needs a human reply (a reservation / table request, a "
+    "private-event or space-rental inquiry, a pricing / menu / availability question, or any "
+    "genuine question), or a notification / newsletter / automated / no-reply message that needs "
+    "nothing?\n"
+    "You are acting as a JSON API, not a chat assistant. Output ONLY a JSON array - no greeting, "
+    "no explanation, no markdown, no code fence, no 'Sources:' line, nothing before or after the "
+    "array. One object per email, in this exact shape:\n"
+    "[{\"id\": <number>, \"importance\": \"high\"|\"normal\", \"category\": "
+    "\"reservation\"|\"event\"|\"request\"|\"inquiry\"|\"notification\"|\"other\", "
+    "\"needs_reply\": true|false, \"reason\": \"<=8 words\"}]\n"
+    "Set importance to \"high\" exactly when needs_reply is true. Be decisive."
 )
 
 TRIAGE_DRAFT_PREAMBLE = (
@@ -917,18 +920,32 @@ def run_briefing() -> int:
 # --------------------------------------------------------------------------
 
 def _extract_json_array(text):
-    """Pull the first JSON array out of Luna's reply (she may wrap it in prose)."""
+    """Pull the first JSON array out of Luna's reply (she may wrap it in prose
+    or a ```json fence). Tries the outermost [...] slice, then a per-object scan
+    so a trailing-comma / stray-bracket tail can't sink the whole batch."""
     if not text:
         return None
-    start = text.find("[")
-    end = text.rfind("]")
-    if start == -1 or end == -1 or end <= start:
-        return None
-    try:
-        obj = json.loads(text[start:end + 1])
-        return obj if isinstance(obj, list) else None
-    except (json.JSONDecodeError, ValueError):
-        return None
+    # Strip markdown code fences if present.
+    cleaned = re.sub(r"```[a-zA-Z]*", "", text).replace("```", "")
+    start = cleaned.find("[")
+    end = cleaned.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        try:
+            obj = json.loads(cleaned[start:end + 1])
+            if isinstance(obj, list):
+                return obj
+        except (json.JSONDecodeError, ValueError):
+            pass
+    # Fallback: salvage individual {...} objects (tolerates junk between them).
+    objs = []
+    for m in re.finditer(r"\{[^{}]*\}", cleaned):
+        try:
+            o = json.loads(m.group(0))
+            if isinstance(o, dict):
+                objs.append(o)
+        except (json.JSONDecodeError, ValueError):
+            continue
+    return objs or None
 
 
 def fetch_unclassified(conn):
@@ -960,15 +977,22 @@ def classify_batch(conn, rows) -> int:
             f"subject: {trunc(subject, 160)}\n"
             f"body: {trunc(message, 600)}"
         )
+    # NOTE: deliberately NOT prepending KNOWLEDGE_PACK here — its "plain text,
+    # two voices, end with a Sources line" rules fight the JSON-only output we
+    # need. Classification is intent detection; it doesn't need venue facts.
     prompt = "\n".join([
-        TRIAGE_CLASSIFY_PREAMBLE, "", KNOWLEDGE_PACK, "",
-        "EMAILS TO TRIAGE:", "\n\n".join(blocks),
+        TRIAGE_CLASSIFY_PREAMBLE, "",
+        "EMAILS TO TRIAGE:", "\n\n".join(blocks), "",
+        "Output ONLY the JSON array now. No other text.",
     ])
     log(f"triage: classifying {len(rows)} email(s)")
-    reply = ask_luna(prompt, session_tag=f"triage-classify-{date.today().isoformat()}")
+    # Unique session per call — reusing one tag across the 20-min passes would
+    # collide with Luna's rolling-session compaction (see ask_luna notes).
+    reply = ask_luna(prompt, session_tag=f"triage-classify-{int(time.time())}")
     arr = _extract_json_array(reply)
     if not arr:
-        log("triage: classification returned no parseable JSON; leaving for next round")
+        log("triage: classification returned no parseable JSON; leaving for next "
+            f"round. Luna said: {trunc(reply, 280)!r}")
         return 0
     valid_ids = {r[0] for r in rows}
     verdicts = {}
