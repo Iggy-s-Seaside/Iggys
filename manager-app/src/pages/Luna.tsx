@@ -20,6 +20,7 @@ const KIND_CHIP_CLASSES: Record<LunaInsightKind, string> = {
   alert: 'badge-danger',
   suggestion: 'badge-accent',
   note: 'badge bg-surface-hover text-text-muted',
+  pulse: 'badge-primary', // pulse renders as the dashboard card, not in this feed
 };
 
 const EXAMPLE_PROMPTS = [
@@ -303,13 +304,15 @@ export function Luna() {
   const thinking = waiting && waitedMs < STUCK_AFTER_MS;
   const stuck = waiting && waitedMs >= STUCK_AFTER_MS;
 
+  // The daily demand pulse is its own dashboard card — keep it out of the feed.
+  const feedInsights = useMemo(() => insights.filter((i) => i.kind !== 'pulse'), [insights]);
   const newInsightCount = useMemo(
-    () => insights.filter((i) => i.status === 'new').length,
-    [insights]
+    () => feedInsights.filter((i) => i.status === 'new').length,
+    [feedInsights]
   );
   const visibleInsights = useMemo(
-    () => (showDismissed ? insights : insights.filter((i) => i.status !== 'dismissed')),
-    [insights, showDismissed]
+    () => (showDismissed ? feedInsights : feedInsights.filter((i) => i.status !== 'dismissed')),
+    [feedInsights, showDismissed]
   );
 
   // Keep the thread pinned to the newest message — but never yank the user

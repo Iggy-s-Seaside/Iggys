@@ -19,6 +19,7 @@ Environment (see luna-bridge.env.example):
   LUNA_POLL_SECONDS   default 5
 """
 
+import calendar
 import json
 import os
 import re
@@ -68,6 +69,17 @@ except ValueError:
 TRIAGE_CLASSIFY_BATCH = 12   # emails classified per Luna call
 TRIAGE_MAX_DRAFTS = 2        # reply drafts per triage pass (bounds wall-clock)
 TRIAGE_LOOKBACK_DAYS = 30    # ignore mail older than this
+
+# Daily demand pulse ("Tonight's Read"). A deterministic model computes the band
+# from weather + season + conventions; Luna only phrases it. Refreshed on idle
+# ticks every PULSE_INTERVAL so the morning read updates for the dinner window.
+try:
+    PULSE_INTERVAL = max(900, int(os.environ.get("LUNA_PULSE_SECONDS", "14400")))  # default 4h
+except ValueError:
+    PULSE_INTERVAL = 14400
+SEASIDE_LAT, SEASIDE_LON = 45.9929, -123.9229
+PORTLAND_LAT, PORTLAND_LON = 45.5152, -122.6784
+SEASIDE_CONVENTION_API = "https://seasideconvention.com/wp-json/tribe/events/v1/events"
 
 
 def log(msg: str) -> None:
@@ -379,6 +391,27 @@ def fetch_staff_identity(conn, email):
     return (None, None)
 
 
+# Authoritative dietary/allergen + bar policy (sourced 2026-06-15 from
+# doogersseafood.com + iggysseaside.com). The menu schema has no dietary flags,
+# so THIS is how Luna answers dietary questions accurately instead of guessing.
+MENU_POLICY = (
+    "MENU & DIETARY POLICY (authoritative - answer dietary/allergen + bar questions from THIS, "
+    "never guess):\n"
+    "- The FOOD is Dooger's Seafood & Grill. GLUTEN-FREE: Dooger's states 'with few exceptions we "
+    "are happy to provide gluten-free options for our entire menu' - most items can be MADE "
+    "gluten-free ON REQUEST (gluten-free breading or sauteed in olive oil; steaks pan-grilled; "
+    "pans/fryer washed), but items are NOT gluten-free as plated by default. The one item that is "
+    "gluten-free as served is the CLAM CHOWDER (Dooger's clam chowder is gluten free). ALWAYS add, "
+    "for any severe allergy or celiac: Dooger's cannot offer a 100% guarantee against cross-contact "
+    "- have the guest flag it to the kitchen.\n"
+    "- VEGETARIAN/VEGAN markers are name-level only: the Garden Burger is vegetarian; the 'Vegan' "
+    "salad is vegan. Do NOT infer any other item is veg/vegan.\n"
+    "- HAPPY HOUR: $5 drafts, $5 wells, $3 cans, daily 3-5pm.\n"
+    "- Signature cocktails: Marionberry Mule, Burlini Espresso Martini, Iggy's Old Fashioned, "
+    "Key Lime Pie Martini (current prices live in the cocktails list / ask the bar)."
+)
+
+
 def fetch_menu(conn) -> str:
     """The live menus Luna must answer FROM (never invent): drinks from cocktails
     (with ingredients), food from menu_items grouped by menu_type. Allergen/diet
@@ -420,12 +453,8 @@ def fetch_menu(conn) -> str:
             if is_86d:
                 row += " | [86'd - currently OUT]"
             lines.append(f"- {trunc(row, 220)}")
-    if not lines:
-        return ""
-    lines.append(
-        "NOTE: this menu data has no allergen/dietary flags. Do NOT state gluten-free / "
-        "dairy-free / nut-free / vegan etc. from it - if asked, say you'll confirm with the kitchen."
-    )
+    lines.append("")
+    lines.append(MENU_POLICY)
     return "\n".join(lines)
 
 
@@ -582,6 +611,22 @@ TRIAGE_DRAFT_PREAMBLE = (
     "(date, headcount, which space). Return ONLY the ready-to-send reply body - a few sentences, "
     "plain text, no subject line, no [bracketed placeholders]. You may end with a simple line "
     "'- Iggy's Seaside'."
+)
+
+PULSE_PREAMBLE = (
+    "You are Luna writing Iggy's DAILY DEMAND PULSE - the one-glance read staff see on login. A "
+    "deterministic model already computed the band + drivers; you do NOT do the math, you PHRASE "
+    "it in your voice. On the Oregon coast, sunny is the BASELINE, not news - only call out what is "
+    "genuinely different tonight. A normal quiet night should read as a calm one-liner, not an "
+    "alarm. Output EXACTLY this shape, plain text, no markdown:\n"
+    "Line 1: the read - the band in plain English + the SINGLE biggest reason (e.g. 'Busy tonight - "
+    "a convention's in town and the weather's holding', or 'Quiet Tuesday - cold and nothing on the "
+    "books').\n"
+    "Line 2: 'Do: ' then ONE concrete action small enough to act on in 2 seconds - the single "
+    "highest-leverage move (a staffing call, which special to run, or a prep call).\n"
+    "Then a final line starting 'ACTION:' with a compact one-line JSON object "
+    "{deep_link, action:{type,label,draft}} where type is one of draft_special, add_todo, navigate "
+    "- the one-tap version of your action. Keep it to those 2 lines + the ACTION line, nothing else."
 )
 
 
@@ -946,6 +991,7 @@ def run_daemon() -> None:
     conn = None
     backoff = 2
     last_triage = 0.0
+    last_pulse = 0.0
     while True:
         try:
             if conn is None or conn.closed:
@@ -953,13 +999,16 @@ def run_daemon() -> None:
                 requeue_stuck(conn)
                 backoff = 2
             if process_pending(conn) == 0:
-                # Idle tick: interactive Q&A always wins; on quiet ticks fold in
-                # a periodic inbox triage (classify new mail + draft the urgent),
-                # then nap.
+                # Idle tick: interactive Q&A always wins. On quiet ticks fold in
+                # background work — at most one heavy op per tick: the inbox
+                # triage, else the daily demand pulse — then nap.
                 now = time.monotonic()
                 if now - last_triage >= TRIAGE_INTERVAL:
                     last_triage = now
                     run_triage(conn)
+                elif now - last_pulse >= PULSE_INTERVAL:
+                    last_pulse = now
+                    run_pulse(conn)
                 time.sleep(POLL_SECONDS)
         except DB_ERRORS as e:
             log(f"Postgres connection problem: {e}; reconnecting in {backoff}s")
@@ -1267,6 +1316,232 @@ def run_triage_once() -> int:
 
 
 # --------------------------------------------------------------------------
+# Daily demand pulse ("Tonight's Read") — deterministic band, Luna phrases it
+# --------------------------------------------------------------------------
+
+def http_get_json(url, timeout=12):
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "iggys-bridge/1.0", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _om_url(lat, lon, daily):
+    return ("https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,weather_code,wind_speed_10m"
+            f"&daily={daily}"
+            "&temperature_unit=fahrenheit&wind_speed_unit=mph"
+            "&timezone=America%2FLos_Angeles&forecast_days=1")
+
+
+def fetch_pulse_weather() -> dict:
+    """Open-Meteo (keyless): Seaside dinner-window-ish daily + sunset, plus a
+    Portland high for the heat-escape spread."""
+    w = {}
+    try:
+        s = http_get_json(_om_url(SEASIDE_LAT, SEASIDE_LON,
+            "temperature_2m_max,temperature_2m_min,precipitation_probability_max,"
+            "weather_code,wind_gusts_10m_max,sunset"))
+        d, c = s.get("daily", {}), s.get("current", {})
+        first = lambda k: (d.get(k) or [None])[0]
+        w["temp"] = c.get("temperature_2m")
+        w["high"], w["low"] = first("temperature_2m_max"), first("temperature_2m_min")
+        w["precip"], w["code"] = first("precipitation_probability_max"), first("weather_code")
+        w["gust"], w["sunset"] = first("wind_gusts_10m_max"), first("sunset")
+    except Exception as e:
+        log(f"pulse: Seaside weather failed: {e}")
+    try:
+        p = http_get_json(_om_url(PORTLAND_LAT, PORTLAND_LON, "temperature_2m_max"))
+        w["pdx_high"] = (p.get("daily", {}).get("temperature_2m_max") or [None])[0]
+    except Exception as e:
+        log(f"pulse: Portland weather failed: {e}")
+    return w
+
+
+def fetch_conventions() -> list:
+    """Seaside Civic & Convention Center events in the next ~2 days (public Tribe
+    JSON API, no auth). The #1 off-season demand lever for Iggy's."""
+    try:
+        start = date.today().isoformat()
+        end = (date.today() + timedelta(days=2)).isoformat()
+        data = http_get_json(f"{SEASIDE_CONVENTION_API}?start_date={start}&end_date={end}&per_page=50")
+        out = []
+        for e in (data.get("events") or []):
+            out.append({
+                "title": (e.get("title") or "").strip(),
+                "start": e.get("start_date") or "",
+                "desc": re.sub(r"<[^>]+>", " ", e.get("description") or "")[:280].strip(),
+                "url": e.get("url") or "",
+            })
+        return out
+    except Exception as e:
+        log(f"pulse: convention fetch failed: {e}")
+        return []
+
+
+def _looks_private(c) -> bool:
+    t = (c.get("title", "") + " " + c.get("desc", "")).lower()
+    return any(k in t for k in ("private", "closed to the public", "members only", "by invitation"))
+
+
+def _major_holiday(d):
+    """A small set of demand-moving US holidays (fixed + the floating biggies)."""
+    fixed = {
+        (1, 1): "New Year's Day", (2, 14): "Valentine's Day", (3, 17): "St. Patrick's Day",
+        (7, 4): "Independence Day", (10, 31): "Halloween", (11, 11): "Veterans Day",
+        (12, 24): "Christmas Eve", (12, 25): "Christmas", (12, 31): "New Year's Eve",
+    }
+    if (d.month, d.day) in fixed:
+        return fixed[(d.month, d.day)]
+    last_day = calendar.monthrange(d.year, d.month)[1]
+    if d.month == 5 and d.weekday() == 0 and d.day + 7 > last_day:
+        return "Memorial Day weekend"
+    if d.month == 9 and d.weekday() == 0 and d.day <= 7:
+        return "Labor Day weekend"
+    if d.month == 11 and d.weekday() == 3 and 22 <= d.day <= 28:
+        return "Thanksgiving"
+    return None
+
+
+def compute_pulse(w, conventions, d) -> dict:
+    """Deterministic, transparent band: a weekday/season baseline modulated by
+    weather, conventions, the Portland heat-escape spread, and holidays. Luna
+    never does this math; she only phrases the result."""
+    drivers = []
+    score = 40.0
+    wd, month = d.weekday(), d.month  # wd: 0=Mon .. 6=Sun
+
+    if wd in (4, 5):
+        score += 22; drivers.append(("weekend", "+", "Friday/Saturday"))
+    elif wd == 6:
+        score += 8; drivers.append(("sunday", "+", "Sunday"))
+    else:
+        score -= 4
+
+    if month in (6, 7, 8):
+        score += 18; drivers.append(("peak season", "+", "summer"))
+    elif month in (5, 9):
+        score += 6
+    else:
+        score -= 8; drivers.append(("off-season", "-", "winter weekday baseline"))
+
+    high, precip, code, gust = w.get("high"), w.get("precip") or 0, w.get("code") or 0, w.get("gust") or 0
+    if high is not None:
+        if high >= 70 and precip <= 25 and code <= 3:
+            score += 14; drivers.append(("sunny & warm", "+", f"{round(high)}F, clear"))
+        elif high < 55:
+            score -= 10; drivers.append(("cold", "-", f"{round(high)}F high"))
+    if precip >= 55:
+        score -= 12; drivers.append(("rain", "-", f"{round(precip)}% chance"))
+    if gust >= 22:
+        score -= 8; drivers.append(("windy", "-", f"gusts {round(gust)} mph — patio risk"))
+
+    pdx = w.get("pdx_high")
+    if pdx is not None and high is not None:
+        spread = pdx - high
+        if spread >= 18 and precip <= 30 and code <= 3:
+            score += 12
+            drivers.append(("heat escape", "+", f"Portland {round(pdx)}F vs coast {round(high)}F — inland bakes, coast fills"))
+
+    public_conv = [c for c in conventions if not _looks_private(c)]
+    if public_conv:
+        score += 14
+        drivers.append(("convention", "+", "in town: " + ", ".join(c["title"] for c in public_conv[:2])))
+    elif conventions:
+        drivers.append(("convention (private)", "0", "in town but private/closed — little walk-in lift"))
+
+    hol = _major_holiday(d)
+    if hol:
+        score += 10; drivers.append(("holiday", "+", hol))
+
+    band = ("SLOW" if score < 38 else "STEADY" if score < 58 else "BUSY" if score < 78 else "PACKED")
+    return {"band": band, "score": round(score), "drivers": drivers, "confidence": "learning"}
+
+
+def _candidate_specials(band, w) -> list:
+    out = []
+    code, precip, high = w.get("code"), w.get("precip") or 0, w.get("high")
+    sunny = code is not None and code <= 3 and precip <= 25
+    if band in ("BUSY", "PACKED"):
+        out.append("a high-margin seafood feature (Admiral's Plate, Surf & Turf, or the Combination Plate) — fast to fire under a rush")
+    else:
+        out.append("a value / move-the-perishables play (chowder + a hot toddy on a cold night, or a steamer-clam or mussel special)")
+    if sunny and high is not None and high >= 65:
+        out.append("a deck drink for golden hour (a Sunset Spritz or the Marionberry Mule) — seat people facing west")
+    return out
+
+
+def build_pulse_prompt(p, w, conventions) -> str:
+    drivers = "; ".join(f"{name} ({sign}{detail})" for (name, sign, detail) in p["drivers"]) or "nothing unusual"
+    conv = "; ".join(c["title"] for c in conventions[:3]) or "none listed"
+    specials = " OR ".join(_candidate_specials(p["band"], w))
+    return "\n".join([
+        PULSE_PREAMBLE, "",
+        f"Computed band: {p['band']} (confidence: {p['confidence']} — no POS history yet, so lean on the drivers, not a fake number).",
+        f"Model drivers: {drivers}.",
+        f"Weather: high {w.get('high')}F, low {w.get('low')}F, {w.get('precip')}% rain, max gust {w.get('gust')} mph; "
+        f"sunset {w.get('sunset') or 'n/a'}; Portland high {w.get('pdx_high')}F.",
+        f"Conventions in town (next 2 days): {conv}.",
+        f"Candidate specials to pick from: {specials}.",
+        "Write the read now — 2 lines + the ACTION line.",
+    ])
+
+
+def run_pulse(conn) -> None:
+    """Compute tonight's band, have Luna phrase it, write a kind='pulse' insight.
+    Insert-only: the dashboard pins the most recent pulse."""
+    try:
+        w = fetch_pulse_weather()
+        conventions = fetch_conventions()
+        p = compute_pulse(w, conventions, date.today())
+        prompt = build_pulse_prompt(p, w, conventions)
+        log(f"pulse: band={p['band']} score={p['score']} drivers={len(p['drivers'])}; asking Luna")
+        reply = plainify(ask_luna(prompt, session_tag=f"pulse-{int(time.time())}"))
+        body, action = extract_action(reply)
+        data = {
+            "band": p["band"], "score": p["score"], "confidence": p["confidence"],
+            "drivers": [{"name": n, "sign": s, "detail": d} for (n, s, d) in p["drivers"]],
+            "sunset": w.get("sunset"),
+            "weather": {k: w.get(k) for k in ("high", "low", "precip", "gust", "pdx_high", "code")},
+        }
+        if action:
+            data.update(action)
+        title = f"Tonight's read: {p['band']}"
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO luna_insights (kind, title, body, status, data) "
+                "VALUES ('pulse', %s, %s, 'new', %s::jsonb)",
+                (title, body or f"{p['band']} tonight.", json.dumps(data)),
+            )
+        conn.commit()
+        log(f"pulse: wrote '{title}' ({len(body)} chars)")
+    except DB_ERRORS:
+        raise
+    except LunaUnavailable as e:
+        log(f"pulse: Luna unavailable ({e}); will retry next tick")
+    except Exception as e:
+        log(f"pulse: failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+
+def run_pulse_once() -> int:
+    conn = None
+    try:
+        conn = connect_db()
+        run_pulse(conn)
+        return 0
+    except Exception as e:
+        log(f"pulse one-shot FAILED: {e}")
+        return 1
+    finally:
+        close_quietly(conn)
+
+
+# --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
 
@@ -1284,6 +1559,8 @@ def main() -> int:
         return run_briefing()
     if "--triage" in sys.argv[1:]:
         return run_triage_once()
+    if "--pulse" in sys.argv[1:]:
+        return run_pulse_once()
     run_daemon()
     return 0
 

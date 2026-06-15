@@ -1,17 +1,35 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Calendar, PartyPopper, PackageX, Mail, Sparkles, Activity } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Calendar, PartyPopper, PackageX, Mail, Sparkles, Activity, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { useParties } from '../../hooks/useParties';
 import { useWeather } from '../../hooks/useWeather';
-import type { IggyEvent, Special } from '../../types';
+import type { IggyEvent, Special, LunaInsight } from '../../types';
 
 interface TodaysPulseProps {
   events: IggyEvent[];
   activeSpecials: Special[];
   lowStockCount: number;
   unreadCount: number;
+  /** Luna's daily demand read (kind='pulse'); when present it replaces the canned line. */
+  pulse?: LunaInsight | null;
 }
+
+// Map a Luna action type to the page that consumes its handoff draft.
+const ACTION_ROUTE: Record<string, string> = {
+  draft_special: '/specials/editor',
+  add_todo: '/todos',
+  draft_reply: '/messages',
+  review_reply: '/messages',
+  party_email: '/parties',
+  draft_po: '/cogs',
+};
+const BAND_CLASS: Record<string, string> = {
+  SLOW: 'bg-slate-600',
+  STEADY: 'bg-emerald-600',
+  BUSY: 'bg-amber-500',
+  PACKED: 'bg-red-600',
+};
 
 function eventTime(e: IggyEvent): string {
   if (e.all_day) return 'all day';
@@ -31,7 +49,8 @@ function eventTime(e: IggyEvent): string {
  * shoulder. Pure composition over data already loaded by the Dashboard plus one
  * (free, keyless) weather read. Weather is first-class for a coastal bar.
  */
-export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount }: TodaysPulseProps) {
+export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount, pulse }: TodaysPulseProps) {
+  const navigate = useNavigate();
   const { parties } = useParties();
   const { weather } = useWeather();
 
@@ -117,7 +136,39 @@ export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount
           )}
         </div>
 
-        <p className="text-[13px] text-white/90 mt-3.5 leading-snug">{vibe}</p>
+        {pulse ? (() => {
+          const data = (pulse.data ?? {}) as Record<string, unknown>;
+          const band = typeof data.band === 'string' ? data.band : null;
+          const action = data.action as
+            | { type?: string; label?: string; deep_link?: string; draft?: string; payload?: unknown }
+            | undefined;
+          const deepLink =
+            action?.deep_link ??
+            (typeof data.deep_link === 'string' ? (data.deep_link as string) : undefined) ??
+            (action?.type ? ACTION_ROUTE[action.type] : undefined);
+          return (
+            <div className="mt-3.5">
+              <div className="flex items-start gap-2">
+                {band && (
+                  <span className={`shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-md ${BAND_CLASS[band] ?? 'bg-white/25'}`}>
+                    {band}
+                  </span>
+                )}
+                <p className="text-[13px] text-white/95 leading-snug whitespace-pre-line">{pulse.body}</p>
+              </div>
+              {action && deepLink && (
+                <button
+                  onClick={() => navigate(deepLink, { state: { lunaDraft: action.draft, lunaPayload: action.payload, fromInsight: pulse.id } })}
+                  className="mt-2.5 inline-flex items-center gap-1.5 bg-white/20 hover:bg-white/30 active:scale-[0.98] transition rounded-lg px-3 py-2 text-xs font-semibold"
+                >
+                  {action.label || 'Do it'} <ArrowRight size={13} />
+                </button>
+              )}
+            </div>
+          );
+        })() : (
+          <p className="text-[13px] text-white/90 mt-3.5 leading-snug">{vibe}</p>
+        )}
       </div>
     </div>
   );

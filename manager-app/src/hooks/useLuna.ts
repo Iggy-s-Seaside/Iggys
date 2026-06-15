@@ -215,7 +215,11 @@ export function useLunaInsights() {
   const markSeen = useCallback((id: number) => setStatus(id, 'seen'), [setStatus]);
   const dismiss = useCallback((id: number) => setStatus(id, 'dismissed'), [setStatus]);
 
-  return { insights, loading, markSeen, dismiss, refresh: fetchInsights };
+  // The daily demand pulse is surfaced as its own dashboard card (not in the
+  // insights feed), so expose the most recent one separately.
+  const latestPulse = insights.find((i) => i.kind === 'pulse') ?? null;
+
+  return { insights, latestPulse, loading, markSeen, dismiss, refresh: fetchInsights };
 }
 
 /** Lightweight count of status='new' insights for nav badges. */
@@ -227,7 +231,8 @@ export function useNewInsightCount() {
       const { count: c, error } = await supabase
         .from('luna_insights')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'new');
+        .eq('status', 'new')
+        .neq('kind', 'pulse'); // pulse shows as its own card, not a feed badge
       if (!error && c !== null) setCount(c);
     };
 

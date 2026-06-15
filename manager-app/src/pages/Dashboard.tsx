@@ -26,7 +26,7 @@ export function Dashboard() {
   const lowStockItems = getLowStockItems(inventoryItems);
   const { messages, loading: messagesLoading } = useMessages();
   const { todos, loading: todosLoading, toggle: toggleTodo } = useTodos();
-  const { insights } = useLunaInsights();
+  const { insights, latestPulse } = useLunaInsights();
   const { current: openShift } = useShift();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
@@ -69,6 +69,7 @@ export function Dashboard() {
         activeSpecials={activeSpecials}
         lowStockCount={lowStockItems.length}
         unreadCount={unreadMessages.length}
+        pulse={latestPulse}
       />
 
       {/* Needs your attention — parties surfaced first */}

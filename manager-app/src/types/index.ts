@@ -716,7 +716,7 @@ export interface LunaMessage {
   error: string | null;
 }
 
-export const LUNA_INSIGHT_KINDS = ['briefing', 'alert', 'suggestion', 'note'] as const;
+export const LUNA_INSIGHT_KINDS = ['briefing', 'alert', 'suggestion', 'note', 'pulse'] as const;
 export type LunaInsightKind = (typeof LUNA_INSIGHT_KINDS)[number];
 
 export const LUNA_INSIGHT_KIND_LABELS: Record<LunaInsightKind, string> = {
@@ -724,6 +724,7 @@ export const LUNA_INSIGHT_KIND_LABELS: Record<LunaInsightKind, string> = {
   alert: 'Alert',
   suggestion: 'Suggestion',
   note: 'Note',
+  pulse: 'Pulse',
 };
 
 export interface LunaInsight {
