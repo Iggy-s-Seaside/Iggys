@@ -184,7 +184,69 @@ serve(async (req: Request) => {
       if (error) throw new Error(error.message);
     }
 
-    return json({ synced: rows.length, scanned: ids.length, truncated });
+    // 5) Reconcile reply-state from Gmail THREAD DIRECTION. The DB only learns
+    //    about replies sent THROUGH the app (send-reply sets status='replied');
+    //    a reply typed directly in Gmail leaves the row 'read', so the inbox /
+    //    Luna would keep flagging an already-answered customer. Fix: for each
+    //    still-open gmail thread, if the NEWEST message is from us, the ball is
+    //    in the guest's court — mark the thread replied. Self-limiting: once
+    //    marked, the row drops out of the open set on the next run.
+    let reconciled = 0;
+    try {
+      const since = new Date(Date.now() - 45 * 86_400_000).toISOString();
+      const { data: open } = await admin
+        .from("messages")
+        .select("id, gmail_id, gmail_thread_id")
+        .eq("source", "gmail")
+        .in("status", ["unread", "read"])
+        .gte("created_at", since);
+      // Resolve a thread id for every open row. Legacy rows synced before we
+      // captured threadId have gmail_thread_id=null — backfill it from the
+      // message so they can be reconciled too (one-time cost per row).
+      const threadSet = new Set<string>();
+      for (const r of (open || []) as { id: number; gmail_id: string | null; gmail_thread_id: string | null }[]) {
+        let tid = r.gmail_thread_id;
+        if (!tid && r.gmail_id) {
+          const mRes = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${r.gmail_id}?format=minimal`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (mRes.ok) {
+            tid = (await mRes.json()).threadId || null;
+            if (tid) await admin.from("messages").update({ gmail_thread_id: tid }).eq("id", r.id);
+          }
+        }
+        if (tid) threadSet.add(tid);
+      }
+      const threads = [...threadSet].slice(0, 60);
+      for (const tid of threads) {
+        const tRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/threads/${tid}?format=metadata&metadataHeaders=From`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!tRes.ok) continue;
+        const t = await tRes.json();
+        const msgs = t.messages || [];
+        if (!msgs.length) continue;
+        const newest = msgs[msgs.length - 1];
+        const fromEmail = parseFrom(header(newest.payload?.headers || [], "From")).email;
+        if (fromEmail === OWNER) {
+          const repliedAt = newest.internalDate
+            ? new Date(parseInt(newest.internalDate, 10)).toISOString()
+            : new Date().toISOString();
+          const { error: upErr, count } = await admin
+            .from("messages")
+            .update({ status: "replied", replied_at: repliedAt, replied_by: "gmail" }, { count: "exact" })
+            .eq("gmail_thread_id", tid)
+            .in("status", ["unread", "read"]);
+          if (!upErr) reconciled += count || 0;
+        }
+      }
+    } catch (e) {
+      console.warn("gmail-sync reconcile failed (non-fatal):", e);
+    }
+
+    return json({ synced: rows.length, scanned: ids.length, reconciled, truncated });
   } catch (error) {
     console.error("gmail-sync error:", error);
     return json({ error: error instanceof Error ? error.message : "sync failed" }, 500);

@@ -358,6 +358,77 @@ def gather_context(conn) -> dict:
     return ctx
 
 
+def fetch_staff_identity(conn, email):
+    """Resolve the logged-in staff member by email -> (first_name, role). This is
+    a SHARED work tool, so every answer must be addressed to the actual person on
+    shift, never assumed to be Bradley. Falls back to staff_pins, then to None."""
+    if not email:
+        return (None, None)
+    rows = _query(
+        conn,
+        "SELECT name, role FROM staff WHERE lower(email) = lower(%s) "
+        "AND active IS NOT FALSE ORDER BY id LIMIT 1",
+        (email,),
+    )
+    if not rows:
+        rows = _query(conn, "SELECT name, NULL FROM staff_pins WHERE lower(email) = lower(%s) LIMIT 1", (email,))
+    if rows:
+        full = (rows[0][0] or "").strip()
+        first = full.split()[0] if full else None
+        return (first, rows[0][1])
+    return (None, None)
+
+
+def fetch_menu(conn) -> str:
+    """The live menus Luna must answer FROM (never invent): drinks from cocktails
+    (with ingredients), food from menu_items grouped by menu_type. Allergen/diet
+    flags are intentionally absent from the schema, so the block says so — Luna
+    must not assert gluten-free/dairy-free without that data."""
+    lines = []
+    drinks = _query(conn, "SELECT name, ingredients, price FROM cocktails ORDER BY name LIMIT 60")
+    if drinks:
+        lines.append("DRINKS (name | ingredients | price):")
+        for name, ingredients, price in drinks:
+            row = name or "(unnamed)"
+            if ingredients:
+                row += f" | {trunc(ingredients, 160)}"
+            if price:
+                row += f" | {price}"
+            lines.append(f"- {trunc(row, 220)}")
+    food = _query(
+        conn,
+        """
+        SELECT coalesce(c.menu_type, c.title, 'Menu') AS section,
+               mi.name, mi.description, mi.price, mi.is_86d
+        FROM menu_items mi
+        LEFT JOIN menu_categories c ON c.id = mi.category_id
+        ORDER BY section, mi.sort_order NULLS LAST, mi.name
+        LIMIT 140
+        """,
+    )
+    if food:
+        cur_section = object()
+        for section, name, desc, price, is_86d in food:
+            if section != cur_section:
+                cur_section = section
+                lines.append(f"FOOD - {section}:")
+            row = name or "(unnamed)"
+            if price:
+                row += f" | {price}"
+            if desc:
+                row += f" | {trunc(desc, 140)}"
+            if is_86d:
+                row += " | [86'd - currently OUT]"
+            lines.append(f"- {trunc(row, 220)}")
+    if not lines:
+        return ""
+    lines.append(
+        "NOTE: this menu data has no allergen/dietary flags. Do NOT state gluten-free / "
+        "dairy-free / nut-free / vegan etc. from it - if asked, say you'll confirm with the kitchen."
+    )
+    return "\n".join(lines)
+
+
 def context_block(ctx: dict) -> str:
     lines = [f"Today's date: {ctx['today'].strftime('%A, %B %d, %Y')}"]
 
@@ -452,15 +523,23 @@ KNOWLEDGE_PACK = (
 )
 
 QUESTION_PREAMBLE = (
-    "You are Luna, the AI operations expert embedded in the Iggy's Seaside bar manager "
-    "dashboard (Seaside, Oregon). You run on Bradley's home-lab and reach the dashboard "
-    "through a bridge. You are NOT a generic chatbot - you are a calibrated expert on THIS "
-    "bar whose job is to make the manager feel like he never has to remember, hunt, or open "
-    "six screens. He often runs Iggy's from his phone behind the bar. Answer the question "
-    "directly: concise, concrete, grounded in the KNOWLEDGE PACK and CONTEXT below. Reply "
-    "with the answer itself only - no acknowledgment of these instructions, plain text, no "
-    "markdown (no ** or # markers; simple dashes for lists). When your answer rests on data, "
-    "end with a short 'Sources:' line naming the rows (a party, an item, a count)."
+    "You are Luna, the AI operations assistant built into the Iggy's Seaside (Seaside, Oregon) "
+    "WORK app. This is a SHARED staff tool, not a personal assistant - many different employees "
+    "talk to you through it. You are NOT a generic chatbot; you are a calibrated expert on THIS "
+    "bar/restaurant whose job is to make whoever is on shift feel like they never have to "
+    "remember, hunt, or open six screens. They often use it on a phone behind the bar.\n"
+    "WHO YOU ARE TALKING TO: see CURRENT USER below. Greet and address THEM by their first name. "
+    "Do NOT assume you are talking to Bradley or the owner. This is strictly a WORK context: "
+    "never bring up anyone's personal life - no pets, family, home, hobbies, or private details, "
+    "not about this person and not about anyone else. Everything you say is about running Iggy's.\n"
+    "TRUTH ONLY - never confabulate. Answer only from the KNOWLEDGE PACK, the LIVE MENU, and the "
+    "CONTEXT below. If you don't know something about the bar, say so plainly and offer to find "
+    "out - do NOT invent menu items, prices, ingredients, hours, or policies. ALLERGENS ARE "
+    "SAFETY-CRITICAL: never guess whether an item is gluten-free, dairy-free, nut-free, etc. "
+    "State a dietary/allergen fact only if it is explicit in the MENU data; otherwise say you'll "
+    "confirm with the kitchen. A wrong allergen answer can put a guest in the hospital.\n"
+    "Answer directly: concise, concrete, plain text, no markdown (no ** or # markers; simple "
+    "dashes for lists). When your answer rests on data, end with a short 'Sources:' line."
 )
 
 BRIEFING_PREAMBLE = (
@@ -507,11 +586,29 @@ TRIAGE_DRAFT_PREAMBLE = (
 
 
 def build_question_prompt(ctx: dict, author_email, content: str,
-                          history=None) -> str:
+                          history=None, user_name=None, user_role=None,
+                          menu_text=None) -> str:
+    if user_name:
+        who_line = f"CURRENT USER: {user_name}"
+        if user_role:
+            who_line += f" (role: {user_role})"
+        who_line += " - greet and address them by this first name."
+    else:
+        who_line = (
+            "CURRENT USER: name not on file"
+            + (f" (email {author_email})" if author_email else "")
+            + " - greet them generically (e.g. 'Hey there'); do NOT assume this is Bradley or the owner."
+        )
     parts = [
         QUESTION_PREAMBLE,
         "",
+        who_line,
+        "",
         KNOWLEDGE_PACK,
+    ]
+    if menu_text:
+        parts += ["", "LIVE MENU (answer menu questions ONLY from this; never invent items/prices/allergens):", menu_text]
+    parts += [
         "",
         "CURRENT CONTEXT (live from the dashboard database):",
         context_block(ctx),
@@ -519,11 +616,11 @@ def build_question_prompt(ctx: dict, author_email, content: str,
     if history:
         parts += ["", "RECENT CONVERSATION (oldest first):"]
         for role, text in history:
-            who = "Manager" if role == "user" else "You (Luna)"
+            who = (user_name or "Staff") if role == "user" else "You (Luna)"
             parts.append(f"{who}: {trunc(text, 300)}")
     parts += [
         "",
-        f"QUESTION (from {author_email or 'unknown'}): "
+        f"QUESTION (from {user_name or author_email or 'unknown'}): "
         f"{trunc(content, MAX_QUESTION_CHARS)}",
     ]
     return "\n".join(parts)
@@ -733,18 +830,29 @@ def requeue_question(conn, qid, why: str) -> None:
     log(f"question {qid}: requeued ({why})")
 
 
-def recent_history(conn, qid):
-    """Last few answered turns before this question, oldest first, so Luna
-    keeps conversational continuity across her per-question sessions."""
+def recent_history(conn, qid, author_email=None):
+    """Last few answered turns before this question, oldest first, so Luna keeps
+    conversational continuity. SCOPED to the asking staff member (shared tool —
+    one employee must not see another's thread). If we don't know who's asking,
+    return no history rather than risk crossing users."""
+    if not author_email:
+        return []
     rows = _query(
         conn,
         """
-        SELECT role, content FROM luna_messages
-        WHERE status = 'answered' AND id < %s
-        ORDER BY id DESC
+        SELECT m.role, m.content
+        FROM luna_messages m
+        WHERE m.id < %s AND m.status = 'answered'
+          AND (
+            (m.role = 'user' AND lower(coalesce(m.author_email, '')) = lower(%s))
+            OR (m.role = 'luna' AND m.reply_to IN (
+                  SELECT u.id FROM luna_messages u
+                  WHERE u.role = 'user' AND lower(coalesce(u.author_email, '')) = lower(%s)))
+          )
+        ORDER BY m.id DESC
         LIMIT 6
         """,
-        (qid,),
+        (qid, author_email, author_email),
     )
     return list(reversed(rows or []))
 
@@ -752,9 +860,15 @@ def recent_history(conn, qid):
 def handle_question(conn, qid, content, author_email) -> None:
     try:
         ctx = gather_context(conn)
-        history = recent_history(conn, qid)
-        prompt = build_question_prompt(ctx, author_email, content or "", history)
-        log(f"question {qid}: asking Luna ({len(prompt)} chars)")
+        history = recent_history(conn, qid, author_email)
+        user_name, user_role = fetch_staff_identity(conn, author_email)
+        menu_text = fetch_menu(conn)
+        prompt = build_question_prompt(
+            ctx, author_email, content or "", history,
+            user_name=user_name, user_role=user_role, menu_text=menu_text,
+        )
+        log(f"question {qid}: asking Luna for {user_name or author_email or 'unknown'} "
+            f"({len(prompt)} chars)")
         t0 = time.monotonic()
         reply = plainify(ask_luna(prompt, session_tag=f"q{qid}"))
         log(f"question {qid}: reply in {time.monotonic() - t0:.1f}s "
