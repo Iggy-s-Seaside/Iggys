@@ -65,6 +65,23 @@ serve(async (req: Request) => {
     } = await authClient.auth.getUser();
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
+    // Role gate: refunds move real money — owner/manager only. A UI gate is not
+    // security (this runs on the service role), so resolve the caller's real
+    // role from the allowlist and block employees.
+    const roleAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: callerRow } = await roleAdmin
+      .from("manager_allowlist")
+      .select("role")
+      .ilike("email", user.email ?? "")
+      .maybeSingle();
+    const callerRole = (callerRow?.role as string) ?? "employee";
+    if (callerRole !== "owner" && callerRole !== "manager") {
+      return json({ error: "Only an owner or manager can issue refunds." }, 403);
+    }
+
     const secretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!secretKey) return json({ error: "Payments are not configured yet." }, 503);
 

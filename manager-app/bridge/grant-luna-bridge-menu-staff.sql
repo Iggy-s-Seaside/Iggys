@@ -11,7 +11,8 @@ BEGIN
     GRANT SELECT ON public.cocktails TO luna_bridge;
     GRANT SELECT ON public.menu_items TO luna_bridge;
     GRANT SELECT ON public.menu_categories TO luna_bridge;
-    GRANT SELECT ON public.staff TO luna_bridge;
+    -- Column-scoped: the bridge only needs identity, never wage/certs.
+    GRANT SELECT (id, name, email, role, active) ON public.staff TO luna_bridge;
     GRANT SELECT (id, email, name) ON public.staff_pins TO luna_bridge;
 
     DROP POLICY IF EXISTS "Bridge read cocktails" ON public.cocktails;

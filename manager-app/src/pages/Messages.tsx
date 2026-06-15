@@ -118,6 +118,10 @@ export function Messages() {
   }, [refresh]);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Tracks the live selection so an async Luna draft only lands if the user is
+  // still on the message it was requested for (no dropping A's draft into B).
+  const selectedIdRef = useRef<number | null>(null);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -305,6 +309,7 @@ export function Messages() {
   // taps Send themselves — nothing is auto-sent.
   const askLunaToDraft = async () => {
     if (!selected || drafting) return;
+    const targetId = selected.id;
     setDrafting(true);
     const prompt =
       `Draft a short, warm reply in Bradley's voice to this customer email for Iggy's Seaside. ` +
@@ -332,8 +337,12 @@ export function Messages() {
       supabase.removeChannel(channel);
       setDrafting(false);
       if (text) {
-        setReplyText(text.trim());
-        toast.success('Luna drafted a reply — review & send');
+        if (selectedIdRef.current === targetId) {
+          setReplyText(text.trim());
+          toast.success('Luna drafted a reply — review & send');
+        } else {
+          toast('Luna finished a draft for the other message.');
+        }
       }
     };
     const channel = supabase

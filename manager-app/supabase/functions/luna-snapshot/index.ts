@@ -74,6 +74,25 @@ serve(async (req: Request) => {
     return json({ error: "Could not initialize Supabase client" }, 500);
   }
 
+  // Role gate: this returns a live PII snapshot of the bar. Platform verify_jwt
+  // already requires a valid JWT; additionally require an owner/manager caller
+  // (a plain authenticated employee must not pull this). The home-lab bridge
+  // reads Postgres directly and does NOT use this endpoint, so this is safe.
+  {
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const { data: { user: caller } } = token
+      ? await admin.auth.getUser(token)
+      : { data: { user: null } };
+    if (!caller) return json({ error: "Unauthorized" }, 401);
+    const { data: snapRole } = await admin
+      .from("manager_allowlist")
+      .select("role")
+      .ilike("email", caller.email ?? "")
+      .maybeSingle();
+    const r = (snapRole as { role?: string } | null)?.role;
+    if (r !== "owner" && r !== "manager") return json({ error: "Forbidden" }, 403);
+  }
+
   // ── Events: today + next 7 days, active only ────────────────────────────
   let events: Array<Record<string, unknown>> = [];
   try {

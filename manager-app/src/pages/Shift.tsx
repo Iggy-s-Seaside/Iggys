@@ -233,7 +233,9 @@ export function Shift() {
           title="Cash & End-of-Night"
           subtitle="Count the drawer and close out the shift"
           accent
-          onClick={() => goStation('/shift/close')}
+          /* Go straight to close-out — never auto-(re)open a shift just to view
+             or close it (that would wipe closed_at/closed_by on a done shift). */
+          onClick={() => navigate('/shift/close')}
         />
       </div>
 
