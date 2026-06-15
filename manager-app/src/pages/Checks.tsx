@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck,
@@ -229,6 +229,12 @@ function ChecklistPanel({
   const [busyItem, setBusyItem] = useState<number | null>(null);
   const [completing, setCompleting] = useState(false);
   const completed = !!run?.completed_at;
+
+  // Auto-start so the first thing a new hire sees is tappable boxes, not a gate.
+  // (The button below stays as a manual fallback if the auto-start fails.)
+  useEffect(() => {
+    if (!loading && !run && !starting) void startRun();
+  }, [loading, run, starting, startRun]);
 
   const withBusy = async (itemId: number, fn: () => Promise<unknown>) => {
     setBusyItem(itemId);
@@ -584,9 +590,9 @@ export function Checks() {
         ) : (
           <div className="card p-10 text-center">
             <Thermometer size={40} className="mx-auto text-text-muted mb-3" />
-            <p className="text-text-secondary font-medium">No line check configured</p>
+            <p className="text-text-secondary font-medium">No line check set up yet</p>
             <p className="text-sm text-text-muted mt-1">
-              Run the add-checklists migration to seed the default line check.
+              Ask the owner to add a line check, or check back next shift.
             </p>
           </div>
         )
@@ -599,9 +605,9 @@ export function Checks() {
       ) : (
         <div className="card p-10 text-center">
           <ClipboardCheck size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">No {tab} checklist</p>
+          <p className="text-text-secondary font-medium">No {tab} checklist set up yet</p>
           <p className="text-sm text-text-muted mt-1">
-            Run the add-checklists migration to seed the default templates.
+            Ask the owner to add one in settings.
           </p>
         </div>
       )}

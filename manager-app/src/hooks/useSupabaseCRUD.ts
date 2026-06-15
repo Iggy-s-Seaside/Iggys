@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { enqueue, flush, subscribeOnline, isOffline } from '../lib/outbox';
 import toast from 'react-hot-toast';
@@ -7,9 +7,12 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Only show the skeleton on the FIRST load — realtime refreshes patch data in
+  // place so a teammate's edit doesn't strobe the whole list to gray mid-shift.
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data: result, error: err } = await supabase.from(table).select('*');
     if (err) {
       setError(err.message);
@@ -19,6 +22,7 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
       setData((result as T[]) || []);
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, [table]);
 

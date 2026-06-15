@@ -16,6 +16,8 @@ import { TodaysPulse } from '../components/dashboard/TodaysPulse';
 import { SpecialIdeaCard } from '../components/dashboard/SpecialIdeaCard';
 import { CloseOutCard } from '../components/dashboard/CloseOutCard';
 import { useDemandLog } from '../hooks/useDemandLog';
+import { useAuth } from '../context/AuthContext';
+import { useWeather } from '../hooks/useWeather';
 import { needsReplyNow } from '../utils/triage';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -32,6 +34,8 @@ export function Dashboard() {
   const { insights, latestPulse, latestSpecial } = useLunaInsights();
   const demand = useDemandLog();
   const { current: openShift } = useShift();
+  const { firstName } = useAuth();
+  const { weather } = useWeather();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
   const needsReplyMessages = messages.filter(needsReplyNow);
@@ -54,18 +58,23 @@ export function Dashboard() {
     { label: 'Total Events', value: events.length, icon: TrendingUp, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-500/10' },
   ];
 
-  const greetingSubtitle = (() => {
-    const h = new Date().getHours();
-    const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-    return unreadMessages.length > 0
-      ? `${greeting} — ${unreadMessages.length} unread message${unreadMessages.length === 1 ? '' : 's'}`
-      : `${greeting}`;
+  // Personal, time- + weather-aware greeting — the app should feel like it knows
+  // who's holding the phone and what the day outside looks like.
+  const h = new Date().getHours();
+  const timeGreeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const greetingTitle = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
+  const stateLine = (() => {
+    if (weather?.goodBeachDay) return "Beach weather — the deck's gonna fill.";
+    if (weather && weather.precipProb >= 60) return 'Grey and wet — a good day for a cozy special.';
+    if (unreadMessages.length > 0) return `${unreadMessages.length} unread message${unreadMessages.length === 1 ? '' : 's'} waiting.`;
+    if (weather) return `${weather.summary}.`;
+    return 'Welcome back.';
   })();
 
   return (
     <div>
       <OnboardingChecklist />
-      <PageHeader title="Dashboard" subtitle={greetingSubtitle} />
+      <PageHeader title={greetingTitle} subtitle={stateLine} />
 
       {/* Today's Pulse — the 5-second state of the bar + weather */}
       <TodaysPulse

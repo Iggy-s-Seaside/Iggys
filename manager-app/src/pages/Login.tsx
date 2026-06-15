@@ -35,7 +35,18 @@ export function Login() {
     let alive = true;
     supabase.functions
       .invoke('pin-login', { body: { action: 'list' } })
-      .then(({ data }) => { if (alive) setStaff(Array.isArray(data?.staff) ? data.staff : []); })
+      .then(({ data }) => {
+        if (!alive) return;
+        const list = Array.isArray(data?.staff) ? (data.staff as StaffPin[]) : [];
+        setStaff(list);
+        // On a personal device the name never changes — jump straight to the PIN
+        // pad for whoever logged in last (with a "Not you?" escape on the pad).
+        try {
+          const lastId = Number(localStorage.getItem('iggys.lastUserId') || '');
+          const last = list.find((s) => s.id === lastId);
+          if (last) setSelected(last);
+        } catch { /* private mode */ }
+      })
       .catch(() => { if (alive) setStaff([]); });
     return () => { alive = false; };
   }, [mode]);
@@ -50,14 +61,21 @@ export function Login() {
       let errMsg: string | null = null;
       if (error) {
         errMsg = 'That PIN didn’t work.';
-        try { const ctx = await (error as { context?: Response }).context?.json(); if (ctx?.error) errMsg = ctx.error; } catch { /* keep */ }
+        try {
+          const ctx = await (error as { context?: Response }).context?.json();
+          if (ctx?.error) errMsg = ctx.error;
+          if (typeof ctx?.attempts_left === 'number') errMsg += ` — ${ctx.attempts_left} ${ctx.attempts_left === 1 ? 'try' : 'tries'} left`;
+        } catch { /* keep */ }
       } else if (data?.error) {
         errMsg = data.error;
+        if (typeof data.attempts_left === 'number') errMsg += ` — ${data.attempts_left} ${data.attempts_left === 1 ? 'try' : 'tries'} left`;
       }
       if (errMsg) { setPin(''); setPinError(errMsg); return; }
       // Exchange the one-time token minted by pin-login for a real session.
       const { error: otpErr } = await supabase.auth.verifyOtp({ email: data.email, token: data.token, type: 'email' });
       if (otpErr) { setPin(''); setPinError('Couldn’t sign in. Try email instead.'); return; }
+      // Remember this person on this device so next time we skip the name picker.
+      try { localStorage.setItem('iggys.lastUserId', String(id)); } catch { /* private mode */ }
       // Success → onAuthStateChange sets `user` → the <Navigate> below redirects.
     } finally {
       setPinBusy(false);
