@@ -16,6 +16,10 @@ const INSIGHT_LIMIT = 20;
 let channelSeq = 0;
 const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
+/** Command rows (e.g. '__regen_special__') are control signals for the bridge,
+ * not chat — keep them out of the visible thread. */
+const isChatMessage = (m: LunaMessage) => !m.content.startsWith('__');
+
 const logChannelStatus = (label: string) => (status: string, err?: Error) => {
   if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
     console.error(`[luna realtime] ${label}: ${status}`, err);
@@ -39,7 +43,7 @@ export function useLunaMessages() {
       toast.error('Failed to load Luna chat');
       console.error(error);
     } else {
-      setMessages(((data as LunaMessage[]) || []).reverse());
+      setMessages(((data as LunaMessage[]) || []).filter(isChatMessage).reverse());
     }
     setLoading(false);
   }, []);
@@ -58,6 +62,7 @@ export function useLunaMessages() {
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const row = payload.new as LunaMessage;
+            if (!isChatMessage(row)) return; // command rows aren't chat bubbles
             setMessages((prev) => {
               if (prev.some((m) => m.id === row.id)) return prev;
               // Drop ONE matching optimistic temp row (the oldest), not all —

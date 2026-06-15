@@ -7,6 +7,7 @@ import { useMessages } from '../hooks/useMessages';
 import { useTodos } from '../hooks/useTodos';
 import { useLunaInsights } from '../hooks/useLuna';
 import { useShift } from '../hooks/useShift';
+import { useAutoOpenShift } from '../hooks/useAutoOpenShift';
 import { QuickPostModal } from '../components/editor/QuickPostModal';
 import { LowStockWidget } from '../components/inventory/LowStockWidget';
 import { MessageWidget } from '../components/messages/MessageWidget';
@@ -26,6 +27,8 @@ import type { IggyEvent, Special } from '../types';
 import { format, parseISO, isFuture } from 'date-fns';
 
 export function Dashboard() {
+  // Auto-open the bar during posted business hours (renders nothing).
+  useAutoOpenShift();
   const { data: events } = useSupabaseCRUD<IggyEvent>('events');
   const { data: specials, refresh: refreshSpecials } = useSupabaseCRUD<Special>('specials');
   const { items: inventoryItems } = useInventoryItems();

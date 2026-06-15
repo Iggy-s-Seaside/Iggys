@@ -34,10 +34,29 @@ export function DashboardLayout() {
       <Sidebar />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden lg:overflow-visible">
         {/* The single scroll container. overscroll-contain stops scroll-chaining;
-            safe-area padding clears the notch (top) + bottom nav + home indicator. */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
+            safe-area padding clears the notch (top) + bottom nav + home indicator.
+            On lg we hand vertical scroll back to the body (overflow-visible), but
+            keep the column width-bounded (w-full/min-w-0/max-w-full) so it can
+            never exceed the flex track. The Outlet content is then wrapped in a
+            horizontal-clip div below — that clip is where any stray too-wide child
+            is contained, instead of widening the shell and shoving the sticky
+            sidebar off-screen. (We deliberately don't put overflow-x-hidden on
+            THIS lg container: overflow-x-hidden + overflow-y-visible is an invalid
+            combo where the visible axis silently computes to auto, which would
+            re-introduce an inner scrollbar on desktop.) */}
+        <div className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
           <OfflineBanner />
-          <Outlet />
+          {/* Width-bounded, horizontally-clipped wrapper around the routed page.
+              This element stays overflow-x-hidden at ALL breakpoints. Per the CSS
+              overflow rules, pairing overflow-x:hidden with an unset overflow-y
+              makes y compute to `auto` — but that's harmless here: this wrapper has
+              no fixed height, so it auto-sizes to its content and never has
+              anything to scroll vertically (no inner scrollbar; the body keeps
+              owning desktop vertical scroll). The x-clip is what contains any stray
+              too-wide child, so the page can never exceed viewport width. */}
+          <div className="w-full min-w-0 max-w-full overflow-x-hidden">
+            <Outlet />
+          </div>
         </div>
       </main>
 

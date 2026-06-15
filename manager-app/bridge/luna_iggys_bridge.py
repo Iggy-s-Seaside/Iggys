@@ -626,8 +626,11 @@ PULSE_PREAMBLE = (
     "Line 1: the read - the band in plain English + the SINGLE biggest reason (e.g. 'Busy tonight - "
     "a convention's in town and the weather's holding', or 'Quiet Tuesday - cold and nothing on the "
     "books').\n"
-    "Line 2: 'Do: ' then ONE concrete action small enough to act on in 2 seconds - the single "
-    "highest-leverage move (a staffing call, which special to run, or a prep call).\n"
+    "Line 2: 'Suggestion: ' then ONE optional idea, phrased the way a seasoned bartender would offer "
+    "it to a peer - an option, NOT an order. Use soft framing ('might be worth...', 'could be a good "
+    "night to...', 'if you want to get ahead of it...'); never a bare command. The manager makes the "
+    "call - you just surface the single highest-leverage option (a staffing idea, a special to run, "
+    "or a prep note).\n"
     "Then a final line starting 'ACTION:' with a compact one-line JSON object "
     "{deep_link, action:{type,label,draft}} where type is one of draft_special, add_todo, navigate "
     "- the one-tap version of your action. Keep it to those 2 lines + the ACTION line, nothing else."
@@ -999,9 +1002,42 @@ def process_pending(conn) -> int:
         if not claim_question(conn, qid):
             log(f"question {qid}: already claimed elsewhere, skipping")
             continue
-        handle_question(conn, qid, content, author_email)
+        if (content or "").strip() == CMD_REGEN_SPECIAL:
+            handle_special_regen(conn, qid)
+        else:
+            handle_question(conn, qid, content, author_email)
         handled += 1
     return handled
+
+
+# A control message (not a real question) the dashboard's "Try again" on the
+# special card writes to luna_messages — regenerate today's special on demand.
+CMD_REGEN_SPECIAL = "__regen_special__"
+
+
+def handle_special_regen(conn, qid) -> None:
+    """Force a fresh special (bypassing the once-per-day dedup) in response to a
+    "Try again" command, then close the command row. The dashboard pins the
+    newest special, so the new one supersedes the old via realtime."""
+    try:
+        run_special(conn, force=True)
+        with conn.cursor() as cur:
+            cur.execute("UPDATE luna_messages SET status = 'answered' WHERE id = %s", (qid,))
+        conn.commit()
+        log(f"command {qid}: regenerated special on request")
+    except DB_ERRORS:
+        raise
+    except LunaUnavailable:
+        requeue_question(conn, qid, "model unavailable for special regen")
+    except Exception as e:
+        log(f"command {qid}: special regen failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        with conn.cursor() as cur:
+            cur.execute("UPDATE luna_messages SET status = 'answered' WHERE id = %s", (qid,))
+        conn.commit()
 
 
 def run_daemon() -> None:
@@ -1988,18 +2024,20 @@ def build_special_user(otd, d) -> str:
     ])
 
 
-def run_special(conn) -> None:
+def run_special(conn, force=False) -> None:
     """Generate one creative special per day. Skips if today's already exists
-    (the bridge role can INSERT but not DELETE its insights)."""
+    (the bridge role can INSERT but not DELETE its insights) UNLESS force=True
+    (the dashboard's "Try again" — a newer insert supersedes the pinned one)."""
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT 1 FROM luna_insights WHERE kind = 'special' "
-                "AND created_at::date = current_date LIMIT 1")
-            if cur.fetchone():
-                conn.rollback()
-                return
-        conn.rollback()
+        if not force:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM luna_insights WHERE kind = 'special' "
+                    "AND created_at::date = current_date LIMIT 1")
+                if cur.fetchone():
+                    conn.rollback()
+                    return
+            conn.rollback()
         otd = fetch_on_this_day()
         user = build_special_user(otd, date.today())
         log("special: inventing today's creative special via operator")

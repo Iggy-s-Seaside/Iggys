@@ -103,9 +103,9 @@ export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount
             <p className="text-lg font-bold leading-tight mt-0.5">{format(new Date(), 'EEEE, MMMM d')}</p>
           </div>
           {weather && (
-            <div className="text-right shrink-0">
+            <div className="text-right min-w-0 shrink">
               <p className="text-2xl font-bold leading-none">{weather.tempF}°</p>
-              <p className="text-[11px] text-white/85 mt-0.5 whitespace-nowrap">{weather.summary}</p>
+              <p className="text-[11px] text-white/85 mt-0.5 break-words">{weather.summary}</p>
             </div>
           )}
         </div>
