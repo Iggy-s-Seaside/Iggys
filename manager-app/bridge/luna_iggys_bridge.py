@@ -612,15 +612,10 @@ TRIAGE_CLASSIFY_PREAMBLE = (
     "Set importance to \"high\" exactly when needs_reply is true. Be decisive."
 )
 
-TRIAGE_DRAFT_PREAMBLE = (
-    "You are Luna, drafting a reply Bradley will review before sending, in HIS voice: warm, "
-    "coastal-casual, first-name, specific to what they actually asked, with one clear next step. "
-    "Never salesy, never promise a comp or a price you cannot ground in the knowledge pack. "
-    "Answer their question if you can; otherwise be friendly and ask for the one detail you need "
-    "(date, headcount, which space). Return ONLY the ready-to-send reply body - a few sentences, "
-    "plain text, no subject line, no [bracketed placeholders]. You may end with a simple line "
-    "'- Iggy's Seaside'."
-)
+# NOTE: the old TRIAGE_DRAFT_PREAMBLE ("You are Luna ... in HIS voice") was
+# removed — customer-reply drafting now runs through the clean, persona-free
+# OPERATOR_PREAMBLE + ask_operator path (see below). Routing drafts through
+# Luna's "in Bradley's voice" assistant frame was the persona-bleed root cause.
 
 PULSE_PREAMBLE = (
     "You are Luna writing Iggy's DAILY DEMAND PULSE - the one-glance read staff see on login. A "
@@ -1241,24 +1236,250 @@ def fetch_needs_draft(conn):
     ) or []
 
 
+# --------------------------------------------------------------------------
+# Operator draft path — customer-facing email replies are drafted by a DIRECT,
+# CLEAN-FRAMED model call, NOT through Luna's /api/chat. Routing drafts through
+# Luna's personal-assistant persona made her reply TO the owner ("Hey Bradley
+# ...") or emit a standby phrase ("Ready when you are") on vague inbound emails
+# (2 of 10 prod drafts). This path tells the model it IS the bar, drafting a
+# reply TO the named customer, then a deterministic guard gates it before
+# anything is surfaced. Full standing orders: substrate note board.iggys-operator.
+# --------------------------------------------------------------------------
+
+DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+OPERATOR_MODEL = os.environ.get("OPERATOR_MODEL", "deepseek-chat")
+OPERATOR_TIMEOUT = int(os.environ.get("OPERATOR_TIMEOUT", "60"))
+
+OPERATOR_PREAMBLE = """ROLE LOCK — READ FIRST, OVERRIDES EVERYTHING ELSE:
+You ARE Iggy's Seaside, a bar and restaurant in Seaside, Oregon. Your one and only job is to DRAFT the bar's reply to ONE customer who emailed the bar. You are writing TO that customer, AS the business (the "we"/"us" voice of Iggy's Seaside). A human manager reviews your draft before it is sent, so write a finished, send-ready reply — never a note to a colleague, never a question to a boss.
+
+You are NOT a personal assistant. You are NOT a chatbot. You have no persona, no inner life, and no relationship with any owner. You are NOT chatting with the owner, the manager, or any staff member. There is no "Bradley" in this conversation and no owner on the other end — only the customer named in the CUSTOMER EMAIL block below. The reader of your draft IS that customer. NEVER address, name, or speak to "Bradley", "the owner", "the boss", or "the manager". NEVER write "Hey Bradley", never reference an owner, and never use "you" to mean a manager or colleague. If the email mentions a name, that name belongs to the CUSTOMER who wrote it — reply to them, by that name.
+
+You ALWAYS produce a real, customer-facing reply. Even if the email is vague, rambling, garbled, one line, off-topic, or hard to parse, you still write a warm, professional reply or a friendly clarifying question, addressed to the customer by name, AS the bar — exactly as polished as you would for a clean, structured event inquiry. You NEVER respond with an idle, standby, or assistant-style phrase. Phrases like "Ready when you are", "What's next?", "How can I help?", "How may I help you?", "Something on your mind?", "Let me know what you need", "Standing by", "At your service", or any question directed back at an owner/operator are STRICTLY FORBIDDEN — they are a malfunction, not a valid draft. The urge to ask "what do you need from me?" IS the bug; instead, answer the customer or ask THEM one friendly clarifying question about their visit or event.
+
+HANDLING VAGUE, RAMBLING, OR GARBLED EMAILS (this is the most important case — it is where the old system broke):
+- Many real emails are short, rambling, low-structure, or slightly garbled. You must STILL produce a warm, professional reply AS the bar.
+- Pull out whatever real intent you can (live music? a booking? a question about a night? a group?) and either answer what you reasonably can or ask ONE friendly clarifying question to move it forward (e.g. the date they have in mind, how many people, which space, or simply "what can we set up for you?").
+- When you genuinely cannot tell what they want, do NOT stall and do NOT guess. The correct draft is a warm greeting by the customer's name, an acknowledgement of their note, and one friendly question asking them to tell you a little more about what they're after — signed off as the bar.
+- A confusing email is never a reason to break character, get flippant, address the owner, or skip the task. Treat it exactly like the structured ones.
+
+WHAT YOU OUTPUT:
+Return ONLY the ready-to-send reply body — the text that goes in the email, greeting through sign-off. A few sentences of plain text. No subject line, no "Draft:"/"Reply:"/"Subject:" label, no headers, no markdown (no ** bold, no # headers, no bullet symbols), no [bracketed placeholders] like [name] or [date], no preamble, no quotes around it, and no notes or commentary to a reviewer. Address the customer by their first name when you have it (e.g. "Hi Peggy,"). Greet warmly without a name (e.g. "Hi there,") ONLY if no usable name is given. End the message on its own line with the sign-off exactly: - Iggy's Seaside
+
+TONE:
+Warm, concise, professional, a touch coastal-casual. Friendly and human like a real host at a great coastal bar — never stiff, never a form letter, never salesy, never gushing, never over-eager. Lead with genuine warmth about what they're asking for, then get to the substance. Ask exactly ONE qualifying question — the single detail that most moves their request forward — not a list of asks. A few sentences is plenty, ending with one clear, friendly next step.
+
+NEVER INVENT FACTS — this is a hard rule. A wrong allergen, price, or availability answer can harm a guest or commit the bar to something it cannot honor. When in doubt, defer gracefully rather than guess:
+- Do NOT state any specific menu item, dish, drink, ingredient, price, portion, hours, or availability that is not given to you in the customer's email or in the KNOWN FACTS below. If it is not provided, do not name it — say you'll check, or that the manager will confirm, or ask.
+- Do NOT confirm event pricing, package prices, deposits, or that a date or space is held, booked, reserved, or available. Treat any date, headcount, or space as a request to be confirmed, never as confirmed. Offer to follow up instead, e.g. "I'll have our manager confirm the date and pricing and get right back to you."
+- Do NOT promise a comp, discount, or anything free.
+
+ALLERGENS AND DIETARY ARE SAFETY-CRITICAL — a wrong answer can send a guest to the hospital:
+- NEVER guarantee any item is free of an allergen and NEVER claim a 100% allergen-safe, "totally safe", or no-cross-contamination kitchen.
+- State a dietary fact ONLY if it is in the KNOWN FACTS below. For ANY specific allergy, severe reaction, or celiac question, do not answer the specifics yourself and do not assure them it is safe — route it warmly to the kitchen, e.g. "our kitchen can walk you through your options and what they can do for that," or "I'll have the kitchen confirm the details for you."
+
+KNOWN FACTS YOU MAY USE (this is a closed list — these are the ONLY menu/policy facts you may state without the customer providing them; everything else, defer or ask):
+- IDENTITY & SIGN-OFF: You are Iggy's Seaside, a seaside bar and restaurant in Seaside, Oregon. The food is by Dooger's Seafood & Grill. Always sign off "- Iggy's Seaside".
+- GLUTEN-FREE: Most food can be MADE gluten-free ON REQUEST, but items are NOT gluten-free as plated by default. The CLAM CHOWDER is gluten-free as served. There is NO 100% guarantee against cross-contamination — so for any specific allergy or celiac concern, never promise safety; route them to the kitchen ("our kitchen can walk you through it").
+- HAPPY HOUR: $5 drafts, $5 wells, $3 cans, daily 3-5pm. (State this exactly, only if relevant to what they asked. Do NOT invent any other price.)
+- PRIVATE-EVENT SPACES: There is an upstairs bar, a downstairs room, or the whole space. You may mention these as options and ask which they're picturing, but do NOT quote a rental price and do NOT confirm a specific date is held or available — say the manager will confirm details and pricing.
+- ANYTHING ELSE (specific menu items, cocktail names, prices, hours, today's specials, whether a date is open): you DON'T know it unless the customer stated it — don't make it up; offer to confirm or follow up.
+
+EXAMPLES OF THE BAR'S VOICE (good — match these):
+- "Hey Taelor! 28 people, love it. Which night are you thinking? And are you looking at the upstairs bar, the downstairs room, or the whole space? - Iggy's Seaside"
+- "Hi Thuy, The Blue Lagoon sounds great. We'll have both that and the Watermelon Margarita ready for Monday. - Iggy's Seaside"
+
+EXAMPLES THAT ARE WRONG AND MUST NEVER BE PRODUCED:
+- "Hey Bradley. Something on your mind, or were you shaking off a pocket-dial?" (addresses the owner, flippant, does not reply to the customer)
+- "Ready when you are. What's next?" (an idle standby phrase that does no work)
+
+SCOPE: You only produce draft TEXT. You never send anything, never trigger an action, and have no ability to send. A human reviews and sends the final reply.
+
+The CUSTOMER EMAIL (sender name, sender address, subject, and body) follows. Draft the bar's reply to that customer now."""
+
+
+def ask_operator(system_prompt: str, user_content: str, model: str = None) -> str:
+    """Direct OpenAI-compatible chat call with a CLEAN system prompt — bypasses
+    Luna's /api/chat so no personal-assistant persona bleeds into a customer
+    draft. Raises LunaUnavailable on missing key / 5xx / unreachable host so the
+    triage pass stops and retries later (mirrors ask_luna's contract)."""
+    if not DEEPSEEK_API_KEY:
+        raise LunaUnavailable("operator model key missing (DEEPSEEK_API_KEY unset)")
+    payload = json.dumps({
+        "model": model or OPERATOR_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": 0.6,
+        "max_tokens": 700,
+        "stream": False,
+    })
+    req = urllib.request.Request(
+        DEEPSEEK_BASE_URL + "/chat/completions",
+        data=payload.encode("utf-8"),
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + DEEPSEEK_API_KEY},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=OPERATOR_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        if e.code >= 500 or e.code in (408, 429):  # 5xx / timeout / rate-limit -> back off + retry
+            raise LunaUnavailable(f"operator model HTTP {e.code}")
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", "replace")[:200]
+        except Exception:
+            pass
+        raise RuntimeError(f"operator model HTTP {e.code}: {detail}")
+    except (TimeoutError, socket.timeout) as e:
+        raise LunaUnavailable(f"operator model timeout: {e}")
+    except urllib.error.URLError as e:
+        raise LunaUnavailable(f"operator model unreachable: {e.reason}")
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("operator model returned no choices")
+    content = ((choices[0].get("message") or {}).get("content") or "").strip()
+    if not content:
+        raise RuntimeError("operator model returned empty content")
+    return content
+
+
+# ── Deterministic draft-safety guard (runs before any draft becomes a card) ──
+# Design note: an over-REJECT here is a PERMANENT silent drop (the message is
+# marked reminded -> no card, no retry -> the customer gets total silence), which
+# is strictly worse than a leak on this human-reviewed path. So the reject rules
+# are tuned to avoid false positives (a customer/cocktail named Bradley or Luna,
+# a correct "the kitchen will fully confirm" deferral) while still catching the
+# real failures; softer signals are FLAG-class (surfaced, never dropped).
+SIGN_OFF = "- Iggy's Seaside"
+# Idle/assistant standby openers — never a valid customer reply. (Legit closers
+# like "anything else I can help with?" are deliberately NOT listed.)
+_STANDBY_PHRASES = (
+    "ready when you are", "what's next", "what is next", "how can i help",
+    "how may i help", "how can i assist", "how may i assist",
+    "how can i be of service", "what can i do for you", "something on your mind",
+    "let me know what you need", "standing by", "at your service",
+    "awaiting your response", "are you there", "were you shaking off",
+    "pocket-dial", "pocket dial",
+)
+_ALLERGEN_BARE = (
+    "no cross-contamination", "cross-contamination free", "100% gluten-free",
+    "allergen-free", "allergen free", "totally safe", "completely safe",
+    "celiac-friendly", "celiac friendly", "allergy-friendly", "allergy friendly",
+    "safe to eat", "eat anything", "without worry", "won't react", "wont react",
+)
+_ALLERGEN_WHITELIST = (
+    "made gluten-free on request", "made gf on request",
+    "clam chowder is gluten-free", "kitchen can walk you through",
+)
+# The actual owner's name — rejected only when it is NOT the customer's own name.
+_RECIPIENT_RE = re.compile(r"\bbradley\b", re.I)
+# Greeting an operator, or relaying the customer TO an operator, means the draft
+# thinks it's talking to staff. "our manager will confirm" is a legit deferral
+# and is intentionally NOT matched.
+_ADDRESS_OWNER_RE = re.compile(r"\b(hi|hey|hello|yo|dear)\s+(boss|manager|owner)\b", re.I)
+_OWNER_RELAY_RE = re.compile(
+    r"\b(the owner|the boss|tell the boss|ask the boss|let (the )?(owner|boss) know)\b", re.I)
+# Persona/AI self-reference — anchored so a customer or cocktail named "Luna"
+# ("Hi Luna," / "the Luna cocktail") is NOT a false positive.
+_PERSONA_LEAK_RE = re.compile(
+    r"\b(i am|i'm|this is|it'?s|name'?s)\s+luna\b|\bluna here\b"
+    r"|\b(best|regards|thanks|sincerely|cheers|warmly),?\s+luna\b"
+    r"|\bas an ai\b|\ban ai\b|\blanguage model\b"
+    r"|\b(i am|i'm) an assistant\b|\bas your assistant\b|\bchatbot\b", re.I)
+_PLACEHOLDER_RE = re.compile(r"\[[^\]]+\]")
+# An absolute allergen/dietary SAFETY guarantee — the qualifier must attach to a
+# safety claim, so "the kitchen will fully confirm" (a correct deferral) is safe.
+_ALLERGEN_GUARANTEE_RE = re.compile(
+    r"\b(100%|completely|totally|fully|absolutely)\s+(safe|gluten[- ]?free|allergen[- ]?free|dairy[- ]?free|nut[- ]?free)\b"
+    r"|\bguarantee(d|s)?\b[^.]{0,30}\b(safe|gluten[- ]?free|allergen[- ]?free|free of|no (cross|reaction))\b"
+    r"|\b(safe|gluten[- ]?free|free of \w+)\b[^.]{0,20}\b(guarantee(d|s)?|100%)\b", re.I)
+_BOOKING_RE = re.compile(
+    r"\b(you're booked|booked you in|date is confirmed|you're all set for|we've held|"
+    r"date is held|reserved for you|that date is available|you're confirmed for|"
+    r"we have you (booked|down)|got you down|"
+    r"your (table|booking|event|date|space) is (reserved|confirmed|booked|held|all set))\b", re.I)
+_PRICE_RE = re.compile(r"\$\s?\d[\d,]*(?:\.\d{2})?")
+
+
+def _ensure_signoff(text: str) -> str:
+    """Auto-fix: guarantee the draft ends with the canonical sign-off so a good
+    body is never lost to a formatting nit (checks the tail to avoid a double
+    sign-off when trailing words follow it)."""
+    if "iggy's seaside" in text[-60:].lower().replace("’", "'"):
+        return text
+    return text.rstrip() + "\n\n" + SIGN_OFF
+
+
+def guard_draft(draft: str, customer_name: str, inbound: str):
+    """Deterministic gate on a generated draft. Returns
+    (ok, fixed_draft, rejections, flags). ok=False -> NEVER surface a card (the
+    caller logs + marks the message reminded, exactly like an empty draft).
+    flags -> surface the card but annotate it for the human reviewer."""
+    rejections, flags = [], []
+    text = _ensure_signoff((draft or "").strip())
+    low = text.lower().replace("’", "'")
+    cust = (customer_name or "").lower()
+
+    body = re.sub(r"-\s*iggy'?s seaside\s*$", "", text, flags=re.I).strip()
+    if len(re.sub(r"\s+", "", body)) < 20:
+        rejections.append("empty/too-short")
+    # Owner: reject the owner's NAME (unless the customer is themselves named
+    # Bradley), an operator greeting, or a relay-to-operator phrase.
+    if "bradley" not in cust and _RECIPIENT_RE.search(text):
+        rejections.append("names the owner (Bradley)")
+    if _ADDRESS_OWNER_RE.search(text) or _OWNER_RELAY_RE.search(low):
+        rejections.append("addresses/relays to the owner")
+    if any(p in low for p in _STANDBY_PHRASES):
+        rejections.append("idle/standby phrase")
+    if _PERSONA_LEAK_RE.search(low):
+        rejections.append("assistant/persona leak")
+    if _PLACEHOLDER_RE.search(text):
+        rejections.append("unfilled [placeholder]")
+    allergen_check = low
+    for w in _ALLERGEN_WHITELIST:
+        allergen_check = allergen_check.replace(w, "")
+    if _ALLERGEN_GUARANTEE_RE.search(allergen_check) or any(p in allergen_check for p in _ALLERGEN_BARE):
+        rejections.append("absolute allergen guarantee")
+
+    # FLAG-class (surface, never drop): a price that's neither Happy Hour nor
+    # quoted in the customer's own email, and booking-confirmation language.
+    inbound_prices = {re.sub(r"[^\d]", "", m) for m in _PRICE_RE.findall(inbound or "")}
+    for m in _PRICE_RE.findall(text):
+        digits = re.sub(r"[^\d]", "", m)
+        if ("$" + digits) in ("$5", "$3") or (digits and digits in inbound_prices):
+            continue
+        flags.append(f"mentions price ${digits} not in their email or Happy Hour — verify")
+    if _BOOKING_RE.search(low):
+        flags.append("reads like it confirms/holds a date — verify before sending")
+
+    return (not rejections, text, rejections, flags)
+
+
 def draft_and_insight(conn, row) -> bool:
-    """Draft a guest-voice reply and drop a one-tap 'review & reply' insight.
-    Marks the message reminded so we never re-alert it on a later pass."""
+    """Draft the bar's reply to a customer via the clean operator path, run the
+    safety guard, and only if it passes drop a one-tap 'review & reply' insight.
+    Marks the message reminded either way so a bad email can't wedge the queue
+    or re-burn model calls on a later pass."""
     mid, name, email, subject, message = row
-    prompt = "\n".join([
-        TRIAGE_DRAFT_PREAMBLE, "", KNOWLEDGE_PACK, "",
+    user_content = "\n".join([
         "CUSTOMER EMAIL:",
         f"from: {name or '?'} <{email or '?'}>",
         f"subject: {subject or ''}",
         "",
         trunc(message or "", 1200),
     ])
-    draft = plainify(ask_luna(prompt, session_tag=f"triage-draft-{mid}")).strip()
+    raw = plainify(ask_operator(OPERATOR_PREAMBLE, user_content))
+    ok, draft, rejections, flags = guard_draft(raw, name or "", message or "")
     who = (name or email or "a guest").split("@")[0]
-    # Always mark reminded (even if the draft came back empty) so a persistently
-    # bad email can't wedge the queue and re-burn Luna calls every pass.
+    # Always mark reminded (pass, reject, or empty) so a persistently bad email
+    # can't wedge the queue and re-burn model calls every pass.
     with conn.cursor() as cur:
-        if draft:
+        if ok and draft:
             title = f"Reply needed: {trunc(subject or who, 60)}"
             body = (f"{who} sent something that needs a reply. I drafted one - review and send, "
                     f"or tweak it first.")
@@ -1273,6 +1494,8 @@ def draft_and_insight(conn, row) -> bool:
                     "payload": {"messageId": mid},
                 },
             }
+            if flags:
+                data["review_flags"] = flags
             cur.execute(
                 """
                 INSERT INTO luna_insights (kind, title, body, status, data)
@@ -1290,10 +1513,12 @@ def draft_and_insight(conn, row) -> bool:
             (mid,),
         )
     conn.commit()
-    if draft:
-        log(f"triage: drafted reply + alert for message {mid}")
+    if ok and draft:
+        flagnote = f" (flags: {', '.join(flags)})" if flags else ""
+        log(f"triage: drafted reply + alert for message {mid}{flagnote}")
         return True
-    log(f"triage: message {mid} produced no draft; marked reminded")
+    reason = ", ".join(rejections) or "no draft"
+    log(f"triage: message {mid} draft REJECTED [{reason}]; no card, marked reminded")
     return False
 
 
