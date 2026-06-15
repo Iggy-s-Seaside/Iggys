@@ -486,6 +486,16 @@ export interface Message {
   gmail_id?: string | null;
   /** Gmail thread id, for showing the full conversation. */
   gmail_thread_id?: string | null;
+  /** Triage importance — 'high' = a reservation/request that needs attention. */
+  importance?: 'high' | 'normal' | null;
+  /** Triage bucket: reservation | event | request | inquiry | notification | other. */
+  category?: string | null;
+  /** True when this is a customer asking something that expects a reply. */
+  needs_reply?: boolean | null;
+  /** When the home-lab Luna last classified this message. */
+  luna_classified_at?: string | null;
+  /** Luna's structured triage: { by, importance, category, needs_reply, reason }. */
+  luna_classification?: Record<string, unknown> | null;
 }
 
 export const MESSAGE_STATUSES = ['unread', 'read', 'replied', 'archived'] as const;

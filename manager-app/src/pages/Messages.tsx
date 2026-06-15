@@ -3,22 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
   Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw,
-  PartyPopper
+  PartyPopper, Zap, Moon
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { ErrorState } from '../components/ui/ErrorState';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
 import { createPartyFromLead } from '../utils/partyUpsell';
 import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
 import type { Message } from '../types';
+import { needsReplyNow, messageTriage, categoryLabel } from '../utils/triage';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
 import { TemplateManager } from '../components/messages/TemplateManager';
 
-type StatusFilter = 'all' | 'unread' | 'read' | 'replied' | 'archived';
+type StatusFilter = 'all' | 'needs' | 'unread' | 'read' | 'replied' | 'archived';
 
 // Throttle Gmail auto-sync across page remounts (module-level, not per-mount).
 let lastAutoSync = 0;
@@ -72,8 +74,10 @@ export function Messages() {
   } = useMessages();
   const handoff = useLunaHandoff();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [convertingParty, setConvertingParty] = useState(false);
+  const [drafting, setDrafting] = useState(false);
 
   const handleSyncGmail = async () => {
     if (syncing) return;
@@ -127,7 +131,9 @@ export function Messages() {
 
   const filtered = useMemo(() => {
     let result = messages;
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'needs') {
+      result = result.filter(needsReplyNow);
+    } else if (statusFilter !== 'all') {
       result = result.filter((m) => m.status === statusFilter);
     }
     if (search) {
@@ -142,6 +148,26 @@ export function Messages() {
     }
     return result;
   }, [messages, statusFilter, search]);
+
+  // How many reservations/requests are still waiting on a reply (drives the
+  // filter-chip count + the pinned "Needs a reply" section).
+  const needsReplyCount = useMemo(() => messages.filter(needsReplyNow).length, [messages]);
+
+  // Split the current view into the pinned high-priority board + the rest.
+  // Oldest-waiting first so the most overdue reply is on top.
+  const { needsReplyList, regularList } = useMemo(() => {
+    const byOldest = (a: Message, b: Message) => a.created_at.localeCompare(b.created_at);
+    if (statusFilter === 'needs') {
+      return { needsReplyList: [...filtered].sort(byOldest), regularList: [] as Message[] };
+    }
+    const showSection = statusFilter === 'all' || statusFilter === 'unread' || statusFilter === 'read';
+    if (!showSection) return { needsReplyList: [] as Message[], regularList: filtered };
+    const nr: Message[] = [];
+    const rest: Message[] = [];
+    for (const m of filtered) (needsReplyNow(m) ? nr : rest).push(m);
+    nr.sort(byOldest);
+    return { needsReplyList: nr, regularList: rest };
+  }, [filtered, statusFilter]);
 
   const selected = useMemo(
     () => messages.find((m) => m.id === selectedId) ?? null,
@@ -272,6 +298,64 @@ export function Messages() {
     setReplying(false);
   };
 
+  // On-demand: ask the home-lab Luna to draft a reply via her existing bridge —
+  // insert a pending luna_messages row; when she answers (role='luna',
+  // reply_to=this id), drop her draft into the reply box. Reuses the same Q&A
+  // pipeline as the Luna chat (no bridge changes). The manager always reviews +
+  // taps Send themselves — nothing is auto-sent.
+  const askLunaToDraft = async () => {
+    if (!selected || drafting) return;
+    setDrafting(true);
+    const prompt =
+      `Draft a short, warm reply in Bradley's voice to this customer email for Iggy's Seaside. ` +
+      `Return ONLY the ready-to-send reply body (a couple of sentences), no subject line and no preamble. ` +
+      `Answer their question if you can from what you know; otherwise be friendly and ask for the detail you need.\n\n` +
+      `From: ${selected.name} <${selected.email}>\n` +
+      `Subject: ${selected.subject}\n\n` +
+      `${selected.message}`;
+    const { data, error } = await supabase
+      .from('luna_messages')
+      .insert({ role: 'user', content: prompt, status: 'pending', author_email: user?.email ?? null })
+      .select('id')
+      .single();
+    if (error || !data) {
+      setDrafting(false);
+      toast.error('Could not reach Luna. Try again.');
+      return;
+    }
+    const reqId = (data as { id: number }).id;
+    toast('Luna is drafting a reply…', { icon: '🌙' });
+    let settled = false;
+    const finish = (text?: string) => {
+      if (settled) return;
+      settled = true;
+      supabase.removeChannel(channel);
+      setDrafting(false);
+      if (text) {
+        setReplyText(text.trim());
+        toast.success('Luna drafted a reply — review & send');
+      }
+    };
+    const channel = supabase
+      .channel(`luna-draft-${reqId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'luna_messages', filter: `reply_to=eq.${reqId}` },
+        (payload) => {
+          const row = payload.new as { role?: string; content?: string };
+          if (row.role === 'luna' && row.content) finish(row.content);
+        }
+      )
+      .subscribe();
+    // Luna reasons before answering (30-90s typical). Give her up to 2.5 min.
+    setTimeout(() => {
+      if (!settled) {
+        finish();
+        toast('Luna is taking a while — her draft will land in the Luna tab.');
+      }
+    }, 150000);
+  };
+
   const handleSaveNotes = async () => {
     if (!selected) return;
     await updateNotes(selected.id, notes);
@@ -340,6 +424,53 @@ export function Messages() {
 
   const unreadCount = messages.filter(m => m.status === 'unread').length;
 
+  // One inbox row. High-priority "needs a reply" items get an amber accent + a
+  // category pill (Reservation / Private event / Request) so they read as the
+  // priority queue.
+  const renderRow = (msg: Message) => {
+    const nr = needsReplyNow(msg);
+    return (
+      <div
+        key={msg.id}
+        onClick={() => handleSelect(msg)}
+        className={`flex items-start gap-3 px-3 py-3 border-b border-border cursor-pointer transition-colors hover:bg-surface-hover ${
+          selectedId === msg.id ? 'bg-surface-hover' : ''
+        } ${msg.status === 'unread' ? 'bg-primary/[0.03]' : ''} ${nr ? 'border-l-2 border-l-amber-500' : ''}`}
+      >
+        <input
+          type="checkbox"
+          checked={selectedIds.has(msg.id)}
+          onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
+          className="mt-1 accent-primary"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-sm truncate ${msg.status === 'unread' ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
+              {msg.name}
+            </span>
+            <span className="text-xs text-text-muted shrink-0">
+              {formatDistanceToNow(parseISO(msg.created_at), { addSuffix: true })}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {statusIcon(msg.status)}
+            <span className={`text-xs truncate ${msg.status === 'unread' ? 'font-medium text-text-primary' : 'text-text-muted'}`}>
+              {msg.subject}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {nr && (
+              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                {categoryLabel(messageTriage(msg).category)}
+              </span>
+            )}
+            <p className="text-xs text-text-muted truncate">{msg.message}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-0 h-[calc(100dvh-4rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] -mx-6 lg:h-[calc(100dvh-3rem)] lg:-mx-8 lg:-my-8">
       {/* Header */}
@@ -405,6 +536,18 @@ export function Messages() {
               />
             </div>
             <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-0.5">
+              {needsReplyCount > 0 && (
+                <button
+                  onClick={() => setStatusFilter('needs')}
+                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                    statusFilter === 'needs'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25'
+                  }`}
+                >
+                  <Zap size={11} /> Needs reply ({needsReplyCount})
+                </button>
+              )}
               {(['all', 'unread', 'read', 'replied', 'archived'] as StatusFilter[]).map((f) => (
                 <button
                   key={f}
@@ -449,39 +592,26 @@ export function Messages() {
                 <p className="text-sm text-text-muted">No messages found</p>
               </div>
             ) : (
-              filtered.map((msg) => (
-                <div
-                  key={msg.id}
-                  onClick={() => handleSelect(msg)}
-                  className={`flex items-start gap-3 px-3 py-3 border-b border-border cursor-pointer transition-colors hover:bg-surface-hover ${
-                    selectedId === msg.id ? 'bg-surface-hover' : ''
-                  } ${msg.status === 'unread' ? 'bg-primary/[0.03]' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(msg.id)}
-                    onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
-                    className="mt-1 accent-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm truncate ${msg.status === 'unread' ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
-                        {msg.name}
-                      </span>
-                      <span className="text-xs text-text-muted shrink-0">
-                        {formatDistanceToNow(parseISO(msg.created_at), { addSuffix: true })}
-                      </span>
+              <>
+                {needsReplyList.length > 0 && (
+                  <div>
+                    <div className="sticky top-0 z-10 px-3 py-1.5 bg-amber-500/10 backdrop-blur-sm border-b border-amber-500/20 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <Zap size={12} /> Needs a reply ({needsReplyList.length})
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {statusIcon(msg.status)}
-                      <span className={`text-xs truncate ${msg.status === 'unread' ? 'font-medium text-text-primary' : 'text-text-muted'}`}>
-                        {msg.subject}
-                      </span>
-                    </div>
-                    <p className="text-xs text-text-muted truncate mt-0.5">{msg.message}</p>
+                    {needsReplyList.map(renderRow)}
                   </div>
-                </div>
-              ))
+                )}
+                {regularList.length > 0 && (
+                  <div>
+                    {needsReplyList.length > 0 && (
+                      <div className="px-3 py-1.5 bg-surface-hover/60 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                        Everything else
+                      </div>
+                    )}
+                    {regularList.map(renderRow)}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -569,15 +699,26 @@ export function Messages() {
                 {/* Reply Form */}
                 {selected.status !== 'archived' && (
                   <div className="card p-5">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between gap-2 mb-3">
                       <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                         <Reply size={14} />
                         {selected.status === 'replied' ? 'Send Another Reply' : 'Reply'}
                       </h3>
-                      <TemplatePicker
-                        onPick={(body) => setReplyText((prev) => (prev ? `${prev}\n\n${body}` : body))}
-                        fillContext={{ contact_name: selected.name }}
-                      />
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={askLunaToDraft}
+                          disabled={drafting}
+                          className="btn-ghost text-xs"
+                          title="Ask Luna to draft a reply you can review"
+                        >
+                          {drafting ? <Loader2 size={14} className="animate-spin" /> : <Moon size={14} />}
+                          <span className="hidden sm:inline">Ask Luna to draft</span>
+                        </button>
+                        <TemplatePicker
+                          onPick={(body) => setReplyText((prev) => (prev ? `${prev}\n\n${body}` : body))}
+                          fillContext={{ contact_name: selected.name }}
+                        />
+                      </div>
                     </div>
                     <textarea
                       className="input-field min-h-[100px] resize-y mb-3"

@@ -58,6 +58,17 @@ MAX_QUESTION_CHARS = 4000  # cap on the manager's question text
 
 ERROR_COLUMN_MAX = 500     # luna_messages.error truncation
 
+# Email triage cadence (proactive inbox reading). On idle ticks the daemon
+# classifies unclassified inbound mail, then drafts replies + drops reminder
+# insights for the high-priority ones still waiting on a human.
+try:
+    TRIAGE_INTERVAL = max(120, int(os.environ.get("LUNA_TRIAGE_SECONDS", "1200")))
+except ValueError:
+    TRIAGE_INTERVAL = 1200
+TRIAGE_CLASSIFY_BATCH = 12   # emails classified per Luna call
+TRIAGE_MAX_DRAFTS = 2        # reply drafts per triage pass (bounds wall-clock)
+TRIAGE_LOOKBACK_DAYS = 30    # ignore mail older than this
+
 
 def log(msg: str) -> None:
     """One line to stdout (systemd journal picks it up)."""
@@ -469,6 +480,28 @@ BRIEFING_PREAMBLE = (
     "line entirely when nothing crisp applies; never put JSON anywhere but that final line."
 )
 
+TRIAGE_CLASSIFY_PREAMBLE = (
+    "You are Luna, triaging the Iggy's Seaside inbox. For EACH email below decide: is this a "
+    "customer who needs a human reply (a reservation / table request, a private-event or "
+    "space-rental inquiry, a pricing / menu / availability question, or any genuine question), "
+    "or is it a notification / newsletter / automated / no-reply message that needs nothing? "
+    "Return ONLY a compact JSON array, one object per email, no prose and no markdown:\n"
+    "[{\"id\": <id>, \"importance\": \"high\" or \"normal\", \"category\": one of "
+    "\"reservation\",\"event\",\"request\",\"inquiry\",\"notification\",\"other\", "
+    "\"needs_reply\": true or false, \"reason\": \"8 words max\"}]\n"
+    "Set importance to high exactly when needs_reply is true. Be decisive."
+)
+
+TRIAGE_DRAFT_PREAMBLE = (
+    "You are Luna, drafting a reply Bradley will review before sending, in HIS voice: warm, "
+    "coastal-casual, first-name, specific to what they actually asked, with one clear next step. "
+    "Never salesy, never promise a comp or a price you cannot ground in the knowledge pack. "
+    "Answer their question if you can; otherwise be friendly and ask for the one detail you need "
+    "(date, headcount, which space). Return ONLY the ready-to-send reply body - a few sentences, "
+    "plain text, no subject line, no [bracketed placeholders]. You may end with a simple line "
+    "'- Iggy's Seaside'."
+)
+
 
 def build_question_prompt(ctx: dict, author_email, content: str,
                           history=None) -> str:
@@ -791,10 +824,11 @@ def process_pending(conn) -> int:
 
 
 def run_daemon() -> None:
-    log(f"bridge daemon starting (poll every {POLL_SECONDS}s, "
-        f"Luna at {LUNA_API_URL})")
+    log(f"bridge daemon starting (poll every {POLL_SECONDS}s, triage every "
+        f"{TRIAGE_INTERVAL}s, Luna at {LUNA_API_URL})")
     conn = None
     backoff = 2
+    last_triage = 0.0
     while True:
         try:
             if conn is None or conn.closed:
@@ -802,6 +836,13 @@ def run_daemon() -> None:
                 requeue_stuck(conn)
                 backoff = 2
             if process_pending(conn) == 0:
+                # Idle tick: interactive Q&A always wins; on quiet ticks fold in
+                # a periodic inbox triage (classify new mail + draft the urgent),
+                # then nap.
+                now = time.monotonic()
+                if now - last_triage >= TRIAGE_INTERVAL:
+                    last_triage = now
+                    run_triage(conn)
                 time.sleep(POLL_SECONDS)
         except DB_ERRORS as e:
             log(f"Postgres connection problem: {e}; reconnecting in {backoff}s")
@@ -872,6 +913,222 @@ def run_briefing() -> int:
 
 
 # --------------------------------------------------------------------------
+# Email triage: classify inbound mail + draft replies for the urgent ones
+# --------------------------------------------------------------------------
+
+def _extract_json_array(text):
+    """Pull the first JSON array out of Luna's reply (she may wrap it in prose)."""
+    if not text:
+        return None
+    start = text.find("[")
+    end = text.rfind("]")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        obj = json.loads(text[start:end + 1])
+        return obj if isinstance(obj, list) else None
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def fetch_unclassified(conn):
+    """Recent inbound emails Luna has not classified yet (newest first)."""
+    return _query(
+        conn,
+        """
+        SELECT id, name, email, subject, message
+        FROM messages
+        WHERE luna_classified_at IS NULL
+          AND created_at >= now() - make_interval(days => %s)
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (TRIAGE_LOOKBACK_DAYS, TRIAGE_CLASSIFY_BATCH),
+    ) or []
+
+
+def classify_batch(conn, rows) -> int:
+    """Ask Luna to triage a batch of emails in ONE call; write her verdicts back
+    to messages.importance / category / needs_reply / luna_classification."""
+    if not rows:
+        return 0
+    blocks = []
+    for (mid, name, email, subject, message) in rows:
+        blocks.append(
+            f"EMAIL id={mid}\n"
+            f"from: {name or '?'} <{email or '?'}>\n"
+            f"subject: {trunc(subject, 160)}\n"
+            f"body: {trunc(message, 600)}"
+        )
+    prompt = "\n".join([
+        TRIAGE_CLASSIFY_PREAMBLE, "", KNOWLEDGE_PACK, "",
+        "EMAILS TO TRIAGE:", "\n\n".join(blocks),
+    ])
+    log(f"triage: classifying {len(rows)} email(s)")
+    reply = ask_luna(prompt, session_tag=f"triage-classify-{date.today().isoformat()}")
+    arr = _extract_json_array(reply)
+    if not arr:
+        log("triage: classification returned no parseable JSON; leaving for next round")
+        return 0
+    valid_ids = {r[0] for r in rows}
+    verdicts = {}
+    for item in arr:
+        if not isinstance(item, dict):
+            continue
+        try:
+            mid = int(item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if mid not in valid_ids:
+            continue
+        importance = "high" if str(item.get("importance", "")).lower() == "high" else "normal"
+        needs_reply = bool(item.get("needs_reply")) and importance == "high"
+        category = str(item.get("category") or "inquiry")[:40]
+        reason = trunc(item.get("reason") or "", 120)
+        verdicts[mid] = (importance, category, needs_reply, reason)
+    updated = 0
+    with conn.cursor() as cur:
+        for mid, (importance, category, needs_reply, reason) in verdicts.items():
+            classification = json.dumps({
+                "by": "luna", "importance": importance, "category": category,
+                "needs_reply": needs_reply, "reason": reason,
+            })
+            cur.execute(
+                """
+                UPDATE messages
+                SET importance = %s, category = %s, needs_reply = %s,
+                    luna_classified_at = now(), luna_classification = %s::jsonb
+                WHERE id = %s
+                """,
+                (importance, category, needs_reply, classification, mid),
+            )
+            updated += 1
+    conn.commit()
+    log(f"triage: classified {updated} email(s)")
+    return updated
+
+
+def fetch_needs_draft(conn):
+    """High-priority, unanswered emails Luna hasn't yet drafted a reminder for."""
+    return _query(
+        conn,
+        """
+        SELECT id, name, email, subject, message
+        FROM messages
+        WHERE importance = 'high' AND needs_reply = true
+          AND lower(coalesce(status, '')) NOT IN ('replied', 'archived')
+          AND coalesce(luna_classification->>'reminded', '') <> 'true'
+          AND created_at >= now() - make_interval(days => %s)
+        ORDER BY created_at ASC
+        LIMIT %s
+        """,
+        (TRIAGE_LOOKBACK_DAYS, TRIAGE_MAX_DRAFTS),
+    ) or []
+
+
+def draft_and_insight(conn, row) -> bool:
+    """Draft a guest-voice reply and drop a one-tap 'review & reply' insight.
+    Marks the message reminded so we never re-alert it on a later pass."""
+    mid, name, email, subject, message = row
+    prompt = "\n".join([
+        TRIAGE_DRAFT_PREAMBLE, "", KNOWLEDGE_PACK, "",
+        "CUSTOMER EMAIL:",
+        f"from: {name or '?'} <{email or '?'}>",
+        f"subject: {subject or ''}",
+        "",
+        trunc(message or "", 1200),
+    ])
+    draft = plainify(ask_luna(prompt, session_tag=f"triage-draft-{mid}")).strip()
+    who = (name or email or "a guest").split("@")[0]
+    # Always mark reminded (even if the draft came back empty) so a persistently
+    # bad email can't wedge the queue and re-burn Luna calls every pass.
+    with conn.cursor() as cur:
+        if draft:
+            title = f"Reply needed: {trunc(subject or who, 60)}"
+            body = (f"{who} sent something that needs a reply. I drafted one - review and send, "
+                    f"or tweak it first.")
+            data = {
+                "deep_link": "/messages",
+                "sources": [f"messages#{mid}"],
+                "action": {
+                    "type": "draft_reply",
+                    "label": "Review & reply",
+                    "deep_link": "/messages",
+                    "draft": draft,
+                    "payload": {"messageId": mid},
+                },
+            }
+            cur.execute(
+                """
+                INSERT INTO luna_insights (kind, title, body, status, data)
+                VALUES ('alert', %s, %s, 'new', %s::jsonb)
+                """,
+                (title, body, json.dumps(data)),
+            )
+        cur.execute(
+            """
+            UPDATE messages
+            SET luna_classification =
+                coalesce(luna_classification, '{}'::jsonb) || '{"reminded": true}'::jsonb
+            WHERE id = %s
+            """,
+            (mid,),
+        )
+    conn.commit()
+    if draft:
+        log(f"triage: drafted reply + alert for message {mid}")
+        return True
+    log(f"triage: message {mid} produced no draft; marked reminded")
+    return False
+
+
+def run_triage(conn) -> None:
+    """One triage pass: classify new mail, then draft + alert the urgent unanswered."""
+    try:
+        classify_batch(conn, fetch_unclassified(conn))
+    except DB_ERRORS:
+        raise
+    except LunaUnavailable as e:
+        log(f"triage: Luna unavailable for classify ({e}); will retry next pass")
+        return
+    except Exception as e:
+        log(f"triage: classify pass failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    try:
+        for row in fetch_needs_draft(conn):
+            try:
+                draft_and_insight(conn, row)
+            except LunaUnavailable as e:
+                log(f"triage: Luna unavailable for draft ({e}); stopping pass")
+                break
+            except Exception as e:
+                log(f"triage: draft failed for one message: {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+    except DB_ERRORS:
+        raise
+
+
+def run_triage_once() -> int:
+    """One-shot triage (for manual runs / a cron). Mirrors run_briefing."""
+    conn = None
+    try:
+        conn = connect_db()
+        run_triage(conn)
+        return 0
+    except Exception as e:
+        log(f"triage one-shot FAILED: {e}")
+        return 1
+    finally:
+        close_quietly(conn)
+
+
+# --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
 
@@ -887,6 +1144,8 @@ def main() -> int:
 
     if "--briefing" in sys.argv[1:]:
         return run_briefing()
+    if "--triage" in sys.argv[1:]:
+        return run_triage_once()
     run_daemon()
     return 0
 

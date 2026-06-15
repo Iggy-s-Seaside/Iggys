@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight, ClipboardCheck } from 'lucide-react';
+import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight, ClipboardCheck, Zap } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useInventoryItems, getLowStockItems } from '../hooks/useInventory';
 import { useMessages } from '../hooks/useMessages';
@@ -13,6 +13,7 @@ import { MessageWidget } from '../components/messages/MessageWidget';
 import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
+import { needsReplyNow } from '../utils/triage';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import { PageHeader } from '../components/ui/PageHeader';
 import type { IggyEvent, Special } from '../types';
@@ -29,6 +30,7 @@ export function Dashboard() {
   const { current: openShift } = useShift();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
+  const needsReplyMessages = messages.filter(needsReplyNow);
   const newInsights = insights.filter((i) => i.status === 'new');
   const latestInsight = newInsights[0] ?? null;
 
@@ -61,8 +63,56 @@ export function Dashboard() {
       <OnboardingChecklist />
       <PageHeader title="Dashboard" subtitle={greetingSubtitle} />
 
+      {/* Today's Pulse — the 5-second state of the bar + weather */}
+      <TodaysPulse
+        events={events}
+        activeSpecials={activeSpecials}
+        lowStockCount={lowStockItems.length}
+        unreadCount={unreadMessages.length}
+      />
 
-      {/* Bar open/closed status — links to the Shift cockpit */}
+      {/* Needs your attention — parties surfaced first */}
+      <PartiesTodayWidget />
+
+      {/* Needs a reply — reservations & requests Luna flagged in the inbox */}
+      {needsReplyMessages.length > 0 && (
+        <Link
+          to="/messages"
+          className="card-hover p-4 mb-6 flex items-center gap-3 group active:scale-[0.99] transition-transform border-amber-500/30 bg-amber-500/5"
+        >
+          <div className="p-2.5 rounded-lg bg-amber-500/15 shrink-0">
+            <Zap size={20} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-text-primary">
+              {needsReplyMessages.length} email{needsReplyMessages.length === 1 ? '' : 's'} need a reply
+            </p>
+            <p className="text-xs text-text-muted mt-0.5">
+              Reservations &amp; requests waiting — Luna flagged these as high priority.
+            </p>
+          </div>
+          <ChevronRight size={18} className="text-text-muted shrink-0 group-hover:text-text-primary transition-colors" />
+        </Link>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        {stats.map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className="card p-3 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <div className={`p-2 sm:p-2.5 rounded-lg ${bg} w-fit`}>
+                <Icon size={18} className={color} />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-bold text-text-primary">{value}</p>
+                <p className="text-[11px] sm:text-xs text-text-muted leading-tight">{label}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Shift status — quick link to the Service cockpit (no longer leads the page) */}
       <Link
         to="/shift"
         className="card-hover p-4 mb-6 flex items-center gap-3 group active:scale-[0.99] transition-transform"
@@ -85,34 +135,6 @@ export function Dashboard() {
         </div>
         <ChevronRight size={18} className="text-text-muted shrink-0 group-hover:text-text-primary transition-colors" />
       </Link>
-
-      {/* Today's Pulse — the 5-second state of the bar + weather */}
-      <TodaysPulse
-        events={events}
-        activeSpecials={activeSpecials}
-        lowStockCount={lowStockItems.length}
-        unreadCount={unreadMessages.length}
-      />
-
-      {/* Needs your attention — parties surfaced first */}
-      <PartiesTodayWidget />
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
-        {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="card p-3 sm:p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <div className={`p-2 sm:p-2.5 rounded-lg ${bg} w-fit`}>
-                <Icon size={18} className={color} />
-              </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-bold text-text-primary">{value}</p>
-                <p className="text-[11px] sm:text-xs text-text-muted leading-tight">{label}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* Luna */}
       <Link

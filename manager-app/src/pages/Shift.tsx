@@ -106,6 +106,20 @@ export function Shift() {
     }
   };
 
+  // The stations are always reachable (no "open the bar" wall). Tapping one
+  // quietly starts today's shift if it isn't open yet, so checks/log/close-out
+  // attach to a real session — then we navigate. Jumping into your opening
+  // checks IS opening the bar.
+  const goStation = async (path: string) => {
+    if (!isOpen) {
+      setOpening(true);
+      const row = await openShift(user?.email ?? null);
+      setOpening(false);
+      if (!row) return;
+    }
+    navigate(path);
+  };
+
   const closedHistory = recent.filter((s) => s.status === 'closed');
 
   // ── Loading skeleton ──
@@ -132,97 +146,96 @@ export function Shift() {
         <p className="text-sm text-text-muted mt-1">Open the bar, run your checks, close out the night.</p>
       </div>
 
-      {!(isOpen && current) ? (
-        /* ── CLOSED: one big "Open the Bar" ── */
-        <div className="card p-8 sm:p-12 text-center">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-5">
-            <Power size={32} />
+      {/* Status banner — live timer when open, a one-tap opener when closed.
+          Either way the stations below are always available. */}
+      {isOpen && current ? (
+        <div className="card p-5 sm:p-6 mb-5 bg-primary/5 border-primary/30">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-primary">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-wide">Shift in progress</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-text-primary">
+                <Clock size={20} className="text-text-muted" />
+                <span className="text-3xl font-bold tabular-nums">{liveDuration(current.opened_at)}</span>
+                <span className="text-sm text-text-muted">elapsed</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
+                <span className="flex items-center gap-1">
+                  <Clock size={12} />
+                  Opened {(() => {
+                    try {
+                      return format(parseISO(current.opened_at), 'h:mm a');
+                    } catch {
+                      return '—';
+                    }
+                  })()}
+                </span>
+                {current.opened_by && (
+                  <span className="flex items-center gap-1">
+                    <UserIcon size={12} />
+                    by {current.opened_by.split('@')[0]}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/shift/close')}
+              className="btn-secondary flex items-center gap-2 shrink-0 min-h-[48px] border-danger/40 text-danger hover:bg-danger/10"
+            >
+              <Power size={18} />
+              Close the Bar
+            </button>
           </div>
-          <h2 className="text-lg font-semibold text-text-primary">The bar is closed</h2>
-          <p className="text-sm text-text-muted mt-1 mb-6">
-            Start a shift to log line checks, notes, and the end-of-night cash count.
-          </p>
+        </div>
+      ) : (
+        <div className="card p-4 sm:p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shrink-0 p-2.5 rounded-lg bg-surface-hover">
+              <Power size={20} className="text-text-muted" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-text-primary">The bar is closed</p>
+              <p className="text-sm text-text-muted">Jump into any task below — it starts your shift automatically.</p>
+            </div>
+          </div>
           <button
             onClick={handleOpen}
             disabled={opening}
-            className="btn-primary w-full sm:w-auto sm:min-w-[260px] mx-auto justify-center text-base py-4 px-8 min-h-[60px]"
+            className="btn-primary min-h-[48px] px-6 shrink-0"
           >
-            {opening ? <Loader2 size={20} className="animate-spin" /> : <Power size={20} />}
+            {opening ? <Loader2 size={18} className="animate-spin" /> : <Power size={18} />}
             Open the Bar
           </button>
         </div>
-      ) : (
-        /* ── OPEN: command center ── */
-        <>
-          {/* Live status banner */}
-          <div className="card p-5 sm:p-6 mb-5 bg-primary/5 border-primary/30">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-primary">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-wide">Shift in progress</span>
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-text-primary">
-                  <Clock size={20} className="text-text-muted" />
-                  <span className="text-3xl font-bold tabular-nums">{liveDuration(current.opened_at)}</span>
-                  <span className="text-sm text-text-muted">elapsed</span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
-                  <span className="flex items-center gap-1">
-                    <Clock size={12} />
-                    Opened {(() => {
-                      try {
-                        return format(parseISO(current.opened_at), 'h:mm a');
-                      } catch {
-                        return '—';
-                      }
-                    })()}
-                  </span>
-                  {current.opened_by && (
-                    <span className="flex items-center gap-1">
-                      <UserIcon size={12} />
-                      by {current.opened_by.split('@')[0]}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => navigate('/shift/close')}
-                className="btn-secondary flex items-center gap-2 shrink-0 min-h-[48px] border-danger/40 text-danger hover:bg-danger/10"
-              >
-                <Power size={18} />
-                Close the Bar
-              </button>
-            </div>
-          </div>
-
-          {/* Sub-stations */}
-          <div className="space-y-3">
-            <Station
-              icon={ListChecks}
-              title="Checklists & Line Check"
-              subtitle="Opening checks, par checks, equipment"
-              onClick={() => navigate('/shift/checks')}
-            />
-            <Station
-              icon={NotebookPen}
-              title="Shift Log"
-              subtitle="Notes, incidents, handoff for the next shift"
-              onClick={() => navigate('/shift/log')}
-            />
-            <Station
-              icon={DollarSign}
-              title="Cash & End-of-Night"
-              subtitle="Count the drawer and close out the shift"
-              accent
-              onClick={() => navigate('/shift/close')}
-            />
-          </div>
-        </>
       )}
+
+      {/* Sub-stations — always available; tapping one auto-starts the shift. */}
+      <div className="space-y-3">
+        <Station
+          icon={ListChecks}
+          title="Checklists & Line Check"
+          subtitle="Opening checks, par checks, equipment"
+          onClick={() => goStation('/shift/checks')}
+        />
+        <Station
+          icon={NotebookPen}
+          title="Shift Log"
+          subtitle="Notes, incidents, handoff for the next shift"
+          onClick={() => goStation('/shift/log')}
+        />
+        <Station
+          icon={DollarSign}
+          title="Cash & End-of-Night"
+          subtitle="Count the drawer and close out the shift"
+          accent
+          onClick={() => goStation('/shift/close')}
+        />
+      </div>
 
       {/* Recent shifts */}
       {closedHistory.length > 0 && (
