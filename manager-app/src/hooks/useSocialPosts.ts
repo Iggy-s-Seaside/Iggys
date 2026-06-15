@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 
 // ── Social draft-queue (approval-gated) ──
 // Mirrors scripts/add-social-posts.sql. Posts are drafted from a special/event,
@@ -61,9 +62,10 @@ export interface SocialPost {
 export function useSocialPosts() {
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('social_posts')
       .select('*')
@@ -72,8 +74,9 @@ export function useSocialPosts() {
       toast.error('Failed to load social posts');
       console.error('[social_posts] load error:', error.message);
     } else {
-      setPosts((data as SocialPost[]) || []);
+      setPosts(filterPendingDeletes('social_posts', (data as SocialPost[]) || []));
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -117,14 +120,18 @@ export function useSocialPosts() {
   };
 
   const remove = async (id: number): Promise<boolean> => {
-    const { error } = await supabase.from('social_posts').delete().eq('id', id);
-    if (error) {
-      toast.error('Failed to delete post');
-      console.error('[social_posts] delete error:', error.message);
-      return false;
+    const item = posts.find((p) => p.id === id);
+    if (!item) {
+      const { error } = await supabase.from('social_posts').delete().eq('id', id);
+      if (error) {
+        toast.error('Failed to delete post');
+        console.error('[social_posts] delete error:', error.message);
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Post removed');
-    await refresh();
+    undoableDelete('social_posts', id, item, setPosts, 'Post removed');
     return true;
   };
 

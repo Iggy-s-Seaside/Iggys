@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { MessageTemplate } from '../types';
 import { DEFAULT_MESSAGE_TEMPLATES } from '../data/messageTemplates';
+import { undoableDelete } from './useUndoableDelete';
 import toast from 'react-hot-toast';
 
 export function useMessageTemplates() {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('message_templates')
       .select('*')
@@ -21,6 +23,7 @@ export function useMessageTemplates() {
     } else {
       setTemplates((data as MessageTemplate[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -51,12 +54,17 @@ export function useMessageTemplates() {
   };
 
   const remove = async (id: number) => {
-    const { error } = await supabase.from('message_templates').delete().eq('id', id);
-    if (error) {
-      toast.error('Failed to delete template');
-      return false;
+    const item = templates.find((t) => t.id === id);
+    if (!item) {
+      const { error } = await supabase.from('message_templates').delete().eq('id', id);
+      if (error) {
+        toast.error('Failed to delete template');
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    await refresh();
+    undoableDelete('message_templates', id, item, setTemplates, 'Template removed');
     return true;
   };
 

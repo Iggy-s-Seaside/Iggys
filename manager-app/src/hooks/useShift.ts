@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { ShiftSession } from '../types';
 import { todaysBusinessDay } from '../utils/businessDay';
@@ -25,9 +25,10 @@ export function useShift() {
   const [current, setCurrent] = useState<ShiftSession | null>(null);
   const [recent, setRecent] = useState<ShiftSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('shift_sessions')
       .select('*')
@@ -50,6 +51,7 @@ export function useShift() {
         byBusinessDay == null ? rows.find((s) => s.business_day == null && s.status === 'open') ?? null : null;
       setCurrent(byBusinessDay ?? openFallback);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

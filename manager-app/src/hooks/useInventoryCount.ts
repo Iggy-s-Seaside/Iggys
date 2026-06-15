@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import type { InventoryItem } from '../types';
@@ -68,6 +68,7 @@ export function useInventoryCount(items: InventoryItem[]) {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [closing, setClosing] = useState(false);
+  const loadedRef = useRef(false);
 
   // Hydrate display fields (name/unit/category) from the live items list so we
   // never need a join and stay resilient if an item is later renamed/deleted.
@@ -92,7 +93,7 @@ export function useInventoryCount(items: InventoryItem[]) {
 
   // ── Load any existing open count (resume) ──
   const loadOpen = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data: counts, error: cErr } = await supabase
       .from('inventory_counts')
       .select('*')
@@ -132,6 +133,7 @@ export function useInventoryCount(items: InventoryItem[]) {
     setCount(open);
     setRows(((lineRows as InventoryCountItem[]) || []).map(hydrate));
     setError(null);
+    loadedRef.current = true;
     setLoading(false);
   }, [hydrate]);
 

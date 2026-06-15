@@ -6,6 +6,7 @@ import { QuickAddParty } from '../parties/QuickAddParty';
 import { CommandPalette, CMD_NEW_PARTY, CMD_QUICK_POST } from '../CommandPalette';
 import { OfflineBanner } from '../OfflineBanner';
 import { NotificationBell } from '../NotificationBell';
+import { MobileCommandButton } from '../MobileCommandButton';
 
 export function DashboardLayout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -50,6 +51,9 @@ export function DashboardLayout() {
 
       {/* Global notification bell — self-contained, fixed top-right */}
       <NotificationBell />
+
+      {/* Mobile-only command-palette entry — fixed top-left (no keyboard on mobile) */}
+      <MobileCommandButton />
     </div>
   );
 }

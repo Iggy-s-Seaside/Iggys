@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -64,10 +64,11 @@ export function useCloseOut(shiftId?: number | null) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const loadedRef = useRef(false);
 
   // ── Load existing counts + reports (scoped to the shift when given) ──
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const countsQuery = supabase
       .from('cash_counts')
       .select('*')
@@ -90,7 +91,14 @@ export function useCloseOut(shiftId?: number | null) {
     else setCounts((cData as CashCount[]) || []);
     if (rErr) console.error('[eon_reports] load error:', rErr.message);
     else setReports((rData as EonReport[]) || []);
+    loadedRef.current = true;
     setLoading(false);
+  }, [sid]);
+
+  // Reset the first-load guard on a genuine shift switch so the spinner shows
+  // for the new shift (same-shift refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
   }, [sid]);
 
   useEffect(() => {

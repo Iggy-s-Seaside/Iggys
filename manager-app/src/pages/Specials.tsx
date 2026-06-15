@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit, Share2 } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
@@ -9,7 +9,10 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { CreateSocialPostModal } from '../components/social/CreateSocialPostModal';
 import { getAllDrafts, clearDraftByKey } from '../hooks/useDraftPersistence';
 import { getSpecialLifecycle, SPECIAL_LIFECYCLE_LABELS } from '../utils/specialsWindow';
+import type { SpecialLifecycle } from '../utils/specialsWindow';
 import type { Special, DraftState } from '../types';
+
+type LifecycleFilter = 'all' | SpecialLifecycle;
 
 export function Specials() {
   const { data: specials, loading, update, remove } = useSupabaseCRUD<Special>('specials');
@@ -17,6 +20,7 @@ export function Specials() {
   const [socialFor, setSocialFor] = useState<number | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [drafts, setDrafts] = useState<DraftState[]>([]);
+  const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>('all');
 
   useEffect(() => {
     setDrafts(getAllDrafts());
@@ -39,6 +43,23 @@ export function Specials() {
       default: return 'badge bg-surface-hover text-text-muted';
     }
   };
+
+  // Lifecycle counts for the filter chips (computed once per data change)
+  const lifecycleCounts = useMemo(() => {
+    const counts: Record<SpecialLifecycle, number> = { live: 0, scheduled: 0, expired: 0, inactive: 0 };
+    for (const s of specials) counts[getSpecialLifecycle(s)] += 1;
+    return counts;
+  }, [specials]);
+
+  // In-memory display filter — never mutates special data
+  const filteredSpecials = useMemo(
+    () => lifecycleFilter === 'all'
+      ? specials
+      : specials.filter((s) => getSpecialLifecycle(s) === lifecycleFilter),
+    [specials, lifecycleFilter]
+  );
+
+  const lifecycleKeys = Object.keys(SPECIAL_LIFECYCLE_LABELS) as SpecialLifecycle[];
 
   const handleDiscardDraft = (draft: DraftState) => {
     clearDraftByKey(draft.specialId);
@@ -149,8 +170,44 @@ export function Specials() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {specials.map((special) => (
+        <>
+          {/* Lifecycle filter chips */}
+          <div className="flex gap-1 mb-4 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setLifecycleFilter('all')}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                lifecycleFilter === 'all' ? 'bg-primary text-white' : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
+              }`}
+            >
+              All ({specials.length})
+            </button>
+            {lifecycleKeys.map((key) => (
+              <button
+                key={key}
+                onClick={() => setLifecycleFilter(key)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  lifecycleFilter === key ? 'bg-primary text-white' : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
+                }`}
+              >
+                {SPECIAL_LIFECYCLE_LABELS[key]} ({lifecycleCounts[key]})
+              </button>
+            ))}
+          </div>
+
+          {filteredSpecials.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title={`No ${SPECIAL_LIFECYCLE_LABELS[lifecycleFilter as SpecialLifecycle].toLowerCase()} specials`}
+              description="Try a different filter to see your other specials."
+              action={
+                <button onClick={() => setLifecycleFilter('all')} className="btn-secondary inline-flex">
+                  Show all
+                </button>
+              }
+            />
+          ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredSpecials.map((special) => (
             <div key={special.id} className="card-hover overflow-hidden">
               {special.image_url ? (
                 <img src={special.image_url} alt={special.title} className="w-full h-44 object-cover" />
@@ -197,7 +254,9 @@ export function Specials() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+          )}
+        </>
       )}
 
       <ConfirmDialog

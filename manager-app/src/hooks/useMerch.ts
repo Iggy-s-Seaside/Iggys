@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { undoableDelete } from './useUndoableDelete';
 
 // ── Types ──
 // The supabase client is untyped, so these widened local types are runtime-safe.
@@ -145,9 +146,10 @@ export function useMerch() {
   const [variants, setVariants] = useState<MerchVariant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const [prodRes, varRes] = await Promise.all([
       supabase
         .from('merch_products')
@@ -165,6 +167,7 @@ export function useMerch() {
       setVariants((varRes.data as MerchVariant[]) || []);
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -367,16 +370,20 @@ export function useMerch() {
   /** Delete a product (cascades its variants + logs). */
   const deleteProduct = useCallback(
     async (productId: string) => {
-      const { error: delErr } = await supabase.from('merch_products').delete().eq('id', productId);
-      if (delErr) {
-        toast.error(`Failed to delete: ${delErr.message}`);
-        return false;
+      const product = products.find((p) => p.id === productId);
+      if (!product) {
+        const { error: delErr } = await supabase.from('merch_products').delete().eq('id', productId);
+        if (delErr) {
+          toast.error(`Failed to delete: ${delErr.message}`);
+          return false;
+        }
+        await refresh();
+        return true;
       }
-      toast.success('Merch deleted');
-      await refresh();
+      undoableDelete('merch_products', productId, product, setProducts, 'Merch removed');
       return true;
     },
-    [refresh]
+    [products, refresh]
   );
 
   return {
@@ -404,13 +411,14 @@ export type UseMerch = ReturnType<typeof useMerch>;
 export function useMerchVariantLogs(variantId: number | null) {
   const [logs, setLogs] = useState<MerchInventoryLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!variantId) {
       setLogs([]);
       return;
     }
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error: err } = await supabase
       .from('merch_inventory_logs')
       .select('*')
@@ -421,7 +429,14 @@ export function useMerchVariantLogs(variantId: number | null) {
     } else {
       setLogs((data as MerchInventoryLog[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
+  }, [variantId]);
+
+  // Reset the first-load guard on a genuine variant switch so the spinner shows
+  // for the new variant (same-variant realtime refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
   }, [variantId]);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, PartyPopper, PackageX, Mail, Sparkles, Activity, ArrowRight } from 'lucide-react';
+import { Calendar, PartyPopper, PackageX, Mail, Sparkles, Activity, ArrowRight, Moon, TrendingUp, Flame } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useParties } from '../../hooks/useParties';
 import { useWeather } from '../../hooks/useWeather';
@@ -31,6 +32,14 @@ const BAND_CLASS: Record<string, string> = {
   STEADY: 'bg-emerald-600',
   BUSY: 'bg-amber-500',
   PACKED: 'bg-red-600',
+};
+// A distinct icon shape per band so the demand level reads without relying on
+// color alone (color-blind-safe): the four shapes are distinguishable on their own.
+const BAND_ICON: Record<string, LucideIcon> = {
+  SLOW: Moon,
+  STEADY: Activity,
+  BUSY: TrendingUp,
+  PACKED: Flame,
 };
 
 function eventTime(e: IggyEvent): string {
@@ -151,11 +160,15 @@ export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount
           return (
             <div className="mt-3.5">
               <div className="flex items-start gap-2">
-                {band && (
-                  <span className={`shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-md ${BAND_CLASS[band] ?? 'bg-white/25'}`}>
-                    {band}
-                  </span>
-                )}
+                {band && (() => {
+                  const BandIcon = BAND_ICON[band];
+                  return (
+                    <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-md ${BAND_CLASS[band] ?? 'bg-white/25'}`}>
+                      {BandIcon && <BandIcon size={12} aria-hidden="true" />}
+                      {band}
+                    </span>
+                  );
+                })()}
                 <p className="text-[13px] text-white/95 leading-snug whitespace-pre-line">{pulse.body}</p>
               </div>
               {action && deepLink && (

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import type { Todo, TodoPriority } from '../types';
 import toast from 'react-hot-toast';
 
@@ -21,18 +22,20 @@ export function useTodos() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase.from('todos').select('*');
     if (error) {
       toast.error('Failed to load todos');
       console.error(error);
       setError(error.message);
     } else {
-      setTodos(sortTodos((data as Todo[]) || []));
+      setTodos(filterPendingDeletes('todos', sortTodos((data as Todo[]) || [])));
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -98,12 +101,17 @@ export function useTodos() {
   };
 
   const remove = async (id: number) => {
-    const { error } = await supabase.from('todos').delete().eq('id', id);
-    if (error) {
-      toast.error('Failed to delete task');
-      return false;
+    const item = todos.find((r) => r.id === id);
+    if (!item) {
+      const { error } = await supabase.from('todos').delete().eq('id', id);
+      if (error) {
+        toast.error('Failed to delete task');
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    await refresh();
+    undoableDelete('todos', id, item, setTodos, 'Task removed');
     return true;
   };
 

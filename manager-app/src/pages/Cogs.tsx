@@ -85,6 +85,8 @@ interface RecipeFormProps {
   open: boolean;
   onClose: () => void;
   items: InventoryItem[];
+  /** Distinct units already in use across recipes — native autocomplete. */
+  unitOptions: string[];
   initial?: Recipe | null;
   onSubmitCreate: (
     recipe: Omit<Recipe, 'id' | 'created_at' | 'recipe_ingredients'>,
@@ -99,7 +101,7 @@ interface RecipeFormProps {
 
 type DraftIng = { item_id: number | null; qty: number; unit: string };
 
-function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubmitUpdate }: RecipeFormProps) {
+function RecipeFormModal({ open, onClose, items, unitOptions, initial, onSubmitCreate, onSubmitUpdate }: RecipeFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [category, setCategory] = useState<string>(initial?.category ?? 'drink');
   const [menuPrice, setMenuPrice] = useState<string>(initial?.menu_price != null ? String(initial.menu_price) : '');
@@ -227,6 +229,7 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
                       className="input-field w-16 shrink-0"
                       value={ing.unit}
                       onChange={(e) => patchIngredient(idx, { unit: e.target.value })}
+                      list="recipe-unit-options"
                       aria-label="Unit"
                     />
                     <button
@@ -241,6 +244,12 @@ function RecipeFormModal({ open, onClose, items, initial, onSubmitCreate, onSubm
                 ))}
               </div>
             )}
+            {/* Native autocomplete for the repeated free-text unit field. */}
+            <datalist id="recipe-unit-options">
+              {unitOptions.map((u) => (
+                <option key={u} value={u} />
+              ))}
+            </datalist>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -318,6 +327,18 @@ export function Cogs() {
     [costedRecipes]
   );
   const totalRecipeCost = useMemo(() => costedRecipes.reduce((s, c) => s + c.cost, 0), [costedRecipes]);
+
+  // Distinct ingredient units already used across recipes → datalist autocomplete.
+  const unitOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of recipes) {
+      for (const ing of r.recipe_ingredients ?? []) {
+        const u = (ing.unit ?? '').trim();
+        if (u) seen.add(u);
+      }
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  }, [recipes]);
 
   // Recent observed unit costs (price_history) for the trend sparkline.
   const costTrend = useMemo(() => {
@@ -843,6 +864,7 @@ export function Cogs() {
         open={recipeModal.open}
         onClose={() => setRecipeModal({ open: false, initial: null })}
         items={items}
+        unitOptions={unitOptions}
         initial={recipeModal.initial}
         onSubmitCreate={createRecipe}
         onSubmitUpdate={updateRecipe}

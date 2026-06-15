@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useSupabaseCRUD } from './useSupabaseCRUD';
+import { undoableDelete } from './useUndoableDelete';
 import type { InventoryCategory, InventoryItem, InventoryLog } from '../types';
 
 // ── "Mark, don't count" qualitative stock state ──
@@ -102,9 +103,10 @@ export function useInventoryItems() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error: err } = await supabase
       .from('inventory_items')
       .select('*, inventory_categories(name)')
@@ -116,6 +118,7 @@ export function useInventoryItems() {
       setItems((data as InventoryItem[]) || []);
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -151,13 +154,17 @@ export function useInventoryItems() {
   };
 
   const remove = async (id: number) => {
-    const { error: err } = await supabase.from('inventory_items').delete().eq('id', id);
-    if (err) {
-      toast.error(`Failed to delete: ${err.message}`);
-      return false;
+    const item = items.find((i) => i.id === id);
+    if (!item) {
+      const { error: err } = await supabase.from('inventory_items').delete().eq('id', id);
+      if (err) {
+        toast.error(`Failed to delete: ${err.message}`);
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Item deleted');
-    await refresh();
+    undoableDelete('inventory_items', id, item, setItems, 'Item removed');
     return true;
   };
 
@@ -207,10 +214,11 @@ export function useInventoryLogs(itemId: number | null) {
   const [logs, setLogs] = useState<InventoryLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!itemId) return;
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error: err } = await supabase
       .from('inventory_logs')
       .select('*')
@@ -223,7 +231,14 @@ export function useInventoryLogs(itemId: number | null) {
       setLogs((data as InventoryLog[]) || []);
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
+  }, [itemId]);
+
+  // Reset the first-load guard on a genuine item switch so the spinner shows
+  // for the new item (same-item realtime refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
   }, [itemId]);
 
   useEffect(() => {

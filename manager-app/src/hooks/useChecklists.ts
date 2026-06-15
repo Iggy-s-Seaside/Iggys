@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useImageUpload } from './useImageUpload';
@@ -92,9 +92,10 @@ export interface ChecklistTemplateWithItems extends ChecklistTemplate {
 export function useChecklistTemplates(kind?: ChecklistKind) {
   const [templates, setTemplates] = useState<ChecklistTemplateWithItems[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const [tplRes, itemRes] = await Promise.all([
       supabase
         .from('checklist_templates')
@@ -107,6 +108,7 @@ export function useChecklistTemplates(kind?: ChecklistKind) {
     if (tplRes.error || itemRes.error) {
       toast.error('Failed to load checklists');
       console.error(tplRes.error ?? itemRes.error);
+      loadedRef.current = true;
       setLoading(false);
       return;
     }
@@ -123,6 +125,7 @@ export function useChecklistTemplates(kind?: ChecklistKind) {
       }));
 
     setTemplates(grouped);
+    loadedRef.current = true;
     setLoading(false);
   }, [kind]);
 
@@ -156,6 +159,7 @@ export function useChecklistRun(
   const [runItems, setRunItems] = useState<ChecklistRunItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
+  const loadedRef = useRef(false);
   const { upload, uploading } = useImageUpload();
 
   const templateId = template?.id ?? null;
@@ -179,7 +183,7 @@ export function useChecklistRun(
       setRunItems([]);
       return;
     }
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     let query = supabase
       .from('checklist_runs')
       .select('*')
@@ -192,6 +196,7 @@ export function useChecklistRun(
     const { data, error } = await query.maybeSingle();
     if (error) {
       toast.error('Failed to load checklist run');
+      loadedRef.current = true;
       setLoading(false);
       return;
     }
@@ -202,8 +207,15 @@ export function useChecklistRun(
     } else {
       setRunItems([]);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, [templateId, shiftId, loadRunItems]);
+
+  // Reset the first-load guard on a genuine template/shift switch so the spinner
+  // shows for the new run (same-run realtime refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
+  }, [templateId, shiftId]);
 
   useEffect(() => {
     refresh();
@@ -389,9 +401,10 @@ export interface LineCheckTemplateWithItems extends LineCheckTemplate {
 export function useLineCheckTemplates() {
   const [templates, setTemplates] = useState<LineCheckTemplateWithItems[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const [tplRes, itemRes] = await Promise.all([
       supabase
         .from('line_check_templates')
@@ -404,6 +417,7 @@ export function useLineCheckTemplates() {
     if (tplRes.error || itemRes.error) {
       toast.error('Failed to load line check');
       console.error(tplRes.error ?? itemRes.error);
+      loadedRef.current = true;
       setLoading(false);
       return;
     }
@@ -419,6 +433,7 @@ export function useLineCheckTemplates() {
     );
 
     setTemplates(grouped);
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -453,6 +468,7 @@ export function useLineCheckRun(
   const [readings, setReadings] = useState<LineCheckReading[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const loadedRef = useRef(false);
 
   const templateId = template?.id ?? null;
 
@@ -476,7 +492,7 @@ export function useLineCheckRun(
       setReadings([]);
       return;
     }
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     let query = supabase
       .from('line_check_runs')
       .select('*')
@@ -487,6 +503,7 @@ export function useLineCheckRun(
     const { data, error } = await query.maybeSingle();
     if (error) {
       toast.error('Failed to load line check');
+      loadedRef.current = true;
       setLoading(false);
       return;
     }
@@ -497,8 +514,15 @@ export function useLineCheckRun(
     } else {
       setReadings([]);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, [templateId, shiftId, loadReadings]);
+
+  // Reset the first-load guard on a genuine template/shift switch so the spinner
+  // shows for the new run (same-run realtime refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
+  }, [templateId, shiftId]);
 
   useEffect(() => {
     refresh();

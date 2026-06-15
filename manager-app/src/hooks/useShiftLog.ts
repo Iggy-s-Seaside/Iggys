@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import { useAuth } from '../context/AuthContext';
 import { useCurrentShiftId } from './useChecklists';
 import type { ShiftLogEntry, ShiftLogTag } from '../types';
@@ -47,9 +48,10 @@ export function useShiftLog(shiftId?: number | null) {
   const [entries, setEntries] = useState<ShiftLogEntry[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemRef[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     let query = supabase
       .from('shift_log')
       .select('*')
@@ -61,8 +63,9 @@ export function useShiftLog(shiftId?: number | null) {
       toast.error('Failed to load shift log');
       console.error('[shift_log] load error:', error.message);
     } else {
-      setEntries((data as ShiftLogEntry[]) || []);
+      setEntries(filterPendingDeletes('shift_log', (data as ShiftLogEntry[]) || []));
     }
+    loadedRef.current = true;
     setLoading(false);
   }, [effectiveShiftId]);
 
@@ -78,6 +81,14 @@ export function useShiftLog(shiftId?: number | null) {
     }
     setMenuItems((data as MenuItemRef[]) || []);
   }, []);
+
+  // Reset the first-load guard when the resolved shift changes (async resolution
+  // null→id, or a service-day rollover past 9am) so the spinner shows for the new
+  // shift's entries instead of flashing the prior shift's; same-shift realtime
+  // ticks still skip the skeleton.
+  useEffect(() => {
+    loadedRef.current = false;
+  }, [effectiveShiftId]);
 
   useEffect(() => {
     refresh();
@@ -145,16 +156,21 @@ export function useShiftLog(shiftId?: number | null) {
   /** Delete a journal entry. */
   const remove = useCallback(
     async (id: number): Promise<boolean> => {
-      const { error } = await supabase.from('shift_log').delete().eq('id', id);
-      if (error) {
-        toast.error('Failed to delete entry');
-        console.error('[shift_log] delete error:', error.message);
-        return false;
+      const item = entries.find((r) => r.id === id);
+      if (!item) {
+        const { error } = await supabase.from('shift_log').delete().eq('id', id);
+        if (error) {
+          toast.error('Failed to delete entry');
+          console.error('[shift_log] delete error:', error.message);
+          return false;
+        }
+        await refresh();
+        return true;
       }
-      await refresh();
+      undoableDelete('shift_log', id, item, setEntries, 'Entry removed');
       return true;
     },
-    [refresh]
+    [entries, refresh]
   );
 
   /**

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import type { Campaign, CampaignChannel, CampaignStatus, ConsentChannel, ConsentSource, MarketingContact } from '../types';
 
 // ── Contacts (marketing view) ──────────────────────────────────────────────
@@ -10,9 +11,10 @@ import type { Campaign, CampaignChannel, CampaignStatus, ConsentChannel, Consent
 export function useMarketingContacts() {
   const [contacts, setContacts] = useState<MarketingContact[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
@@ -23,6 +25,7 @@ export function useMarketingContacts() {
     } else {
       setContacts((data as MarketingContact[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -84,9 +87,10 @@ export interface CampaignDraft {
 export function useCampaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('campaigns')
       .select('*')
@@ -95,8 +99,9 @@ export function useCampaigns() {
       toast.error('Failed to load campaigns');
       console.error('[campaigns] load error:', error.message);
     } else {
-      setCampaigns((data as Campaign[]) || []);
+      setCampaigns(filterPendingDeletes('campaigns', (data as Campaign[]) || []));
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -152,16 +157,21 @@ export function useCampaigns() {
 
   const remove = useCallback(
     async (id: number): Promise<boolean> => {
-      const { error } = await supabase.from('campaigns').delete().eq('id', id);
-      if (error) {
-        toast.error('Failed to delete campaign');
-        console.error('[campaigns] delete error:', error.message);
-        return false;
+      const item = campaigns.find((c) => c.id === id);
+      if (!item) {
+        const { error } = await supabase.from('campaigns').delete().eq('id', id);
+        if (error) {
+          toast.error('Failed to delete campaign');
+          console.error('[campaigns] delete error:', error.message);
+          return false;
+        }
+        await refresh();
+        return true;
       }
-      await refresh();
+      undoableDelete('campaigns', id, item, setCampaigns, 'Campaign removed');
       return true;
     },
-    [refresh],
+    [campaigns, refresh],
   );
 
   return { campaigns, loading, refresh, create, update, remove };

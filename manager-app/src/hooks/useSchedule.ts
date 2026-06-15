@@ -8,9 +8,10 @@
 // Realtime: shifts + time_off_requests + staff drive a live board, so we
 // subscribe and refetch on any change (debounced by Supabase's channel).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { supabase } from '../lib/supabase';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import type { Staff, Shift, TimeOffRequest, TipPool } from '../types';
 import toast from 'react-hot-toast';
 
@@ -154,13 +155,14 @@ export function useSchedule(weekAnchor: Date) {
   const [timeOff, setTimeOff] = useState<TimeOffRequest[]>([]);
   const [tipPools, setTipPools] = useState<TipPool[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const week = useMemo(() => buildWeek(weekAnchor), [weekAnchor]);
   const weekStart = week[0]?.date ?? '';
   const weekEnd = week[6]?.date ?? '';
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const [staffRes, shiftRes, offRes, poolRes] = await Promise.all([
       supabase.from('staff').select('*').order('name'),
       supabase.from('shifts').select('*').gte('date', weekStart).lte('date', weekEnd),
@@ -172,11 +174,12 @@ export function useSchedule(weekAnchor: Date) {
       console.error('[schedule] load error:', firstErr.message);
       toast.error('Failed to load schedule. Please refresh.');
     } else {
-      setStaff((staffRes.data as Staff[]) || []);
-      setShifts((shiftRes.data as Shift[]) || []);
+      setStaff(filterPendingDeletes('staff', (staffRes.data as Staff[]) || []));
+      setShifts(filterPendingDeletes('shifts', (shiftRes.data as Shift[]) || []));
       setTimeOff((offRes.data as TimeOffRequest[]) || []);
-      setTipPools((poolRes.data as TipPool[]) || []);
+      setTipPools(filterPendingDeletes('tip_pools', (poolRes.data as TipPool[]) || []));
     }
+    loadedRef.current = true;
     setLoading(false);
   }, [weekStart, weekEnd]);
 
@@ -207,9 +210,14 @@ export function useSchedule(weekAnchor: Date) {
     await refresh(); return true;
   };
   const removeStaff = async (id: number) => {
-    const { error } = await supabase.from('staff').delete().eq('id', id);
-    if (error) { toast.error('Failed to remove staff'); return false; }
-    toast.success('Staff removed'); await refresh(); return true;
+    const item = staff.find((r) => r.id === id);
+    if (!item) {
+      const { error } = await supabase.from('staff').delete().eq('id', id);
+      if (error) { toast.error('Failed to remove staff'); return false; }
+      await refresh(); return true;
+    }
+    undoableDelete('staff', id, item, setStaff, 'Staff removed');
+    return true;
   };
 
   // ── shift CRUD ──
@@ -224,9 +232,14 @@ export function useSchedule(weekAnchor: Date) {
     await refresh(); return true;
   };
   const removeShift = async (id: number) => {
-    const { error } = await supabase.from('shifts').delete().eq('id', id);
-    if (error) { toast.error('Failed to remove shift'); return false; }
-    await refresh(); return true;
+    const item = shifts.find((r) => r.id === id);
+    if (!item) {
+      const { error } = await supabase.from('shifts').delete().eq('id', id);
+      if (error) { toast.error('Failed to remove shift'); return false; }
+      await refresh(); return true;
+    }
+    undoableDelete('shifts', id, item, setShifts, 'Shift removed');
+    return true;
   };
 
   /** Publish (or unpublish) every shift in the current week in one shot. */
@@ -255,9 +268,14 @@ export function useSchedule(weekAnchor: Date) {
     toast.success('Tip pool saved'); await refresh(); return true;
   };
   const removeTipPool = async (id: number) => {
-    const { error } = await supabase.from('tip_pools').delete().eq('id', id);
-    if (error) { toast.error('Failed to delete tip pool'); return false; }
-    await refresh(); return true;
+    const item = tipPools.find((r) => r.id === id);
+    if (!item) {
+      const { error } = await supabase.from('tip_pools').delete().eq('id', id);
+      if (error) { toast.error('Failed to delete tip pool'); return false; }
+      await refresh(); return true;
+    }
+    undoableDelete('tip_pools', id, item, setTipPools, 'Tip pool removed');
+    return true;
   };
 
   return {

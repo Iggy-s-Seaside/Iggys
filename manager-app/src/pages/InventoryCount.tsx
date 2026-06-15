@@ -68,6 +68,27 @@ export function InventoryCount() {
     return lines.filter((l) => (l.name ?? '').toLowerCase().includes(q));
   }, [lines, search]);
 
+  // Enter-to-advance: pressing Enter in a count input commits live (CountRow
+  // already saves on change) and jumps focus to the next item's input so a
+  // counter can fly down the list without reaching for the mouse. Last row =
+  // blur (done). Bound at the list container so we don't touch CountRow.
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    if (!(target instanceof HTMLInputElement) || !target.id.startsWith('count-')) return;
+    e.preventDefault();
+    const inputs = Array.from(
+      e.currentTarget.querySelectorAll<HTMLInputElement>('input[id^="count-"]')
+    );
+    const next = inputs[inputs.indexOf(target) + 1];
+    if (next) {
+      next.focus();
+      next.select();
+    } else {
+      target.blur();
+    }
+  };
+
   const handleStart = async () => {
     await start({
       categoryId: categoryId,
@@ -217,7 +238,7 @@ export function InventoryCount() {
           {search ? 'No items match your search.' : 'No items in this count.'}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" onKeyDown={handleListKeyDown}>
           {visibleLines.map((line) => (
             <CountRow key={line.id} line={line} onCount={setCounted} />
           ))}

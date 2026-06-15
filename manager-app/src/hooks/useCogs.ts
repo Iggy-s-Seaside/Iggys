@@ -11,9 +11,10 @@
 // note asks for the same shapes to be promoted into src/types/index.ts; until then,
 // import them from this module.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { undoableDelete } from './useUndoableDelete';
 import type { InventoryItem } from '../types';
 
 // ── Types ──
@@ -184,9 +185,10 @@ export const fmtPct = (n: number | null) => (n == null ? '—' : `${n.toFixed(1)
 function useTable<T>(table: string, select = '*', orderBy?: string) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     let query = supabase.from(table).select(select);
     if (orderBy) query = query.order(orderBy);
     const { data: rows, error } = await query;
@@ -196,6 +198,7 @@ function useTable<T>(table: string, select = '*', orderBy?: string) {
     } else {
       setData((rows as T[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, [table, select, orderBy]);
 
@@ -203,13 +206,13 @@ function useTable<T>(table: string, select = '*', orderBy?: string) {
     refresh();
   }, [refresh]);
 
-  return { data, loading, refresh };
+  return { data, setData, loading, refresh };
 }
 
 // ── Vendors ──
 
 export function useVendors() {
-  const { data, loading, refresh } = useTable<Vendor>('vendors', '*', 'name');
+  const { data, setData, loading, refresh } = useTable<Vendor>('vendors', '*', 'name');
 
   const create = async (input: Omit<Vendor, 'id' | 'created_at'>) => {
     const { error } = await supabase.from('vendors').insert(input as Record<string, unknown>);
@@ -234,13 +237,17 @@ export function useVendors() {
   };
 
   const remove = async (id: number) => {
-    const { error } = await supabase.from('vendors').delete().eq('id', id);
-    if (error) {
-      toast.error(`Failed to delete vendor: ${error.message}`);
-      return false;
+    const item = data.find((v) => v.id === id);
+    if (!item) {
+      const { error } = await supabase.from('vendors').delete().eq('id', id);
+      if (error) {
+        toast.error(`Failed to delete vendor: ${error.message}`);
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Vendor deleted');
-    await refresh();
+    undoableDelete('vendors', id, item, setData, 'Vendor removed');
     return true;
   };
 
@@ -257,9 +264,10 @@ export function useVendorCatalog() {
 export function useRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('recipes')
       .select('*, recipe_ingredients(*)')
@@ -270,6 +278,7 @@ export function useRecipes() {
     } else {
       setRecipes((data as Recipe[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -335,13 +344,17 @@ export function useRecipes() {
   };
 
   const removeRecipe = async (id: number) => {
-    const { error } = await supabase.from('recipes').delete().eq('id', id);
-    if (error) {
-      toast.error(`Failed to delete recipe: ${error.message}`);
-      return false;
+    const item = recipes.find((r) => r.id === id);
+    if (!item) {
+      const { error } = await supabase.from('recipes').delete().eq('id', id);
+      if (error) {
+        toast.error(`Failed to delete recipe: ${error.message}`);
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Recipe deleted');
-    await refresh();
+    undoableDelete('recipes', id, item, setRecipes, 'Recipe removed');
     return true;
   };
 
@@ -353,9 +366,10 @@ export function useRecipes() {
 export function usePurchaseOrders() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('purchase_orders')
       .select('*, purchase_order_items(*), vendors(name, email)')
@@ -366,6 +380,7 @@ export function usePurchaseOrders() {
     } else {
       setOrders((data as PurchaseOrder[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -421,13 +436,17 @@ export function usePurchaseOrders() {
   };
 
   const remove = async (id: number) => {
-    const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
-    if (error) {
-      toast.error(`Failed to delete PO: ${error.message}`);
-      return false;
+    const item = orders.find((o) => o.id === id);
+    if (!item) {
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+      if (error) {
+        toast.error(`Failed to delete PO: ${error.message}`);
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Purchase order deleted');
-    await refresh();
+    undoableDelete('purchase_orders', id, item, setOrders, 'Purchase order removed');
     return true;
   };
 

@@ -8,7 +8,7 @@ import {
   ChevronRight,
   GripVertical,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { money } from '../../utils/format';
 import type { PipelineCard as PipelineCardData } from '../../hooks/usePipeline';
 
@@ -19,6 +19,14 @@ function fmtDate(d: string | null) {
   } catch {
     return d;
   }
+}
+
+/** Compact "how long this card has been around" since created_at — "3d", "2w". */
+function ageLabel(days: number) {
+  if (days < 1) return 'today';
+  if (days < 7) return `${days}d`;
+  if (days < 70) return `${Math.round(days / 7)}w`;
+  return `${Math.round(days / 30)}mo`;
 }
 
 export interface PipelineCardProps {
@@ -59,6 +67,18 @@ export function PipelineCard({
   const { party: p, estValue, followUpDue, depositOwed } = card;
   const space = p.space_name || p.space;
 
+  // Age since the card entered the pipeline. Subtle by default; escalates only
+  // while the deal is still unresolved (inquiry), so a long-settled "Paid" card
+  // doesn't shout for attention.
+  const ageDays = differenceInCalendarDays(new Date(), parseISO(p.created_at));
+  const unresolved = p.status === 'inquiry';
+  const ageTone =
+    unresolved && ageDays >= 14
+      ? 'text-danger'
+      : unresolved && ageDays >= 7
+        ? 'text-accent'
+        : 'text-text-muted';
+
   return (
     <div
       className={`p-3.5 space-y-2 ${
@@ -94,6 +114,12 @@ export function PipelineCard({
               <MapPin size={11} /> {space}
             </span>
           )}
+          <span
+            className={`flex items-center gap-1 ml-auto shrink-0 tabular-nums ${ageTone}`}
+            title={`In pipeline ${ageLabel(ageDays)} (since ${fmtDate(p.created_at)})`}
+          >
+            <Clock size={11} /> {ageLabel(ageDays)}
+          </span>
         </div>
 
         {(followUpDue || depositOwed) && (

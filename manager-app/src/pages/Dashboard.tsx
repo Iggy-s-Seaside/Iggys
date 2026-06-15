@@ -15,6 +15,7 @@ import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
 import { SpecialIdeaCard } from '../components/dashboard/SpecialIdeaCard';
 import { CloseOutCard } from '../components/dashboard/CloseOutCard';
+import { OwnerMoneyStrip } from '../components/dashboard/OwnerMoneyStrip';
 import { useDemandLog } from '../hooks/useDemandLog';
 import { useAuth } from '../context/AuthContext';
 import { useWeather } from '../hooks/useWeather';
@@ -34,7 +35,7 @@ export function Dashboard() {
   const { insights, latestPulse, latestSpecial } = useLunaInsights();
   const demand = useDemandLog();
   const { current: openShift } = useShift();
-  const { firstName } = useAuth();
+  const { firstName, role } = useAuth();
   const { weather } = useWeather();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
@@ -75,6 +76,10 @@ export function Dashboard() {
     <div>
       <OnboardingChecklist />
       <PageHeader title={greetingTitle} subtitle={stateLine} />
+
+      {/* Owner-only money strip — for the owner, the money leads; for everyone
+          else the ops cockpit (shift/low-stock/messages) is what matters. */}
+      {role === 'owner' && <OwnerMoneyStrip />}
 
       {/* Today's Pulse — the 5-second state of the bar + weather */}
       <TodaysPulse

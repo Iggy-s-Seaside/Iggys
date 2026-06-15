@@ -56,6 +56,10 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
   // split. Kept as a single default for now so the form stays one-tap fast.
   const area = DEFAULT_WAITLIST_AREA;
 
+  // Quick party-size chips — the bulk of walk-ups; tap-fast on a phone behind
+  // the bar. Odd/large sizes still come from the numeric input.
+  const SIZE_CHIPS = [1, 2, 3, 4, 5, 6, 8];
+
   const quote = useMemo(() => suggestWaitQuote(partiesWaiting, size), [partiesWaiting, size]);
 
   const submit = async (e: React.FormEvent) => {
@@ -99,9 +103,27 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
           aria-label="Phone number"
         />
       </div>
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor={sizeId} className="text-xs text-text-muted shrink-0">Party</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor={sizeId} className="text-xs text-text-muted shrink-0">Party</label>
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Party size">
+          {SIZE_CHIPS.map((n) => {
+            const active = size === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setSize(n)}
+                aria-pressed={active}
+                className={`min-w-[40px] min-h-[40px] px-2 rounded-lg text-sm font-semibold tabular-nums transition-colors ${
+                  active
+                    ? 'bg-primary text-white'
+                    : 'bg-surface border border-border text-text-secondary hover:bg-surface-hover'
+                }`}
+              >
+                {n}
+              </button>
+            );
+          })}
           <input
             id={sizeId}
             className="input-field w-16 text-center"
@@ -109,6 +131,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
             min={1}
             value={size}
             onChange={(e) => setSize(Math.max(1, Number(e.target.value) || 1))}
+            aria-label="Party size (other)"
           />
         </div>
         <span className="flex items-center gap-1 text-xs text-text-muted">

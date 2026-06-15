@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Contact } from '../types';
 import toast from 'react-hot-toast';
@@ -6,9 +6,10 @@ import toast from 'react-hot-toast';
 export function useContacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase.from('contacts').select('*').order('name');
     if (error) {
       toast.error('Failed to load contacts');
@@ -16,6 +17,7 @@ export function useContacts() {
     } else {
       setContacts((data as Contact[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

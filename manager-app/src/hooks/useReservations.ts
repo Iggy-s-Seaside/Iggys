@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -80,9 +80,10 @@ export function useReservations() {
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error: err } = await supabase
       .from('waitlist_entries')
       .select('*')
@@ -97,6 +98,7 @@ export function useReservations() {
       setWaitlist((data as WaitlistEntry[]) || []);
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

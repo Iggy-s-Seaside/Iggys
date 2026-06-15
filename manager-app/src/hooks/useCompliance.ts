@@ -9,8 +9,9 @@
 // shapes should be added to src/types/index.ts as canonical app types (see the agent's
 // integration notes) — these local re-exports keep the hook self-contained meanwhile.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { undoableDelete } from './useUndoableDelete';
 import { useAuth } from '../context/AuthContext';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -134,9 +135,10 @@ export function useCompliance() {
   const [temps, setTemps] = useState<TemperatureLog[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const [r, i, u, t, c] = await Promise.all([
       supabase.from('refusal_logs').select('*').order('created_at', { ascending: false }),
       supabase.from('incidents').select('*').order('created_at', { ascending: false }),
@@ -154,6 +156,7 @@ export function useCompliance() {
     setUnits((u.data as TempUnit[]) || []);
     setTemps((t.data as TemperatureLog[]) || []);
     setCredentials((c.data as Credential[]) || []);
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -246,17 +249,21 @@ export function useCompliance() {
 
   const removeUnit = useCallback(
     async (id: number): Promise<boolean> => {
-      const { error } = await supabase.from('temp_units').delete().eq('id', id);
-      if (error) {
-        console.error('[temp_units] delete error:', error.message);
-        toast.error('Failed to remove unit.');
-        return false;
+      const item = units.find((r) => r.id === id);
+      if (!item) {
+        const { error } = await supabase.from('temp_units').delete().eq('id', id);
+        if (error) {
+          console.error('[temp_units] delete error:', error.message);
+          toast.error('Failed to remove unit.');
+          return false;
+        }
+        await refresh();
+        return true;
       }
-      toast.success('Unit removed');
-      await refresh();
+      undoableDelete('temp_units', id, item, setUnits, 'Unit removed');
       return true;
     },
-    [refresh]
+    [units, refresh]
   );
 
   // ── Temperature logs (append-only; in_range snapshotted at log time) ──
@@ -327,17 +334,21 @@ export function useCompliance() {
 
   const removeCredential = useCallback(
     async (id: number): Promise<boolean> => {
-      const { error } = await supabase.from('credentials').delete().eq('id', id);
-      if (error) {
-        console.error('[credentials] delete error:', error.message);
-        toast.error('Failed to remove credential.');
-        return false;
+      const item = credentials.find((r) => r.id === id);
+      if (!item) {
+        const { error } = await supabase.from('credentials').delete().eq('id', id);
+        if (error) {
+          console.error('[credentials] delete error:', error.message);
+          toast.error('Failed to remove credential.');
+          return false;
+        }
+        await refresh();
+        return true;
       }
-      toast.success('Credential removed');
-      await refresh();
+      undoableDelete('credentials', id, item, setCredentials, 'Credential removed');
       return true;
     },
-    [refresh]
+    [credentials, refresh]
   );
 
   // ── Derived: latest reading per unit + soonest expiry tier counts ──

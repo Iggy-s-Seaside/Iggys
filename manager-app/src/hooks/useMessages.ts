@@ -7,9 +7,10 @@ export function useMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -23,6 +24,7 @@ export function useMessages() {
       setMessages((data as Message[]) || []);
       setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

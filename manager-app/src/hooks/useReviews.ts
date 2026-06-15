@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Review, Feedback, ReviewSource } from '../types';
 import toast from 'react-hot-toast';
@@ -25,9 +25,10 @@ export function useReviews() {
   const [sources, setSources] = useState<ReviewSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const [revRes, fbRes, srcRes] = await Promise.all([
       supabase.from('reviews').select('*').order('created_at', { ascending: false }),
       supabase.from('feedback').select('*').order('created_at', { ascending: false }),
@@ -50,6 +51,7 @@ export function useReviews() {
     if (!srcRes.error) {
       setSources((srcRes.data as ReviewSource[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

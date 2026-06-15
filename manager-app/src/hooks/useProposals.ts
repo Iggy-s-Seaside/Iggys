@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 
 /** Lifecycle of a tokenized public proposal link. */
 export type ProposalStatus = 'draft' | 'sent' | 'viewed' | 'signed' | 'deposit_paid';
@@ -29,6 +30,7 @@ export function useProposals(partyId: number | null) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (partyId == null) {
@@ -36,7 +38,7 @@ export function useProposals(partyId: number | null) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('proposals')
       .select('*')
@@ -46,9 +48,17 @@ export function useProposals(partyId: number | null) {
       toast.error('Failed to load proposals');
       console.error('[proposals] load error:', error.message);
     } else {
-      setProposals((data as Proposal[]) || []);
+      // filterPendingDeletes keeps a mid-undo-window row hidden if a realtime tick re-pulls it.
+      setProposals(filterPendingDeletes('proposals', (data as Proposal[]) || []));
     }
+    loadedRef.current = true;
     setLoading(false);
+  }, [partyId]);
+
+  // Reset the first-load guard on a genuine party switch so the spinner shows
+  // for the new party (same-party realtime refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
   }, [partyId]);
 
   useEffect(() => {
@@ -101,14 +111,19 @@ export function useProposals(partyId: number | null) {
 
   /** Permanently revoke a proposal link (deletes the row → token 404s). */
   const removeProposal = async (id: number): Promise<boolean> => {
-    const { error } = await supabase.from('proposals').delete().eq('id', id);
-    if (error) {
-      toast.error('Could not revoke link');
-      console.error('[proposals] delete error:', error.message);
-      return false;
+    const item = proposals.find((r) => r.id === id);
+    if (!item) {
+      // Fallback: row not in local cache — delete directly.
+      const { error } = await supabase.from('proposals').delete().eq('id', id);
+      if (error) {
+        toast.error('Could not revoke link');
+        console.error('[proposals] delete error:', error.message);
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Link revoked');
-    await refresh();
+    undoableDelete('proposals', id, item, setProposals, 'Link revoked');
     return true;
   };
 
