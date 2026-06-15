@@ -1432,10 +1432,89 @@ def _major_holiday(d):
     return None
 
 
-def compute_pulse(w, conventions, d) -> dict:
+# ── Forecast learning loop ──────────────────────────────────────────────────
+# Score at the center of each band's bucket (SLOW <38≤ STEADY <58≤ BUSY <78≤
+# PACKED) — turns an observed actual_band back into a comparable number so we
+# can measure how far the model missed.
+_BAND_SCORE = {"SLOW": 29, "STEADY": 48, "BUSY": 68, "PACKED": 88}
+
+# How many closed nights before we trust a correction, the window we learn from,
+# and the most we'll ever shift the score (a guardrail against one wild week).
+CALIB_MIN_NIGHTS = 6
+CALIB_WINDOW_DAYS = 90
+CALIB_MAX_BIAS = 15.0
+
+
+def _band_for_score(score) -> str:
+    s = float(score)
+    return "SLOW" if s < 38 else "STEADY" if s < 58 else "BUSY" if s < 78 else "PACKED"
+
+
+def fetch_demand_calibration(conn) -> dict:
+    """Learn a transparent score correction from the manager's close-outs.
+
+    For each closed night, compare the RAW model score (base_score — never the
+    already-corrected one, so a correction can't feed back on itself) to the
+    score implied by what actually happened, and average the miss. Splits
+    weekend vs weekday once each bucket has its own sample. Returns a zero
+    correction until CALIB_MIN_NIGHTS nights are in, so a cold start never
+    invents a bias."""
+    empty = {"n": 0, "bias": 0.0, "weekend_bias": None, "weekday_bias": None, "hit_rate": None}
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT business_day, COALESCE(base_score, predicted_score) AS base, actual_band "
+                "FROM demand_log "
+                "WHERE actual_band IS NOT NULL "
+                "AND COALESCE(base_score, predicted_score) IS NOT NULL "
+                "AND business_day >= (CURRENT_DATE - %s::int) "
+                "ORDER BY business_day DESC",
+                (CALIB_WINDOW_DAYS,),
+            )
+            rows = cur.fetchall()
+    except DB_ERRORS:
+        raise
+    except Exception as e:
+        log(f"calibration: query failed: {e}")
+        return empty
+
+    errs_all, errs_wknd, errs_wkdy, hits = [], [], [], 0
+    for business_day, base, actual_band in rows:
+        if actual_band not in _BAND_SCORE or base is None:
+            continue
+        err = _BAND_SCORE[actual_band] - float(base)
+        errs_all.append(err)
+        (errs_wknd if business_day.weekday() in (4, 5) else errs_wkdy).append(err)
+        if _band_for_score(base) == actual_band:
+            hits += 1
+
+    n = len(errs_all)
+    if n == 0:
+        return empty
+
+    def _clamp(x):
+        return max(-CALIB_MAX_BIAS, min(CALIB_MAX_BIAS, x))
+
+    def _mean(xs):
+        return sum(xs) / len(xs)
+
+    bias = _clamp(_mean(errs_all)) if n >= CALIB_MIN_NIGHTS else 0.0
+    wknd = _clamp(_mean(errs_wknd)) if len(errs_wknd) >= CALIB_MIN_NIGHTS else None
+    wkdy = _clamp(_mean(errs_wkdy)) if len(errs_wkdy) >= CALIB_MIN_NIGHTS else None
+    return {
+        "n": n,
+        "bias": round(bias, 1),
+        "weekend_bias": round(wknd, 1) if wknd is not None else None,
+        "weekday_bias": round(wkdy, 1) if wkdy is not None else None,
+        "hit_rate": round(100 * hits / n),
+    }
+
+
+def compute_pulse(w, conventions, d, calib=None) -> dict:
     """Deterministic, transparent band: a weekday/season baseline modulated by
-    weather, conventions, the Portland heat-escape spread, and holidays. Luna
-    never does this math; she only phrases the result."""
+    weather, conventions, the Portland heat-escape spread, and holidays, then a
+    learned correction from past close-outs (calib). Luna never does this math;
+    she only phrases the result."""
     drivers = []
     score = 40.0
     wd, month = d.weekday(), d.month  # wd: 0=Mon .. 6=Sun
@@ -1483,8 +1562,36 @@ def compute_pulse(w, conventions, d) -> dict:
     if hol:
         score += 10; drivers.append(("holiday", "+", hol))
 
+    base_score = score  # raw model output, before any learned correction
+
+    # Learned correction from the manager's close-outs. Transparent: it shows up
+    # as its own driver, prefers the weekend/weekday-specific bias when we have
+    # one, and stays at zero until there's enough history to trust it.
+    confidence = "learning"
+    if calib and calib.get("n"):
+        n = calib["n"]
+        is_weekend = wd in (4, 5)
+        corr = calib.get("weekend_bias") if is_weekend else calib.get("weekday_bias")
+        if corr is None:
+            corr = calib.get("bias") or 0.0
+        if corr:
+            score += corr
+            sign = "+" if corr > 0 else "-"
+            drivers.append((
+                "learning", sign,
+                f"{n} close-out{'s' if n != 1 else ''} say we run "
+                f"{'busier' if corr > 0 else 'quieter'} than the model here — nudged {sign}{abs(round(corr))}",
+            ))
+        if n >= 20:
+            confidence = f"calibrated · {n} nights logged, {calib.get('hit_rate')}% exact"
+        elif n >= CALIB_MIN_NIGHTS:
+            confidence = f"calibrating · {n} nights logged"
+        else:
+            confidence = f"learning · {n} night{'s' if n != 1 else ''} logged"
+
     band = ("SLOW" if score < 38 else "STEADY" if score < 58 else "BUSY" if score < 78 else "PACKED")
-    return {"band": band, "score": round(score), "drivers": drivers, "confidence": "learning"}
+    return {"band": band, "score": round(score), "base_score": round(base_score),
+            "drivers": drivers, "confidence": confidence}
 
 
 def _candidate_specials(band, w) -> list:
@@ -1506,7 +1613,7 @@ def build_pulse_prompt(p, w, conventions) -> str:
     specials = " OR ".join(_candidate_specials(p["band"], w))
     return "\n".join([
         PULSE_PREAMBLE, "",
-        f"Computed band: {p['band']} (confidence: {p['confidence']} — no POS history yet, so lean on the drivers, not a fake number).",
+        f"Computed band: {p['band']} (confidence: {p['confidence']}). Lean on the drivers below, not a precise number.",
         f"Model drivers: {drivers}.",
         f"Weather: high {w.get('high')}F, low {w.get('low')}F, {w.get('precip')}% rain, max gust {w.get('gust')} mph; "
         f"sunset {w.get('sunset') or 'n/a'}; Portland high {w.get('pdx_high')}F.",
@@ -1522,13 +1629,15 @@ def run_pulse(conn) -> None:
     try:
         w = fetch_pulse_weather()
         conventions = fetch_conventions()
-        p = compute_pulse(w, conventions, date.today())
+        calib = fetch_demand_calibration(conn)
+        p = compute_pulse(w, conventions, date.today(), calib)
         prompt = build_pulse_prompt(p, w, conventions)
         log(f"pulse: band={p['band']} score={p['score']} drivers={len(p['drivers'])}; asking Luna")
         reply = plainify(ask_luna(prompt, session_tag=f"pulse-{int(time.time())}"))
         body, action = extract_action(reply)
         data = {
-            "band": p["band"], "score": p["score"], "confidence": p["confidence"],
+            "band": p["band"], "score": p["score"], "base_score": p["base_score"],
+            "confidence": p["confidence"],
             "drivers": [{"name": n, "sign": s, "detail": d} for (n, s, d) in p["drivers"]],
             "sunset": w.get("sunset"),
             "weather": {k: w.get(k) for k in ("high", "low", "precip", "gust", "pdx_high", "code")},
@@ -1545,12 +1654,12 @@ def run_pulse(conn) -> None:
             # Log the prediction for the forecast-vs-actual trust loop. The
             # manager's nightly close-out fills actual_band on the same row.
             cur.execute(
-                "INSERT INTO demand_log (business_day, predicted_band, predicted_score, drivers) "
-                "VALUES (%s, %s, %s, %s::jsonb) "
+                "INSERT INTO demand_log (business_day, predicted_band, predicted_score, base_score, drivers) "
+                "VALUES (%s, %s, %s, %s, %s::jsonb) "
                 "ON CONFLICT (business_day) DO UPDATE SET "
                 "predicted_band = EXCLUDED.predicted_band, predicted_score = EXCLUDED.predicted_score, "
-                "drivers = EXCLUDED.drivers, updated_at = now()",
-                (date.today(), p["band"], p["score"], json.dumps(data["drivers"])),
+                "base_score = EXCLUDED.base_score, drivers = EXCLUDED.drivers, updated_at = now()",
+                (date.today(), p["band"], p["score"], p["base_score"], json.dumps(data["drivers"])),
             )
         conn.commit()
         log(f"pulse: wrote '{title}' ({len(body)} chars)")
