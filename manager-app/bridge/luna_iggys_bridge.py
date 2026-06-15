@@ -1832,12 +1832,42 @@ def _candidate_specials(band, w) -> list:
     return out
 
 
-def build_pulse_prompt(p, w, conventions) -> str:
+# A "non-answer": the standby/meta acknowledgement an LLM emits when it treats
+# the task as a system message to ack rather than work to do (observed live in
+# the pulse: "Got it. Context loaded, XML format noted. Ready for whatever's
+# next."). The clean ask_operator call prevents these, but this is the safety
+# net so a broken read never reaches the dashboard — we fall back to a
+# deterministic line instead.
+_NONANSWER_CONTAINS = (
+    "context loaded", "format noted", "ready for whatever", "ready when you",
+    "how can i help", "how may i help", "standing by", "ready to assist",
+    "let me know what you need", "what can i do for you", "at your service",
+    "ready for your next", "awaiting your", "whatever's next", "whatever is next",
+)
+_NONANSWER_STARTS = ("got it", "understood", "acknowledged", "sure thing", "okay,", "ok,")
+
+
+def _looks_like_nonanswer(text: str) -> bool:
+    t = (text or "").strip().lower().replace("’", "'")
+    if len(re.sub(r"\s+", "", t)) < 12:
+        return True
+    if any(m in t for m in _NONANSWER_CONTAINS):
+        return True
+    return any(t.startswith(s) for s in _NONANSWER_STARTS)
+
+
+def _pulse_fallback(p) -> str:
+    """Deterministic one-liner if the model fails to phrase a real read."""
+    top = next((detail for (_n, sign, detail) in p["drivers"] if sign == "+"), "")
+    line = f"{p['band'].title()} expected tonight"
+    return f"{line} — {top}." if top else f"{line}."
+
+
+def build_pulse_user(p, w, conventions) -> str:
     drivers = "; ".join(f"{name} ({sign}{detail})" for (name, sign, detail) in p["drivers"]) or "nothing unusual"
     conv = "; ".join(c["title"] for c in conventions[:3]) or "none listed"
     specials = " OR ".join(_candidate_specials(p["band"], w))
     return "\n".join([
-        PULSE_PREAMBLE, "",
         f"Computed band: {p['band']} (confidence: {p['confidence']}). Lean on the drivers below, not a precise number.",
         f"Model drivers: {drivers}.",
         f"Weather: high {w.get('high')}F, low {w.get('low')}F, {w.get('precip')}% rain, max gust {w.get('gust')} mph; "
@@ -1856,10 +1886,15 @@ def run_pulse(conn) -> None:
         conventions = fetch_conventions()
         calib = fetch_demand_calibration(conn)
         p = compute_pulse(w, conventions, date.today(), calib)
-        prompt = build_pulse_prompt(p, w, conventions)
-        log(f"pulse: band={p['band']} score={p['score']} drivers={len(p['drivers'])}; asking Luna")
-        reply = plainify(ask_luna(prompt, session_tag=f"pulse-{int(time.time())}"))
+        user = build_pulse_user(p, w, conventions)
+        log(f"pulse: band={p['band']} score={p['score']} drivers={len(p['drivers'])}; phrasing via operator")
+        # Clean direct call (NOT ask_luna/api/chat) — her persona made the read a
+        # standby-ack ("Context loaded... Ready for whatever's next.") on 6/15.
+        reply = plainify(ask_operator(PULSE_PREAMBLE, user))
         body, action = extract_action(reply)
+        if _looks_like_nonanswer(body):
+            log(f"pulse: model returned a non-answer ({body[:60]!r}); using deterministic read")
+            body, action = _pulse_fallback(p), None
         data = {
             "band": p["band"], "score": p["score"], "base_score": p["base_score"],
             "confidence": p["confidence"],
@@ -1935,7 +1970,7 @@ def fetch_on_this_day() -> dict:
     return out
 
 
-def build_special_prompt(otd, d) -> str:
+def build_special_user(otd, d) -> str:
     facts = []
     if otd["holidays"]:
         facts.append("Observances today: " + " | ".join(otd["holidays"]))
@@ -1947,7 +1982,6 @@ def build_special_prompt(otd, d) -> str:
     if hol:
         facts.append(f"Major holiday: {hol}")
     return "\n".join([
-        SPECIAL_PREAMBLE, "",
         f"Today is {d.strftime('%A, %B %d, %Y')}.",
         ("\n".join(facts) if facts else "(no notable facts found - invent something seasonal + coastal)"),
         "Invent the special now.",
@@ -1967,11 +2001,12 @@ def run_special(conn) -> None:
                 return
         conn.rollback()
         otd = fetch_on_this_day()
-        prompt = build_special_prompt(otd, date.today())
-        log("special: inventing today's creative special")
-        reply = plainify(ask_luna(prompt, session_tag=f"special-{date.today().isoformat()}"))
+        user = build_special_user(otd, date.today())
+        log("special: inventing today's creative special via operator")
+        reply = plainify(ask_operator(SPECIAL_PREAMBLE, user))
         body, action = extract_action(reply)
-        if not body:
+        if not body or _looks_like_nonanswer(body):
+            log("special: no usable special this pass")
             return
         first = (body.splitlines() or [""])[0]
         name = re.split(r"[—:\-]", first, maxsplit=1)[0].strip()[:60] or "Today's special"
