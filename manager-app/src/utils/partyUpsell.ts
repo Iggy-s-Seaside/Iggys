@@ -11,6 +11,13 @@ import { createParty } from '../hooks/useParties';
 import { findOrCreateContact } from '../hooks/useContacts';
 import type { Party } from '../types';
 
+/** Maps Luna's extracted space code to the party form's space_name label. */
+const SPACE_LABELS: Record<string, string> = {
+  upstairs: 'Upstairs bar',
+  downstairs: 'Downstairs room',
+  whole: 'Whole space',
+};
+
 export interface PartyUpsellInput {
   /** Required — the lead's name (reservation guest / message sender). */
   contactName: string;
@@ -19,10 +26,23 @@ export interface PartyUpsellInput {
   company?: string | null;
   /** Calendar/event title. From a message subject, or built from the guest name. */
   title?: string | null;
-  /** yyyy-MM-dd. From a reservation's date; leave blank if unknown. */
+  /** yyyy-MM-dd. From a reservation's date or Luna's extraction; blank if unknown. */
   eventDate?: string | null;
-  /** Maps the reservation party_size onto the party guest_count. */
+  /** HH:MM — from Luna's extraction of the email thread. */
+  startTime?: string | null;
+  endTime?: string | null;
+  /** Maps the reservation party_size / extracted headcount onto guest_count. */
   guestCount?: number | null;
+  /** 'upstairs' | 'downstairs' | 'whole' (Luna's extraction) → space_name label. */
+  space?: string | null;
+  /** A deposit amount stated in the thread → deposit_amount. */
+  depositAmount?: number | null;
+  /** A quoted total in the thread — folded into internal_notes as context (the
+   *  party total is computed from line items, so there's no stored total field). */
+  estTotal?: number | null;
+  /** Luna's one-line summary of the food/drink/setup the customer requested →
+   *  special_requests so the manager sees it on the party. */
+  extractedNotes?: string | null;
   /** Carried into internal_notes (never emailed) so the lead's context isn't lost. */
   internalNotes?: string | null;
   /** Where this lead came from, for the source badge (e.g. 'website', 'email'). */
@@ -44,6 +64,14 @@ export async function createPartyFromLead(input: PartyUpsellInput): Promise<Part
 
   const contactId = await findOrCreateContact({ name, email, phone, company });
 
+  // Fold a quoted total into the internal notes (no stored total field — the
+  // party total is derived from line items).
+  const baseNotes = input.internalNotes?.trim() || '';
+  const internalNotes = [
+    baseNotes,
+    input.estTotal != null ? `Email quoted ~$${input.estTotal} total.` : '',
+  ].filter(Boolean).join('\n\n') || null;
+
   const payload: Partial<Party> = {
     status: 'inquiry',
     is_private: true,
@@ -54,8 +82,13 @@ export async function createPartyFromLead(input: PartyUpsellInput): Promise<Part
     company,
     title: input.title?.trim() || null,
     event_date: input.eventDate || null,
+    start_time: input.startTime || null,
+    end_time: input.endTime || null,
     guest_count: input.guestCount != null ? input.guestCount : null,
-    internal_notes: input.internalNotes?.trim() || null,
+    space_name: input.space ? (SPACE_LABELS[input.space] ?? input.space) : null,
+    deposit_amount: input.depositAmount != null ? input.depositAmount : null,
+    special_requests: input.extractedNotes?.trim() || null,
+    internal_notes: internalNotes,
     source: input.source || null,
   };
 

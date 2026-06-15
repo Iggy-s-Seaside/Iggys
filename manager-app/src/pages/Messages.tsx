@@ -377,11 +377,24 @@ export function Messages() {
   const handleMakeParty = async () => {
     if (!selected || convertingParty) return;
     setConvertingParty(true);
+    // Luna's extracted event details (date/time/guests/space/price) pre-fill the
+    // party form so the manager doesn't re-type what's already in the thread.
+    const ed = (selected.luna_classification?.event_details ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    const num = (v: unknown) => (typeof v === 'number' ? v : null);
     const party = await createPartyFromLead({
       contactName: selected.name,
       contactEmail: selected.email,
-      contactPhone: selected.phone,
+      contactPhone: selected.phone || str(ed.contact_phone),
       title: selected.subject?.trim() || `Party — ${selected.name}`,
+      eventDate: str(ed.event_date),
+      startTime: str(ed.start_time),
+      endTime: str(ed.end_time),
+      guestCount: num(ed.guest_count),
+      space: str(ed.space),
+      depositAmount: num(ed.deposit),
+      estTotal: num(ed.est_total),
+      extractedNotes: str(ed.notes),
       internalNotes: `Started from an inbox message${
         selected.subject?.trim() ? ` (“${selected.subject.trim()}”)` : ''
       }.${selected.message?.trim() ? `\n\n${selected.message.trim()}` : ''}`,

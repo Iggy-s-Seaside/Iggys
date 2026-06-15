@@ -1558,6 +1558,152 @@ def draft_and_insight(conn, row) -> bool:
     return False
 
 
+# --------------------------------------------------------------------------
+# Event-detail extraction: pull the concrete date/time/guests/price/space a
+# customer stated in an event-able email into messages.luna_classification
+# .event_details, so the dashboard's "Make a party" pre-fills the form instead
+# of the manager re-typing what's already in the thread. Clean operator call
+# (anti-confab JSON) — NEVER ask_luna.
+# --------------------------------------------------------------------------
+
+EVENT_EXTRACT_CATEGORIES = ("reservation", "event", "request", "booking", "party")
+EXTRACT_MAX = 3   # extractions per triage pass (bounds wall-clock)
+_EVENT_SPACES = ("upstairs", "downstairs", "whole")
+
+EXTRACT_PREAMBLE = (
+    "You read ONE customer email thread for a bar/restaurant ('Iggy's Seaside') and pull out ONLY the "
+    "concrete private-event/booking details the customer has actually stated, to pre-fill a party form. "
+    "Extract NOTHING that isn't explicitly in the thread - never guess, infer, or invent a value; use "
+    "null for anything not stated. Output ONLY a single JSON object, no other text, exactly these keys:\n"
+    '{"event_date": null, "start_time": null, "end_time": null, "guest_count": null, "space": null, '
+    '"contact_phone": null, "est_total": null, "deposit": null, "occasion": null, "notes": null}\n'
+    "- event_date: YYYY-MM-DD (the EVENT date, not the email date), else null.\n"
+    "- start_time / end_time: 24h HH:MM, else null.\n"
+    "- guest_count: integer headcount if stated, else null.\n"
+    "- space: one of 'upstairs', 'downstairs', 'whole' (upstairs bar / downstairs room / whole space), else null.\n"
+    "- contact_phone: a phone number the sender gave, else null.\n"
+    "- est_total / deposit: dollar NUMBERS only (e.g. 400), null if no price/total/deposit is stated.\n"
+    "- occasion: a short phrase for the event (e.g. 'educator dinner', 'team dinner'), else null.\n"
+    "- notes: ONE short line summarizing the food/drink/setup actually requested, else null."
+)
+
+
+def _extract_json_object(text):
+    cleaned = re.sub(r"^```(?:json)?|```$", "", (text or "").strip(), flags=re.M).strip()
+    try:
+        obj = json.loads(cleaned)
+        if isinstance(obj, dict):
+            return obj
+    except (json.JSONDecodeError, ValueError):
+        pass
+    m = re.search(r"\{.*\}", cleaned, re.S)
+    if m:
+        try:
+            obj = json.loads(m.group(0))
+            if isinstance(obj, dict):
+                return obj
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return None
+
+
+def _num_or_none(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str):
+        m = re.search(r"-?\d[\d,]*(?:\.\d+)?", v)
+        if m:
+            tok = m.group(0).replace(",", "")
+            try:
+                return float(tok) if "." in tok else int(tok)
+            except ValueError:
+                return None
+    return None
+
+
+def _str_or_none(v):
+    return v.strip() or None if isinstance(v, str) and v.strip() else None
+
+
+def _clean_event_details(d) -> dict:
+    """Type-guard the extracted object to the known keys (anti-confab is in the
+    prompt; this just coerces shape so a bad type can't reach the form)."""
+    d = d or {}
+    gc = _num_or_none(d.get("guest_count"))
+    sp = d.get("space")
+    return {
+        "event_date": _str_or_none(d.get("event_date")),
+        "start_time": _str_or_none(d.get("start_time")),
+        "end_time": _str_or_none(d.get("end_time")),
+        "guest_count": int(gc) if gc is not None else None,
+        "space": sp if sp in _EVENT_SPACES else None,
+        "contact_phone": _str_or_none(d.get("contact_phone")),
+        "est_total": _num_or_none(d.get("est_total")),
+        "deposit": _num_or_none(d.get("deposit")),
+        "occasion": _str_or_none(d.get("occasion")),
+        "notes": (trunc(d["notes"], 280) or None) if isinstance(d.get("notes"), str) else None,
+    }
+
+
+def fetch_needs_extract(conn):
+    """Event-able emails that don't have structured event_details yet."""
+    return _query(
+        conn,
+        """
+        SELECT id, name, email, subject, message
+        FROM messages
+        WHERE lower(coalesce(category, '')) IN %s
+          AND (luna_classification -> 'event_details') IS NULL
+          AND created_at >= now() - make_interval(days => %s)
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (EVENT_EXTRACT_CATEGORIES, TRIAGE_LOOKBACK_DAYS, EXTRACT_MAX),
+    ) or []
+
+
+def extract_event_details(conn) -> int:
+    """Pull stated event details from event-able emails into
+    luna_classification.event_details so 'Make a party' pre-fills the form.
+    Stores an object every time (all-null if nothing's there) so a non-event
+    email isn't re-extracted every pass."""
+    n = 0
+    today = date.today().isoformat()
+    for (mid, name, email, subject, message) in fetch_needs_extract(conn):
+        # Give a generous window — event details (times, totals, headcount) often
+        # sit deep in a long quoted thread — plus today's date so a bare "6/27"
+        # resolves to the right YEAR.
+        user = "\n".join([
+            f"Today is {today}.",
+            f"from: {name or '?'} <{email or '?'}>",
+            f"subject: {subject or ''}",
+            "",
+            trunc(message or "", 6000),
+        ])
+        try:
+            raw = ask_operator(EXTRACT_PREAMBLE, user)
+        except LunaUnavailable:
+            break  # model down — retry next pass (leave event_details null)
+        except Exception as e:
+            log(f"extract: message {mid} failed: {e}")
+            continue
+        clean = _clean_event_details(_extract_json_object(raw))
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE messages SET luna_classification = "
+                "coalesce(luna_classification, '{}'::jsonb) "
+                "|| jsonb_build_object('event_details', %s::jsonb) WHERE id = %s",
+                (json.dumps(clean), mid),
+            )
+        conn.commit()
+        n += 1
+    if n:
+        log(f"extract: pulled event details for {n} email(s)")
+    return n
+
+
 def run_triage(conn) -> None:
     """One triage pass: classify new mail, then draft + alert the urgent unanswered."""
     try:
@@ -1588,6 +1734,19 @@ def run_triage(conn) -> None:
                     pass
     except DB_ERRORS:
         raise
+    # Pull structured event details for event-able mail (pre-fills "Make a party").
+    try:
+        extract_event_details(conn)
+    except DB_ERRORS:
+        raise
+    except LunaUnavailable as e:
+        log(f"triage: model unavailable for extract ({e}); will retry next pass")
+    except Exception as e:
+        log(f"triage: extract pass failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
 
 def run_triage_once() -> int:
