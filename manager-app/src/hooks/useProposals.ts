@@ -82,7 +82,13 @@ export function useProposals(partyId: number | null) {
     };
   }, [partyId, refresh]);
 
-  /** Create a fresh proposal link for this party (status 'sent', sent_at now). */
+  /**
+   * Create a fresh proposal link for this party. Status starts at 'draft' — the
+   * link exists and is fully usable, but we DON'T claim it was "sent" just
+   * because the manager generated + copied it. "Sent" is stamped only when they
+   * actually send it (markSent) or — as real proof of delivery — when the client
+   * opens it ('viewed', stamped by the proposal-sign fn).
+   */
   const createProposal = async (): Promise<Proposal | null> => {
     if (partyId == null) return null;
     setCreating(true);
@@ -92,8 +98,8 @@ export function useProposals(partyId: number | null) {
         .insert({
           token: crypto.randomUUID(),
           party_id: partyId,
-          status: 'sent',
-          sent_at: new Date().toISOString(),
+          status: 'draft',
+          sent_at: null,
         })
         .select('*')
         .single();
@@ -107,6 +113,32 @@ export function useProposals(partyId: number | null) {
     } finally {
       setCreating(false);
     }
+  };
+
+  /**
+   * Mark a link as actually sent to the client — the manager confirms they
+   * delivered it (email/text), so the "Sent" milestone reflects reality rather
+   * than the moment the link was generated. Optimistic; guarded so a link the
+   * client already viewed/signed is never downgraded.
+   */
+  const markSent = async (id: number): Promise<boolean> => {
+    const target = proposals.find((p) => p.id === id);
+    if (!target || target.status !== 'draft') return false;
+    const nowIso = new Date().toISOString();
+    setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'sent', sent_at: nowIso } : p)));
+    const { error } = await supabase
+      .from('proposals')
+      .update({ status: 'sent', sent_at: nowIso })
+      .eq('id', id)
+      .eq('status', 'draft');
+    if (error) {
+      setProposals((prev) => prev.map((p) => (p.id === id ? target : p)));
+      toast.error('Could not mark sent');
+      console.error('[proposals] markSent error:', error.message);
+      return false;
+    }
+    toast.success('Marked as sent');
+    return true;
   };
 
   /** Permanently revoke a proposal link (deletes the row → token 404s). */
@@ -127,5 +159,5 @@ export function useProposals(partyId: number | null) {
     return true;
   };
 
-  return { proposals, loading, creating, refresh, createProposal, removeProposal };
+  return { proposals, loading, creating, refresh, createProposal, markSent, removeProposal };
 }

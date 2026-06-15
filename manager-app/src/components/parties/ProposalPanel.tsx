@@ -26,7 +26,7 @@ function fmtStamp(d: string | null): string | null {
 /** Chips shown for each lifecycle milestone the client has reached. */
 function StatusChips({ p }: { p: Proposal }) {
   const chips: { icon: React.ElementType; label: string; on: boolean; at: string | null }[] = [
-    { icon: Send, label: 'Sent', on: p.status !== 'draft' || !!p.sent_at, at: p.sent_at },
+    { icon: Send, label: 'Sent', on: !!p.sent_at, at: p.sent_at },
     { icon: Eye, label: 'Viewed', on: !!p.viewed_at, at: p.viewed_at },
     { icon: PenLine, label: 'Signed', on: !!p.signed_at, at: p.signed_at },
     { icon: CreditCard, label: 'Deposit paid', on: !!p.deposit_paid_at, at: p.deposit_paid_at },
@@ -50,7 +50,7 @@ function StatusChips({ p }: { p: Proposal }) {
   );
 }
 
-function ProposalRow({ p, onRevoke }: { p: Proposal; onRevoke: (id: number) => void }) {
+function ProposalRow({ p, onRevoke, onMarkSent }: { p: Proposal; onRevoke: (id: number) => void; onMarkSent: (id: number) => void }) {
   const url = proposalUrl(p.token);
   const [copied, setCopied] = useState(false);
 
@@ -89,14 +89,28 @@ function ProposalRow({ p, onRevoke }: { p: Proposal; onRevoke: (id: number) => v
           {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-      >
-        <ExternalLink size={12} /> Open proposal page
-      </a>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          <ExternalLink size={12} /> Open proposal page
+        </a>
+        {/* Truth, not presumption: "Sent" is the manager's call, made after they
+            actually deliver the link — not auto-claimed when it was generated. */}
+        {!p.sent_at && (
+          <button
+            onClick={() => onMarkSent(p.id)}
+            className="btn-secondary text-xs shrink-0"
+            type="button"
+            title="Stamp the Sent milestone once you've emailed/texted this link"
+          >
+            <Send size={13} /> Mark as sent
+          </button>
+        )}
+      </div>
       {p.signer_name && (
         <p className="text-xs text-text-muted">
           Signed by <span className="text-text-secondary font-medium">{p.signer_name}</span>
@@ -112,7 +126,7 @@ const STATUS_RANK: Record<ProposalStatus, number> = {
 };
 
 export function ProposalPanel({ party }: ProposalPanelProps) {
-  const { proposals, loading, creating, createProposal, removeProposal } = useProposals(party.id);
+  const { proposals, loading, creating, createProposal, markSent, removeProposal } = useProposals(party.id);
 
   // Surface the most-advanced live link first (most-recently created wins ties).
   const latest = useMemo(() => {
@@ -155,7 +169,7 @@ export function ProposalPanel({ party }: ProposalPanelProps) {
       ) : (
         <div className="space-y-3">
           {proposals.map((p) => (
-            <ProposalRow key={p.id} p={p} onRevoke={removeProposal} />
+            <ProposalRow key={p.id} p={p} onRevoke={removeProposal} onMarkSent={markSent} />
           ))}
 
           {proposals.length === 0 && (
