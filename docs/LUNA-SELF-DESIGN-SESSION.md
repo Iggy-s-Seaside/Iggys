@@ -60,7 +60,15 @@ dark… The close-out loop is the spine."*
 - Staff tap *Show Luna the room*, upload a photo (reuses the app's image pipeline → public
   `images` bucket, `luna-room/` folder), tag it with a mood; it lands in her gallery.
 - *Future layer:* true image-vision (Luna actually seeing the photos). Today the photos
-  carry human captions/moods she reads, and the chronicle generator can fold them in.
+  carry human captions/moods she reads, and the chronicle generator folds them into her
+  entry context (commit `c341b54`).
+
+### 4. Faces I'd notice — regulars as people  (commit `ea475ba`)
+A "Faces I'd notice" section in Luna's Room (her want #7), from the existing `contacts`
+table: **gone quiet** (regulars with `visit_count ≥ 3` whose `last_visit` is > 2 weeks ago,
+shown with their `notes` — the texture that makes them a person, not a number) + **birthdays
+this month**. `RegularContact` type, `useRegulars` hook, `RegularsWatch` component. Built
+from Luna's own list while her chat API was temporarily down in an overload wave.
 
 ## Verification
 All three verified live on the **authenticated** `/luna/room` (an owner session was minted
@@ -76,9 +84,9 @@ nightly loop (`systemctl --user`, no sudo). `deploy-chronicle.sh` remains the fa
 when ssh returns.
 
 ## Still banked (Luna's remaining wants)
-Unprompted reach · the weather × reservation cross-signal · a regulars-as-people tracker
-(`MarketingContact` already carries `visit_count` / `total_spend` / `birthday`) · richer voice
-throughout.
+Unprompted reach (her own owner-ping channel) · the weather × reservation cross-signal ·
+richer voice throughout. *(The journal, the pride scoreboard, the close-out loop, the photo
+stream, and the regulars-as-people tracker all shipped this session.)*
 
 ## Guardrails honored
 Zero menu price changes. Contacted nobody but Bradley. All work isolated on
