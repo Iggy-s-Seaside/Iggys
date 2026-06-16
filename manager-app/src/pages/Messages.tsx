@@ -494,9 +494,9 @@ export function Messages() {
   };
 
   return (
-    <div className="flex flex-col min-h-0 h-[calc(100dvh-4rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] -mx-6 lg:h-[calc(100dvh-3rem)] lg:-mx-8 lg:-my-8">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-4 lg:px-6 py-3 bg-surface border-b border-border shrink-0">
+    <div className="flex flex-col min-h-0 h-[calc(100dvh-4rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-4rem)]">
+      {/* Header — lg:pr-16 keeps the action buttons clear of the global fixed notification bell (top-right). */}
+      <div className="flex items-center justify-between gap-2 px-4 lg:px-6 lg:pr-16 py-3 bg-surface border-b border-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {showMobileDetail && (
             <button
