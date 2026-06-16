@@ -32,6 +32,8 @@ export interface PublicPackage {
   unit: PublicPackageUnit;
   /** Highlighted card on the public site. Defaults to false when the column doesn't exist yet. */
   featured: boolean;
+  /** Whether the package is shown to customers. Manager-only detailed packages are `false`. */
+  publicVisible: boolean;
   sortOrder: number;
 }
 
@@ -50,6 +52,7 @@ interface PackageRow {
   sort_order: number | null;
   public_description?: string | null;
   featured?: boolean | null;
+  public_visible?: boolean | null;
 }
 
 function normalize(row: PackageRow): PublicPackage {
@@ -63,6 +66,7 @@ function normalize(row: PackageRow): PublicPackage {
     price: row.price ?? 0,
     unit: toUnit(row.unit),
     featured: row.featured === true,
+    publicVisible: row.public_visible !== false,
     sortOrder: row.sort_order ?? 0,
   };
 }
@@ -86,6 +90,7 @@ export function usePublicPackages() {
         .from('packages')
         .select('*')
         .eq('active', true)
+        .eq('public_visible', true)
         .order('sort_order');
 
       if (cancelled) return;

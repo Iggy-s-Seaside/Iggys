@@ -647,6 +647,11 @@ export interface Package {
   unit: PackageUnit;
   active: boolean;
   sort_order: number;
+  /** Whether this package shows on the public customer booking estimator.
+   *  Manager-only à-la-carte lines (public_visible=false) are hidden from
+   *  customers; only summary options appear. Optional on the insert path —
+   *  the DB defaults it to true. */
+  public_visible?: boolean;
 }
 
 export interface PartyPackage {

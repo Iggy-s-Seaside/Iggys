@@ -38,8 +38,9 @@ function lineAmount(pkg: PublicPackage, guests: number, hours: number): number {
 }
 
 function unitDetail(pkg: PublicPackage): string {
-  // Prices aren't all locked yet — never show "$0". Anything unpriced reads as a quote.
-  if (pkg.price <= 0) return 'Price on request';
+  // $0 never reads as "free": flat $0 is quoted per event; per-person/per-hour $0
+  // is unpriced. Both surface as a quote label, never "$0.00".
+  if (pkg.price <= 0) return pkg.unit === 'flat' ? 'Priced per event' : 'Price on request';
   if (pkg.unit === 'per_person') return `${moneyPrecise(pkg.price)} / guest`;
   if (pkg.unit === 'per_hour') return `${moneyPrecise(pkg.price)} / hour`;
   return `${moneyPrecise(pkg.price)} flat`;

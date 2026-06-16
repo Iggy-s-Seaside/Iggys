@@ -20,6 +20,7 @@ const emptyForm = {
   price: '0',
   unit: 'flat' as PackageUnit,
   active: true,
+  public_visible: true,
   sort_order: '0',
 };
 
@@ -40,6 +41,7 @@ export function Packages() {
         price: String(editing.price),
         unit: editing.unit,
         active: editing.active,
+        public_visible: editing.public_visible !== false,
         sort_order: String(editing.sort_order),
       });
     } else {
@@ -64,6 +66,7 @@ export function Packages() {
       price: parseFloat(form.price) || 0,
       unit: form.unit,
       active: form.active,
+      public_visible: form.public_visible,
       sort_order: parseInt(form.sort_order, 10) || 0,
     };
     const ok = editing
@@ -97,6 +100,9 @@ export function Packages() {
                 <div className="flex items-center gap-2">
                   <p className={`text-sm font-medium ${p.active ? 'text-text-primary' : 'text-text-muted line-through'}`}>{p.name}</p>
                   <span className="badge-primary capitalize">{p.category}</span>
+                  {p.public_visible === false && (
+                    <span className="badge bg-surface-hover text-text-muted">Manager only</span>
+                  )}
                 </div>
                 {p.description && <p className="text-xs text-text-muted truncate mt-0.5">{p.description}</p>}
               </div>
@@ -162,6 +168,11 @@ export function Packages() {
             checked={form.active}
             onChange={(next) => setField('active', next)}
             label="Active (available to add to parties)"
+          />
+          <Toggle
+            checked={form.public_visible}
+            onChange={(next) => setField('public_visible', next)}
+            label="Show on public booking (customers see this in the estimator)"
           />
           <div className="flex gap-3 justify-end pt-1">
             <button type="button" onClick={() => setFormOpen(false)} className="btn-secondary">Cancel</button>
