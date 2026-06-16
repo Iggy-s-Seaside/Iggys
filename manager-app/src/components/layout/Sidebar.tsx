@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, HelpCircle, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, HelpCircle, ChevronDown, BookHeart } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +8,7 @@ import { useRole, type Role } from '../../hooks/useRole';
 import { useUnreadCount } from '../../hooks/useMessages';
 import { useNewInsightCount } from '../../hooks/useLuna';
 
-type NavItem = { to: string; icon: LucideIcon; label: string; badge?: 'messages' | 'luna'; roles?: Role[] };
+type NavItem = { to: string; icon: LucideIcon; label: string; badge?: 'messages' | 'luna'; roles?: Role[]; end?: boolean };
 type NavSection = { id: string; label: string; items: NavItem[] };
 
 // Operational tier (owner + manager). Items with no `roles` are visible to ALL
@@ -77,7 +77,8 @@ const navSections: NavSection[] = [
     label: 'Insights',
     items: [
       { to: '/reports', icon: BarChart3, label: 'Reports', roles: OPS },
-      { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna', roles: OPS },
+      { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna', roles: OPS, end: true },
+      { to: '/luna/room', icon: BookHeart, label: "Luna's Room", roles: OPS },
       { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages', roles: OPS },
     ],
   },
@@ -173,14 +174,14 @@ export function Sidebar() {
               </button>
               {isOpen && (
                 <div className="mt-1 space-y-1">
-                  {section.items.map(({ to, icon: Icon, label, badge }) => {
+                  {section.items.map(({ to, icon: Icon, label, badge, end }) => {
                     const badgeCount =
                       badge === 'messages' ? unreadCount : badge === 'luna' ? newInsightCount : 0;
                     return (
                       <NavLink
                         key={to}
                         to={to}
-                        end={to === '/'}
+                        end={to === '/' || end}
                         onClick={() => setMobileOpen(false)}
                         className={({ isActive }) =>
                           `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${

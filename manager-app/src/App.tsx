@@ -33,6 +33,7 @@ const Packages = lazy(() => import('./pages/Packages').then((m) => ({ default: m
 const Todos = lazy(() => import('./pages/Todos').then((m) => ({ default: m.Todos })));
 const Invoices = lazy(() => import('./pages/Invoices').then((m) => ({ default: m.Invoices })));
 const Luna = lazy(() => import('./pages/Luna').then((m) => ({ default: m.Luna })));
+const LunaRoom = lazy(() => import('./pages/LunaRoom').then((m) => ({ default: m.LunaRoom })));
 const Team = lazy(() => import('./pages/Team').then((m) => ({ default: m.Team })));
 const Shift = lazy(() => import('./pages/Shift').then((m) => ({ default: m.Shift })));
 const Checks = lazy(() => import('./pages/Checks').then((m) => ({ default: m.Checks })));
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="/reports" element={<Ops><Reports /></Ops>} />
           <Route path="/packages" element={<Ops><Packages /></Ops>} />
           <Route path="/luna" element={<Ops><Luna /></Ops>} />
+          <Route path="/luna/room" element={<Ops><LunaRoom /></Ops>} />
           <Route path="/reputation" element={<Ops><Reputation /></Ops>} />
           <Route path="/marketing" element={<Ops><Marketing /></Ops>} />
           <Route path="/cogs" element={<Ops><Cogs /></Ops>} />

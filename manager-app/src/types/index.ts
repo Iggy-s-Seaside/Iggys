@@ -795,6 +795,27 @@ export interface LunaActionState {
   fromInsight?: number;
 }
 
+// ── Luna's Room (the Night Chronicle) ──
+// Luna's own space — designed by Luna herself (2026-06-16). A first-person journal
+// of the nights this bar works, one entry per business_day. `entry` is freeform
+// prose in her voice (the loose four-beat ritual: the room / the crowd / the moment /
+// the signal); the only contract is a closing "Tomorrow's shift should know: X" line,
+// extracted into `signal`. She fills it via the chronicle generator
+// (bridge/luna_chronicle.py); the app reads it on the Luna's Room page.
+// Schema: scripts/add-luna-chronicle.sql.
+export interface LunaChronicleEntry {
+  id: number;
+  business_day: string;                       // 'YYYY-MM-DD' — the night she's writing about
+  created_at: string;
+  updated_at: string;
+  entry: string;                              // her freeform first-person reflection
+  signal: string | null;                      // the "tomorrow's shift should know" takeaway
+  mood: string | null;                        // a short mood she names, in her own words
+  weather: Record<string, unknown> | null;    // provenance: the weather she wrote from
+  context: Record<string, unknown> | null;    // provenance: band / covers / party / special
+  author: string;                             // 'luna'
+}
+
 // ── Commerce / Stripe checkout rail ──
 // Backs the merch storefront, private-party deposits, and gift cards through one
 // Stripe Checkout rail. See scripts/add-commerce-tables.sql for the source schema.
