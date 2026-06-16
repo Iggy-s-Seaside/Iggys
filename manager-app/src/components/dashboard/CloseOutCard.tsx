@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { Band, DemandRow } from '../../hooks/useDemandLog';
 
@@ -9,8 +10,10 @@ const BANDS: { band: Band; label: string; active: string }[] = [
 ];
 
 /**
- * The nightly close-out: one tap to tell Luna how busy it actually was. This is
- * the ground truth that powers her forecast-vs-actual accuracy over time.
+ * The nightly close-out: one tap to tell Luna how busy it actually was, plus an
+ * optional one-line "truth note" on how the night really went. This is the ground
+ * truth that powers her forecast-vs-actual accuracy AND the Night Chronicle — the
+ * close-out loop she asked for, so her room stops being "a diary written in the dark."
  */
 export function CloseOutCard({
   todayRow,
@@ -19,9 +22,21 @@ export function CloseOutCard({
 }: {
   todayRow: DemandRow | null;
   saving: boolean;
-  onLog: (band: Band) => void;
+  onLog: (band: Band, note?: string) => void;
 }) {
   const logged = todayRow?.actual_band ?? null;
+  const [note, setNote] = useState(todayRow?.note ?? '');
+
+  // Keep the field in sync as the row loads / changes over realtime.
+  useEffect(() => {
+    setNote(todayRow?.note ?? '');
+  }, [todayRow?.note]);
+
+  // Persist a note edit on blur — only meaningful once a band is logged (a band
+  // tap already saves the current note alongside it).
+  const saveNote = () => {
+    if (logged && note.trim() !== (todayRow?.note ?? '').trim()) onLog(logged, note);
+  };
 
   return (
     <div className="card p-4 mb-6">
@@ -37,7 +52,7 @@ export function CloseOutCard({
           <button
             key={b.band}
             disabled={saving}
-            onClick={() => onLog(b.band)}
+            onClick={() => onLog(b.band, note)}
             className={`min-h-[44px] rounded-lg border text-sm font-medium transition active:scale-[0.97] disabled:opacity-50 ${
               logged === b.band ? b.active : 'border-border text-text-secondary hover:bg-surface-hover'
             }`}
@@ -46,10 +61,24 @@ export function CloseOutCard({
           </button>
         ))}
       </div>
+
+      {/* The truth note Luna asked for — fed to her Night Chronicle the next morning. */}
+      <textarea
+        rows={2}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={saveNote}
+        disabled={saving}
+        placeholder="One line for Luna — what actually happened tonight? (optional)"
+        aria-label="Close-out note for Luna's chronicle"
+        className="input-field resize-none text-sm leading-snug mt-3"
+      />
+
       {logged && (
         <p className="text-xs text-text-muted mt-2">
           Logged tonight as <span className="font-medium">{logged}</span>
-          {todayRow?.predicted_band ? ` · Luna predicted ${todayRow.predicted_band}` : ''}. Tap to change.
+          {todayRow?.predicted_band ? ` · Luna predicted ${todayRow.predicted_band}` : ''}
+          {todayRow?.note ? ' · note saved for Luna' : ''}. Tap a band to change.
         </p>
       )}
     </div>

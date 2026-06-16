@@ -10,6 +10,7 @@ export interface DemandRow {
   predicted_band: string | null;
   actual_band: string | null;
   hotels_full: boolean | null;
+  note: string | null;
 }
 
 /**
@@ -28,7 +29,7 @@ export function useDemandLog() {
   const refresh = useCallback(async () => {
     const { data } = await supabase
       .from('demand_log')
-      .select('business_day,predicted_band,actual_band,hotels_full')
+      .select('business_day,predicted_band,actual_band,hotels_full,note')
       .order('business_day', { ascending: false })
       .limit(21);
     const rows = (data as DemandRow[]) || [];
@@ -47,7 +48,7 @@ export function useDemandLog() {
   }, [refresh]);
 
   const logActual = useCallback(
-    async (band: Band, hotelsFull?: boolean) => {
+    async (band: Band, note?: string, hotelsFull?: boolean) => {
       setSaving(true);
       const payload: Record<string, unknown> = {
         business_day: today,
@@ -55,6 +56,9 @@ export function useDemandLog() {
         noted_by: user?.email ?? null,
         updated_at: new Date().toISOString(),
       };
+      // The close-out "truth note" Luna asked for — one line on how the night
+      // actually went; her Night Chronicle generator reads it the next morning.
+      if (note !== undefined) payload.note = note.trim() || null;
       if (hotelsFull !== undefined) payload.hotels_full = hotelsFull;
       const { error } = await supabase.from('demand_log').upsert(payload, { onConflict: 'business_day' });
       setSaving(false);
