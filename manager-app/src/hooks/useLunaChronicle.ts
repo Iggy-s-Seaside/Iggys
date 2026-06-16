@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import type { LunaChronicleEntry, LunaPhoto } from '../types';
+import type { LunaChronicleEntry, LunaPhoto, RegularContact } from '../types';
 import toast from 'react-hot-toast';
 
 /** Cap on chronicle entries fetched — the journal grows forever in the DB. */
@@ -231,4 +231,47 @@ export function useLunaPhotos() {
   );
 
   return { photos, loading, addPhoto, removePhoto, refresh };
+}
+
+/** Luna's "faces I'd notice" — regulars as people, not transactions (her want #7).
+ * Quiet regulars = someone who came often and then went quiet (>2wks); plus this
+ * month's birthdays. Read-only, from the existing contacts table. */
+export function useRegulars() {
+  const [quiet, setQuiet] = useState<RegularContact[]>([]);
+  const [birthdays, setBirthdays] = useState<RegularContact[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cols = 'id,name,visit_count,last_visit,total_spend,notes,tags,birthday_month';
+      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const month = new Date().getMonth() + 1;
+      const [q, b] = await Promise.all([
+        supabase
+          .from('contacts')
+          .select(cols)
+          .gte('visit_count', 3)
+          .not('last_visit', 'is', null)
+          .lt('last_visit', twoWeeksAgo)
+          .order('last_visit', { ascending: true })
+          .limit(12),
+        supabase
+          .from('contacts')
+          .select(cols)
+          .eq('birthday_month', month)
+          .order('visit_count', { ascending: false })
+          .limit(12),
+      ]);
+      if (cancelled) return;
+      if (!q.error) setQuiet((q.data as RegularContact[]) || []);
+      if (!b.error) setBirthdays((b.data as RegularContact[]) || []);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { quiet, birthdays, loading };
 }

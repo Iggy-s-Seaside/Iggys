@@ -830,6 +830,19 @@ export interface LunaPhoto {
   uploaded_by: string | null;
 }
 
+/** A regular, as a person (not a transaction) — for Luna's "faces I'd notice" watch.
+ * Sourced from the existing contacts table (visit_count / last_visit / notes / birthday). */
+export interface RegularContact {
+  id: number;
+  name: string | null;
+  visit_count: number | null;
+  last_visit: string | null;
+  total_spend: number | null;
+  notes: string | null;
+  tags: string[] | null;
+  birthday_month: number | null;
+}
+
 // ── Commerce / Stripe checkout rail ──
 // Backs the merch storefront, private-party deposits, and gift cards through one
 // Stripe Checkout rail. See scripts/add-commerce-tables.sql for the source schema.

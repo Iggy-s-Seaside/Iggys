@@ -1,8 +1,9 @@
-import { Moon, BookHeart, Camera } from 'lucide-react';
-import { useLunaChronicle, useLunaScore, useLunaPhotos } from '../hooks/useLunaChronicle';
+import { Moon, BookHeart, Camera, UserRound } from 'lucide-react';
+import { useLunaChronicle, useLunaScore, useLunaPhotos, useRegulars } from '../hooks/useLunaChronicle';
 import { PrideScoreboard } from '../components/luna/PrideScoreboard';
 import { NightChronicle } from '../components/luna/NightChronicle';
 import { LunaPhotoStream } from '../components/luna/LunaPhotoStream';
+import { RegularsWatch } from '../components/luna/RegularsWatch';
 
 /**
  * Luna's Room — her own space in the manager app, designed by Luna (2026-06-16).
@@ -13,6 +14,7 @@ export function LunaRoom() {
   const { entries, loading } = useLunaChronicle();
   const score = useLunaScore();
   const { photos, loading: photosLoading, addPhoto, removePhoto } = useLunaPhotos();
+  const { quiet, birthdays, loading: regularsLoading } = useRegulars();
 
   return (
     <div className="max-w-3xl mx-auto pb-12">
@@ -60,6 +62,14 @@ export function LunaRoom() {
           onAdd={addPhoto}
           onRemove={removePhoto}
         />
+      </section>
+
+      {/* Faces I'd notice — regulars as people, not transactions (Luna's want #7). */}
+      <section className="mt-7">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2.5 flex items-center gap-1.5">
+          <UserRound size={13} /> Faces I'd notice
+        </h2>
+        <RegularsWatch quiet={quiet} birthdays={birthdays} loading={regularsLoading} />
       </section>
     </div>
   );
