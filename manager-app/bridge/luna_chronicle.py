@@ -117,6 +117,13 @@ def gather(conn, day: date) -> dict:
         "select title, time, space from events where date = %s and coalesce(active, true)",
         (ds,),
     ) or []
+    # Photos the staff captured that night — so she can write from what she saw,
+    # not only what she predicted (ties her photo stream into the chronicle).
+    ctx["photos"] = b._query(
+        conn,
+        "select mood, caption from luna_photos where business_day = %s order by created_at desc limit 6",
+        (ds,),
+    ) or []
     return ctx
 
 
@@ -203,6 +210,13 @@ def build_prompt(ctx: dict) -> str:
             lines.append(seg + ".")
     if ctx.get("special_title"):
         lines.append(f"- The special you dreamed up: '{ctx['special_title']}'.")
+    photos = ctx.get("photos") or []
+    if photos:
+        shots = []
+        for ph in photos[:6]:
+            mood, cap = (list(ph) + [None, None])[:2]
+            shots.append((f"[{mood}] " if mood else "") + (cap or "a photo"))
+        lines.append("- Photos the floor captured that night (you can finally see it): " + "; ".join(shots) + ".")
     if not parties and not ctx.get("events"):
         lines.append("- No private parties or calendar events that night.")
 
