@@ -1,48 +1,49 @@
 #!/usr/bin/env bash
-# Deploy Luna's Night Chronicle nightly job on PC1 (archlinux). Run ON pc1:
+# Deploy Luna's Night Chronicle nightly job on PC1. Run ON pc1 from the bridge dir:
 #   bash deploy-chronicle.sh
 #
-# It derives WorkingDirectory / EnvironmentFile / python from the EXISTING
-# luna-iggys-bridge service so the chronicle job always matches the bridge's
-# env + paths, installs luna_chronicle.py beside the bridge, and enables a
-# nightly systemd timer (03:30) that writes the prior night's entry.
-#
-# Safe: it never touches the running luna-iggys-bridge daemon — it adds its own
-# one-shot unit + timer. Rollback:  sudo systemctl disable --now luna-chronicle.timer
+# Mirrors the EXISTING luna-iggys-briefing unit (USER-level on PC1 — systemctl --user,
+# no sudo) so the chronicle job inherits the same env + paths. Installs the generator
+# beside the bridge, creates user-level units, and enables a nightly 03:30 timer.
+# Safe: it never touches the running luna-iggys-bridge daemon.
+# Rollback:  systemctl --user disable --now luna-chronicle.timer
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
-UNIT="$(systemctl cat luna-iggys-bridge 2>/dev/null || true)"
-WORKDIR="$(printf '%s\n' "$UNIT" | sed -n 's/^WorkingDirectory=//p' | head -1)"
-ENVFILE="$(printf '%s\n' "$UNIT" | sed -n 's/^EnvironmentFile=-\{0,1\}//p' | head -1)"
-PYBIN="$(printf '%s\n' "$UNIT" | sed -n 's#^ExecStart=\(/[^ ]*python[0-9.]*\).*#\1#p' | head -1)"
 
-: "${WORKDIR:=$HOME/iggys-bridge}"
-: "${ENVFILE:=$HOME/.local-agent/luna-iggys-bridge.env}"
-: "${PYBIN:=/usr/bin/python3}"
+# Use the existing briefing unit as the template (it knows the real env + paths).
+BREF=""
+for f in "$SRC_DIR/luna-iggys-briefing.service" "$HOME/.config/systemd/user/luna-iggys-briefing.service"; do
+  [ -f "$f" ] && BREF="$(cat "$f")" && break
+done
+[ -z "$BREF" ] && BREF="$(systemctl --user cat luna-iggys-briefing 2>/dev/null || true)"
 
-echo "Using: workdir=$WORKDIR  env=$ENVFILE  python=$PYBIN"
-[ -f "$ENVFILE" ] || { echo "!! env file not found: $ENVFILE (edit this script)"; exit 1; }
+ENVF="$(printf '%s\n' "$BREF" | sed -n 's/^EnvironmentFile=-\{0,1\}//p' | head -1)"
+WD="$(printf '%s\n' "$BREF" | sed -n 's/^WorkingDirectory=//p' | head -1)"
+PY="$(printf '%s\n' "$BREF" | sed -n 's#^ExecStart=\(/[^ ]*python[0-9.]*\).*#\1#p' | head -1)"
+: "${WD:=$SRC_DIR}"
+: "${PY:=/usr/bin/python3}"
+echo "env=${ENVF:-<none>}  workdir=$WD  python=$PY"
 
-install -m 0755 "$SRC_DIR/luna_chronicle.py" "$WORKDIR/luna_chronicle.py"
-echo "Installed luna_chronicle.py -> $WORKDIR"
+# Install the generator next to the bridge.
+cp "$SRC_DIR/luna_chronicle.py" "$WD/luna_chronicle.py"
+echo "Installed luna_chronicle.py -> $WD"
 
-sudo tee /etc/systemd/system/luna-chronicle.service >/dev/null <<EOF
+UDIR="$HOME/.config/systemd/user"
+mkdir -p "$UDIR"
+cat > "$UDIR/luna-chronicle.service" <<EOF
 [Unit]
 Description=Luna's Night Chronicle generator (one-shot) — writes the prior night's entry
-After=network-online.target
 
 [Service]
 Type=oneshot
-User=$(id -un)
-WorkingDirectory=$WORKDIR
-EnvironmentFile=$ENVFILE
-ExecStart=$PYBIN $WORKDIR/luna_chronicle.py
+WorkingDirectory=$WD
+${ENVF:+EnvironmentFile=$ENVF}
+ExecStart=$PY $WD/luna_chronicle.py
 EOF
-
-sudo tee /etc/systemd/system/luna-chronicle.timer >/dev/null <<EOF
+cat > "$UDIR/luna-chronicle.timer" <<'EOF'
 [Unit]
-Description=Run Luna's Night Chronicle nightly (writes the night that just ended)
+Description=Run Luna's Night Chronicle nightly (the night that just ended)
 
 [Timer]
 OnCalendar=*-*-* 03:30:00
@@ -52,11 +53,9 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now luna-chronicle.timer
+systemctl --user daemon-reload
+systemctl --user enable --now luna-chronicle.timer
+systemctl --user list-timers luna-chronicle.timer --no-pager || true
 echo
-echo "Enabled luna-chronicle.timer. Next runs:"
-systemctl list-timers luna-chronicle.timer --no-pager || true
-echo
-echo "Smoke test (no DB write):  $PYBIN $WORKDIR/luna_chronicle.py --dry \$(date -d yesterday +%F)"
-echo "Write a specific night:    $PYBIN $WORKDIR/luna_chronicle.py 2026-06-16"
+echo "Smoke test (dry, no DB write):"
+echo "  set -a; [ -n '${ENVF:-}' ] && . '${ENVF:-/dev/null}'; set +a; $PY $WD/luna_chronicle.py --dry \$(date -d yesterday +%F)"
