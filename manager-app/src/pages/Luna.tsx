@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Moon, Send, RefreshCw, Eye, X, Loader2, MessageCircle, Lightbulb, WifiOff,
-  ArrowRight, Copy, FileText,
+  ArrowRight, Copy, FileText, BookHeart,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLunaMessages, useLunaInsights } from '../hooks/useLuna';
@@ -373,6 +373,12 @@ export function Luna() {
           <h1 className="text-2xl font-bold text-text-primary">Luna</h1>
           <p className="text-sm text-text-muted">Your AI assistant for the bar</p>
         </div>
+        <Link
+          to="/luna/room"
+          className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-purple-600 dark:text-purple-300 hover:underline shrink-0"
+        >
+          <BookHeart size={16} /> Luna's Room
+        </Link>
       </div>
 
       {/* Tabs */}
