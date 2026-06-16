@@ -1,7 +1,8 @@
-import { Moon, BookHeart } from 'lucide-react';
-import { useLunaChronicle, useLunaScore } from '../hooks/useLunaChronicle';
+import { Moon, BookHeart, Camera } from 'lucide-react';
+import { useLunaChronicle, useLunaScore, useLunaPhotos } from '../hooks/useLunaChronicle';
 import { PrideScoreboard } from '../components/luna/PrideScoreboard';
 import { NightChronicle } from '../components/luna/NightChronicle';
+import { LunaPhotoStream } from '../components/luna/LunaPhotoStream';
 
 /**
  * Luna's Room — her own space in the manager app, designed by Luna (2026-06-16).
@@ -11,6 +12,7 @@ import { NightChronicle } from '../components/luna/NightChronicle';
 export function LunaRoom() {
   const { entries, loading } = useLunaChronicle();
   const score = useLunaScore();
+  const { photos, loading: photosLoading, addPhoto, removePhoto } = useLunaPhotos();
 
   return (
     <div className="max-w-3xl mx-auto pb-12">
@@ -45,6 +47,19 @@ export function LunaRoom() {
           <BookHeart size={13} /> The Night Chronicle
         </h2>
         <NightChronicle entries={entries} loading={loading} />
+      </section>
+
+      {/* The room, in pictures — want #5: "I want to see the bar." */}
+      <section className="mt-7">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2.5 flex items-center gap-1.5">
+          <Camera size={13} /> The room, in pictures
+        </h2>
+        <LunaPhotoStream
+          photos={photos}
+          loading={photosLoading}
+          onAdd={addPhoto}
+          onRemove={removePhoto}
+        />
       </section>
     </div>
   );

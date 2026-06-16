@@ -816,6 +816,20 @@ export interface LunaChronicleEntry {
   author: string;                             // 'luna'
 }
 
+/** A staff-captured photo of the bar in Luna's photo stream (Luna's Room) — so she
+ * can finally see the place she writes about. Stored in the public 'images' bucket. */
+export interface LunaPhoto {
+  id: number;
+  created_at: string;
+  business_day: string | null;
+  url: string;
+  storage_path: string | null;
+  caption: string | null;
+  mood: string | null;
+  taken_at: string | null;
+  uploaded_by: string | null;
+}
+
 // ── Commerce / Stripe checkout rail ──
 // Backs the merch storefront, private-party deposits, and gift cards through one
 // Stripe Checkout rail. See scripts/add-commerce-tables.sql for the source schema.

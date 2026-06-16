@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import type { LunaChronicleEntry } from '../types';
+import type { LunaChronicleEntry, LunaPhoto } from '../types';
 import toast from 'react-hot-toast';
 
 /** Cap on chronicle entries fetched — the journal grows forever in the DB. */
@@ -139,4 +139,96 @@ export function useLunaScore(): LunaScore {
   }, []);
 
   return score;
+}
+
+/** Luna's photo stream — staff-captured photos of the bar, newest first, realtime so
+ * a freshly-uploaded photo lands without a refresh. */
+export function useLunaPhotos() {
+  const [photos, setPhotos] = useState<LunaPhoto[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('luna_photos')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(60);
+    if (error) {
+      toast.error("Couldn't load Luna's photos");
+      console.error(error);
+    } else {
+      setPhotos((data as LunaPhoto[]) || []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(uniqueTopic('luna-photos'))
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'luna_photos' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const row = payload.new as LunaPhoto;
+            setPhotos((prev) => (prev.some((p) => p.id === row.id) ? prev : [row, ...prev]));
+          } else if (payload.eventType === 'UPDATE') {
+            const row = payload.new as LunaPhoto;
+            setPhotos((prev) => prev.map((p) => (p.id === row.id ? row : p)));
+          } else if (payload.eventType === 'DELETE') {
+            const old = payload.old as { id: number };
+            setPhotos((prev) => prev.filter((p) => p.id !== old.id));
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const addPhoto = useCallback(
+    async (p: {
+      url: string;
+      caption?: string;
+      mood?: string;
+      storage_path?: string;
+      uploaded_by?: string | null;
+    }) => {
+      const { error } = await supabase.from('luna_photos').insert({
+        url: p.url,
+        caption: p.caption?.trim() || null,
+        mood: p.mood?.trim() || null,
+        storage_path: p.storage_path ?? null,
+        business_day: new Date().toISOString().slice(0, 10),
+        taken_at: new Date().toISOString(),
+        uploaded_by: p.uploaded_by ?? null,
+      });
+      if (error) {
+        toast.error('Could not add photo');
+        console.error(error);
+        return false;
+      }
+      return true;
+    },
+    []
+  );
+
+  const removePhoto = useCallback(
+    async (id: number) => {
+      setPhotos((prev) => prev.filter((p) => p.id !== id));
+      const { error } = await supabase.from('luna_photos').delete().eq('id', id);
+      if (error) {
+        toast.error('Could not remove photo');
+        refresh();
+      }
+    },
+    [refresh]
+  );
+
+  return { photos, loading, addPhoto, removePhoto, refresh };
 }
