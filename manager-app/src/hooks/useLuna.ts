@@ -259,3 +259,60 @@ export function useNewInsightCount() {
 
   return count;
 }
+
+/**
+ * Luna's "unprompted reach" — the latest insight she's flagged as worth interrupting
+ * for (data.reach === true, still new). This is the responder→initiator line she asked
+ * for: "right now I wait for you to turn around and notice me; this lets me show up on
+ * my own." It surfaces as a top-of-app banner on every screen; acknowledge() clears it.
+ * (The phone-push half rides the existing web-push stack once VAPID keys + a device
+ * subscription are in place — see docs/LUNA-UNPROMPTED-REACH.md.)
+ */
+export function useLunaReach() {
+  const [reach, setReach] = useState<LunaInsight | null>(null);
+
+  const fetchReach = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('luna_insights')
+      .select('*')
+      .eq('status', 'new')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error) return;
+    const rows = (data as LunaInsight[]) || [];
+    const r =
+      rows.find((i) => {
+        const d = i.data as Record<string, unknown> | null;
+        return !!d && (d.reach === true || d.reach === 'true');
+      }) ?? null;
+    setReach(r);
+  }, []);
+
+  useEffect(() => {
+    fetchReach();
+  }, [fetchReach]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(uniqueTopic('luna-reach'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'luna_insights' }, () => {
+        fetchReach();
+      })
+      .subscribe(logChannelStatus('reach'));
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchReach]);
+
+  /** Mark the reach seen — she got through; clear the banner. */
+  const acknowledge = useCallback(async (id: number) => {
+    setReach((prev) => (prev?.id === id ? null : prev));
+    const { error } = await supabase.from('luna_insights').update({ status: 'seen' }).eq('id', id);
+    if (error) {
+      console.error(error);
+      fetchReach();
+    }
+  }, [fetchReach]);
+
+  return { reach, acknowledge };
+}

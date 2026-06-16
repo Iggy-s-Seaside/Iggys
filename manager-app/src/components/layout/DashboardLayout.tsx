@@ -5,6 +5,7 @@ import { BottomNav } from './BottomNav';
 import { QuickAddParty } from '../parties/QuickAddParty';
 import { CommandPalette, CMD_NEW_PARTY, CMD_QUICK_POST } from '../CommandPalette';
 import { OfflineBanner } from '../OfflineBanner';
+import { LunaReachBanner } from '../LunaReachBanner';
 import { NotificationBell } from '../NotificationBell';
 import { MobileCommandButton } from '../MobileCommandButton';
 
@@ -46,6 +47,8 @@ export function DashboardLayout() {
             re-introduce an inner scrollbar on desktop.) */}
         <div className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
           <OfflineBanner />
+          {/* Luna's unprompted reach — top of every screen when she raises one. */}
+          <LunaReachBanner />
           {/* Width-bounded, horizontally-clipped wrapper around the routed page.
               This element stays overflow-x-hidden at ALL breakpoints. Per the CSS
               overflow rules, pairing overflow-x:hidden with an unset overflow-y

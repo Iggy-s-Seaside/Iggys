@@ -770,6 +770,8 @@ export interface InsightData {
   deep_link?: string;
   sources?: string[];                // ["parties#12", "Tito's (inventory)"]
   action?: InsightAction;
+  reach?: boolean;                   // Luna raised this as worth interrupting for —
+                                     // her "unprompted reach" (surfaces as a top-of-app banner)
   [key: string]: unknown;
 }
 
