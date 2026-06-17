@@ -4,6 +4,24 @@ import sys
 import datetime
 
 sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else ".")
+
+# psycopg2 is a PC1-only dep; stub it so the (DB-free) scoring tests run anywhere.
+# No-op where psycopg2 is really installed (production / PC1).
+try:
+    import psycopg2  # noqa: F401
+except ModuleNotFoundError:
+    import types
+    _stub = types.ModuleType("psycopg2")
+
+    class _PgErr(Exception):
+        pass
+
+    _stub.OperationalError = _PgErr
+    _stub.InterfaceError = _PgErr
+    _stub.errors = types.SimpleNamespace(QueryCanceled=_PgErr)
+    _stub.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no db in test"))
+    sys.modules["psycopg2"] = _stub
+
 import luna_iggys_bridge as b  # noqa: E402
 
 FAILS = []
@@ -107,6 +125,58 @@ check("perfect hits -> bias 0", c3["bias"] == 0.0)
 
 empty = b.fetch_demand_calibration(_FakeConn([]))
 check("no rows -> n=0 / bias 0", empty["n"] == 0 and empty["bias"] == 0.0)
+
+# ── convention / tourism / mega-event signals ──
+def ev(title, desc="", ongoing=False):
+    return {"title": title, "desc": desc, "ongoing": ongoing}
+
+
+BASE0 = b.compute_pulse(W, [], WEEKDAY, None)["base_score"]  # weather-neutral baseline
+
+# COSA-style multi-day pro conference, already underway (the bug's real case)
+pc = b.compute_pulse(W, [ev("COSA Seaside Conference 2026", ongoing=True)], WEEKDAY, None)
+check("conference adds a 'convention' driver", any(n == "convention" for (n, s, d) in pc["drivers"]))
+check("unknown pro conference = +14 lift", pc["base_score"] == BASE0 + 14)
+check("ongoing conference labelled 'in town now'",
+      any(n == "convention" and "in town now" in d for (n, s, d) in pc["drivers"]))
+
+# no-host conference = GOLD (+20) — the inverted-weighting fix
+pnh = b.compute_pulse(W, [ev("Regional Summit", "Breaks only — dinner on your own")], WEEKDAY, None)
+check("no-host conference = +20 (gold)", pnh["base_score"] == BASE0 + 20)
+
+# fully-catered banquet = lighter walk-in (+7)
+pcat = b.compute_pulse(W, [ev("Awards Gala", "Plated dinner, all meals included")], WEEKDAY, None)
+check("catered banquet = +7", pcat["base_score"] == BASE0 + 7)
+
+# private wedding (not a conference) = low (+3), not the old 0
+pwed = b.compute_pulse(W, [ev("Private Wedding Reception", "by invitation")], WEEKDAY, None)
+check("private social event = +3", pwed["base_score"] == BASE0 + 3)
+
+# tourism: big festival = +12, recurring noise = 0
+pt = b.compute_pulse(W, [], WEEKDAY, None, tourism=[ev("Seaside Beach Volleyball Festival")])
+check("tourism big event = +12", pt["base_score"] == BASE0 + 12)
+check("tourism adds a 'tourism' driver", any(n == "tourism" for (n, s, d) in pt["drivers"]))
+pt0 = b.compute_pulse(W, [], WEEKDAY, None, tourism=[ev("Morning Birding Walk")])
+check("tourism noise (birding walk) scores 0", pt0["base_score"] == BASE0)
+
+# mega surge: a big conference + a big festival stacked
+pm = b.compute_pulse(W, [ev("National Conference")], WEEKDAY, None, tourism=[ev("Summer Music Festival")])
+check("mega surge driver when 2 big draws stack", any(n == "mega surge" for (n, s, d) in pm["drivers"]))
+check("mega surge total = +14 +12 +8", pm["base_score"] == BASE0 + 14 + 12 + 8)
+
+# date parsing for the overlap filter
+check("_tribe_date parses Tribe format", b._tribe_date("2026-06-15 00:00:00") == datetime.date(2026, 6, 15))
+check("_tribe_date handles junk", b._tribe_date("") is None)
+
+# reach decision: only a plannable surprise interrupts
+busy = {"band": "BUSY", "drivers": [("convention", "+", "COSA in town")]}
+check("reach fires for convention + BUSY", b._reach_decision(busy, [ev("COSA")], None) is not None)
+steady = {"band": "STEADY", "drivers": [("convention", "+", "COSA in town")]}
+check("no reach for convention + STEADY", b._reach_decision(steady, [ev("COSA")], None) is None)
+wx = {"band": "PACKED", "drivers": [("heat escape", "+", "hot inland")]}
+check("no reach for weather-only PACKED", b._reach_decision(wx, [], None) is None)
+mega = {"band": "BUSY", "drivers": [("mega surge", "+", "stacked")]}
+check("reach fires for mega surge", b._reach_decision(mega, [], None) is not None)
 
 print("\nRESULT:", "ALL GREEN" if not FAILS else f"{len(FAILS)} FAILED: {FAILS}")
 sys.exit(1 if FAILS else 0)

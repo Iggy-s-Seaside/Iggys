@@ -29,7 +29,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import psycopg2
 
@@ -50,6 +50,14 @@ SESSION_ID = "iggys-dashboard"
 # Luna's brain reasons before speaking: first visible token can take 15-60s.
 # Total SSE read deadline. NEVER set this shorter than 180s.
 LUNA_TOTAL_TIMEOUT = 180
+# The 7am briefing is a non-interactive background job (nobody's waiting on it),
+# and its prompt is large (knowledge pack + live context, ~4800 chars), so a
+# loaded brain can take several minutes. Give it a far longer budget than live
+# chat — otherwise a slow morning trips the 180s deadline and the unit fails.
+try:
+    BRIEFING_TIMEOUT = max(LUNA_TOTAL_TIMEOUT, int(os.environ.get("LUNA_BRIEFING_TIMEOUT", "600")))
+except ValueError:
+    BRIEFING_TIMEOUT = 600
 
 CONTEXT_DAYS = 14          # event lookahead window
 MAX_EVENT_LINES = 40
@@ -80,6 +88,10 @@ except ValueError:
 SEASIDE_LAT, SEASIDE_LON = 45.9929, -123.9229
 PORTLAND_LAT, PORTLAND_LON = 45.5152, -122.6784
 SEASIDE_CONVENTION_API = "https://seasideconvention.com/wp-json/tribe/events/v1/events"
+# Visit Seaside / Seaside Oregon tourism bureau — town-wide festivals, parades,
+# races, markets. Same WordPress "The Events Calendar" (Tribe) plugin as the
+# convention center, so the exact same fetch shape works against a second URL.
+VISIT_SEASIDE_API = "https://www.seasideor.com/wp-json/tribe/events/v1/events"
 
 # Creative "special of the day": Luna invents a fun NEW drink riffed on a
 # holiday / famous birthday / on-this-day fact (NOT a menu pick). Good use of
@@ -719,8 +731,7 @@ def _sse_events(resp, deadline: float):
     saw_field = False
     while True:
         if time.monotonic() > deadline:
-            raise TimeoutError(
-                f"Luna SSE stream exceeded {LUNA_TOTAL_TIMEOUT}s total deadline")
+            raise TimeoutError("Luna SSE stream exceeded its total deadline")
         raw = resp.readline()
         if not raw:  # EOF - dispatch whatever is pending, then stop
             if saw_field:
@@ -761,7 +772,7 @@ def _extract_content(data: str):
     return data
 
 
-def call_luna(message: str, session_id: str) -> str:
+def call_luna(message: str, session_id: str, total_timeout: int = None) -> str:
     """POST one message to Luna's chat API and return her full reply.
 
     Reply selection: the single 'event: text' frame carries the full reply;
@@ -778,13 +789,14 @@ def call_luna(message: str, session_id: str) -> str:
         },
         method="POST",
     )
-    deadline = time.monotonic() + LUNA_TOTAL_TIMEOUT
+    total_timeout = total_timeout or LUNA_TOTAL_TIMEOUT
+    deadline = time.monotonic() + total_timeout
     full_text = None
     sentences = []
 
     # The urlopen timeout bounds connect + each blocking read; the deadline
     # check in _sse_events bounds the whole stream.
-    with urllib.request.urlopen(req, timeout=LUNA_TOTAL_TIMEOUT) as resp:
+    with urllib.request.urlopen(req, timeout=total_timeout) as resp:
         for event_name, data in _sse_events(resp, deadline):
             if event_name == "text":
                 content = _extract_content(data)
@@ -828,7 +840,7 @@ def _is_unavailable(exc: BaseException) -> bool:
     return False
 
 
-def ask_luna(message: str, session_tag: str = "") -> str:
+def ask_luna(message: str, session_tag: str = "", total_timeout: int = None) -> str:
     """Call Luna on a per-question session (her runtime's rolling-session
     compaction garbles multi-turn reuse - verified live 2026-06-12; the
     bridge injects fresh dashboard context + recent history each time
@@ -838,14 +850,14 @@ def ask_luna(message: str, session_tag: str = "") -> str:
     pending (e.g. boot before Luna is up)."""
     session = f"{SESSION_ID}-{session_tag}" if session_tag else SESSION_ID
     try:
-        return call_luna(message, session)
+        return call_luna(message, session, total_timeout)
     except Exception as e:
         if _is_unavailable(e):
             raise LunaUnavailable(str(e)) from e
         if not _is_timeout(e):
             raise
         log(f"Luna timed out ({e}); retrying once on a fresh session")
-        return call_luna(message, f"{session}-retry")
+        return call_luna(message, f"{session}-retry", total_timeout)
 
 
 # --------------------------------------------------------------------------
@@ -1115,7 +1127,8 @@ def run_briefing() -> int:
         prompt = build_briefing_prompt(ctx)
         log(f"briefing: asking Luna ({len(prompt)} chars)")
         reply = plainify(
-            ask_luna(prompt, session_tag=f"briefing-{date.today().isoformat()}"))
+            ask_luna(prompt, session_tag=f"briefing-{date.today().isoformat()}",
+                     total_timeout=BRIEFING_TIMEOUT))
         body, data = extract_action(reply)
         title = f"Morning briefing - {date.today().strftime('%b %d')}"
         with conn.cursor() as cur:
@@ -1807,30 +1820,67 @@ def fetch_pulse_weather() -> dict:
     return w
 
 
-def fetch_conventions() -> list:
-    """Seaside Civic & Convention Center events in the next ~2 days (public Tribe
-    JSON API, no auth). The #1 off-season demand lever for Iggy's."""
+def _tribe_date(s):
+    """Parse a Tribe event date ('2026-06-15 00:00:00' or ISO) down to a date."""
+    if not s:
+        return None
     try:
-        start = date.today().isoformat()
-        end = (date.today() + timedelta(days=2)).isoformat()
-        data = http_get_json(f"{SEASIDE_CONVENTION_API}?start_date={start}&end_date={end}&per_page=50")
+        return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _fetch_tribe_events(api_url, label, back_days=10, ahead_days=2) -> list:
+    """Fetch events from a WordPress 'The Events Calendar' (Tribe) JSON API and
+    keep the ones that OVERLAP tonight..+ahead_days.
+
+    Why the back-dated window (the bug this fixes): Tribe's start_date filter
+    returns only events whose START falls in-window, so a multi-day event already
+    underway — day 2, 3, 4 of a conference — is invisible to a start_date=today
+    query. That is exactly how a 4-day convention's biggest spillover nights got
+    missed. We query from back_days ago and overlap-filter on the client using
+    each event's own [start, end], so an in-progress conference still counts."""
+    today = date.today()
+    horizon = today + timedelta(days=ahead_days)
+    try:
+        start = (today - timedelta(days=back_days)).isoformat()
+        data = http_get_json(
+            f"{api_url}?start_date={start}&end_date={horizon.isoformat()}&per_page=50")
         out = []
         for e in (data.get("events") or []):
+            sd = _tribe_date(e.get("start_date"))
+            if sd is None:
+                continue
+            ed = _tribe_date(e.get("end_date")) or sd
+            # Overlaps [today, horizon]? (still running tonight, or starts soon)
+            if ed < today or sd > horizon:
+                continue
             out.append({
                 "title": (e.get("title") or "").strip(),
                 "start": e.get("start_date") or "",
+                "end": e.get("end_date") or "",
+                "ongoing": sd < today <= ed,   # started earlier, still running
                 "desc": re.sub(r"<[^>]+>", " ", e.get("description") or "")[:280].strip(),
                 "url": e.get("url") or "",
             })
         return out
     except Exception as e:
-        log(f"pulse: convention fetch failed: {e}")
+        log(f"pulse: {label} fetch failed: {e}")
         return []
 
 
-def _looks_private(c) -> bool:
-    t = (c.get("title", "") + " " + c.get("desc", "")).lower()
-    return any(k in t for k in ("private", "closed to the public", "members only", "by invitation"))
+def fetch_conventions() -> list:
+    """Seaside Civic & Convention Center events overlapping the next ~2 nights,
+    INCLUDING multi-day conferences already underway (public Tribe JSON API, no
+    auth). The #1 off-season demand lever for Iggy's."""
+    return _fetch_tribe_events(SEASIDE_CONVENTION_API, "convention")
+
+
+def fetch_tourism() -> list:
+    """Visit Seaside / Seaside Oregon town-wide events (seasideor.com, same Tribe
+    plugin) — festivals, parades, races, markets that draw visitors and fill the
+    bars beyond the convention center."""
+    return _fetch_tribe_events(VISIT_SEASIDE_API, "tourism")
 
 
 def _major_holiday(d):
@@ -1930,11 +1980,66 @@ def fetch_demand_calibration(conn) -> dict:
     }
 
 
-def compute_pulse(w, conventions, d, calib=None) -> dict:
+# What actually fills Iggy's from a conference isn't "public vs private" — it's
+# whether the attendees are FED ON-SITE. A conference that leaves people to find
+# their own dinner floods the bars (the off-season's gold); a catered banquet
+# keeps them in the hall. The Tribe feed exposes no catering/attendance field, so
+# we infer from the title/description and DEFAULT an unknown professional
+# conference to a real walk-in lift (most leave dinner to the attendees).
+_NO_HOST = ("no-host", "no host", "on your own", "on-your-own", "dinner on your own",
+            "lunch on your own", "breaks only", "off-site dinner", "dine-around", "dine around")
+_CATERED = ("banquet", "catered", "plated dinner", "gala dinner", "awards dinner",
+            "all meals", "meals included", "luncheon", "hosted dinner")
+_SOCIAL_PRIVATE = ("wedding", "reception", "memorial", "celebration of life",
+                   "private party", "members only", "by invitation", "closed to the public")
+_CONF_WORDS = ("conference", "convention", "summit", "symposium", "expo", "exposition",
+               "trade show", "tradeshow", "meeting", "training", "seminar", "forum",
+               "championship", "tournament", "rally", "retreat", "conv ")
+
+
+def _conv_points(c) -> tuple:
+    """(points, kind) for one convention-center event — higher = more walk-in lift.
+    kind drives the human-readable driver label."""
+    t = (c.get("title", "") + " " + c.get("desc", "")).lower()
+    if any(k in t for k in _NO_HOST):
+        return 20, "no-host"          # GOLD: attendees explicitly dine out
+    if any(k in t for k in _SOCIAL_PRIVATE) and not any(k in t for k in _CONF_WORDS):
+        return 3, "private"           # a wedding/closed social — guests are AT it
+    if any(k in t for k in _CATERED):
+        return 7, "catered"           # fed on-site — pre/post-dinner walk-in only
+    if any(k in t for k in _CONF_WORDS):
+        return 14, "conference"       # pro conference, dinner-on-own assumed
+    return 10, "event"                # something at the center — modest default
+
+
+# Town-wide tourism events, tiered by how much they actually move bar demand.
+# Recurring small stuff (towel tuesdays, birding walks) is noise — scored 0.
+_TOUR_BIG = ("festival", "parade", "fireworks", "marathon", "jubilee", "miss oregon",
+             "hood to coast", "volleyball", "car show", "rod run", "regatta", "brewfest",
+             "wine walk", "4th of july", "fourth of july", "new year", "fair ")
+_TOUR_MED = ("market", "art walk", "live music", "concert", "tournament", "race",
+             "5k", "10k", "craft", "tasting", "show")
+_TOUR_SKIP = ("towel tuesday", "birding", "walking tour", "history walk", "story time",
+              "storytime", "yoga", "lecture", "book club")
+
+
+def _tour_points(c) -> int:
+    """Demand points for one town-wide tourism event (0 = too small to move the band)."""
+    t = (c.get("title", "") + " " + c.get("desc", "")).lower()
+    if any(k in t for k in _TOUR_SKIP):
+        return 0
+    if any(k in t for k in _TOUR_BIG):
+        return 12
+    if any(k in t for k in _TOUR_MED):
+        return 6
+    return 0
+
+
+def compute_pulse(w, conventions, d, calib=None, tourism=None) -> dict:
     """Deterministic, transparent band: a weekday/season baseline modulated by
-    weather, conventions, the Portland heat-escape spread, and holidays, then a
-    learned correction from past close-outs (calib). Luna never does this math;
-    she only phrases the result."""
+    weather, conventions, town-wide tourism events, the Portland heat-escape
+    spread, and holidays, then a learned correction from past close-outs (calib).
+    Luna never does this math; she only phrases the result."""
     drivers = []
     score = 40.0
     wd, month = d.weekday(), d.month  # wd: 0=Mon .. 6=Sun
@@ -1971,12 +2076,35 @@ def compute_pulse(w, conventions, d, calib=None) -> dict:
             score += 12
             drivers.append(("heat escape", "+", f"Portland {round(pdx)}F vs coast {round(high)}F — inland bakes, coast fills"))
 
-    public_conv = [c for c in conventions if not _looks_private(c)]
-    if public_conv:
-        score += 14
-        drivers.append(("convention", "+", "in town: " + ", ".join(c["title"] for c in public_conv[:2])))
-    elif conventions:
-        drivers.append(("convention (private)", "0", "in town but private/closed — little walk-in lift"))
+    # ── Conventions at the Civic & Convention Center (catering-aware) ──
+    if conventions:
+        scored = sorted(((_conv_points(c), c) for c in conventions),
+                        key=lambda x: x[0][0], reverse=True)
+        (cpts, ckind), top = scored[0]
+        if cpts > 0:
+            score += cpts
+            more = f" +{len(conventions) - 1} more" if len(conventions) > 1 else ""
+            when = "in town now" if top.get("ongoing") else "in town"
+            tail = {
+                "no-host": " (no on-site dinner — they'll eat out)",
+                "catered": " (catered — lighter walk-in)",
+                "private": " (private event)",
+            }.get(ckind, "")
+            drivers.append(("convention", "+", f"{top['title']}{more} {when}{tail}"))
+
+    # ── Town-wide tourism (Visit Seaside) ──
+    if tourism:
+        tpts, ttop = max(((_tour_points(c), c) for c in tourism), key=lambda x: x[0])
+        if tpts > 0:
+            score += tpts
+            drivers.append(("tourism", "+", f"{ttop['title']} — visitors in town"))
+
+    # ── Mega-event surge: multiple big draws stacked at once ──
+    big = ([c for c in conventions if _conv_points(c)[0] >= 14]
+           + [c for c in (tourism or []) if _tour_points(c) >= 12])
+    if len(big) >= 2:
+        score += 8
+        drivers.append(("mega surge", "+", "multiple big draws in town — plan for a flood"))
 
     hol = _major_holiday(d)
     if hol:
@@ -2058,19 +2186,76 @@ def _pulse_fallback(p) -> str:
     return f"{line} — {top}." if top else f"{line}."
 
 
-def build_pulse_user(p, w, conventions) -> str:
+def build_pulse_user(p, w, conventions, tourism=None) -> str:
     drivers = "; ".join(f"{name} ({sign}{detail})" for (name, sign, detail) in p["drivers"]) or "nothing unusual"
-    conv = "; ".join(c["title"] for c in conventions[:3]) or "none listed"
+    conv = "; ".join(c["title"] + (" (in progress)" if c.get("ongoing") else "") for c in conventions[:3]) or "none listed"
+    tour = "; ".join(c["title"] for c in (tourism or [])[:3]) or "none listed"
     specials = " OR ".join(_candidate_specials(p["band"], w))
     return "\n".join([
         f"Computed band: {p['band']} (confidence: {p['confidence']}). Lean on the drivers below, not a precise number.",
         f"Model drivers: {drivers}.",
         f"Weather: high {w.get('high')}F, low {w.get('low')}F, {w.get('precip')}% rain, max gust {w.get('gust')} mph; "
         f"sunset {w.get('sunset') or 'n/a'}; Portland high {w.get('pdx_high')}F.",
-        f"Conventions in town (next 2 days): {conv}.",
+        f"Conventions at the convention center (overlapping tonight): {conv}.",
+        f"Town events (Visit Seaside, overlapping tonight): {tour}.",
         f"Candidate specials to pick from: {specials}.",
         "Write the read now — 2 lines + the ACTION line.",
     ])
+
+
+def _reach_decision(p, conventions, tourism):
+    """Return (title, body, reach_kind) when tonight's signal is worth an
+    UNPROMPTED interruption, else None. We reach for a genuine, plannable demand
+    surprise — a conference in town or a marquee event pushing the night busy —
+    NOT for ordinary weather/season swings (those are just the daily pulse card)."""
+    names = {n for (n, _s, _d) in p["drivers"]}
+    band = p["band"]
+    if "mega surge" in names:
+        return (f"Big day shaping up — tonight reads {band}",
+                "Multiple major draws are in town at once. Plan for a flood — staff up, "
+                "prep ahead, and don't get caught short.", "mega")
+    if "convention" in names and band in ("BUSY", "PACKED"):
+        conv = ", ".join(c["title"] for c in conventions[:2]) or "A convention"
+        nohost = any(_conv_points(c)[1] == "no-host" for c in conventions)
+        spill = ("Their schedule has no host dinner, so expect a real dinner-hour spillover. "
+                 if nohost else "Conference crowds usually head out for dinner. ")
+        return (f"{conv} in town — tonight reads {band}",
+                f"{spill}Worth a staffing look and a fast-to-fire feature before the rush.",
+                "convention")
+    if "tourism" in names and band == "PACKED":
+        tour = next((dd for (n, _s, dd) in p["drivers"] if n == "tourism"), "A town event")
+        return (f"{tour.split(' — ')[0]} — tonight reads PACKED",
+                "A marquee town event plus the night's read says packed. Get ahead of it.",
+                "tourism")
+    return None
+
+
+def maybe_reach(cur, p, conventions, tourism) -> None:
+    """Fire Luna's unprompted reach (data.reach=true → top-of-app banner) for a
+    plannable demand surprise. At most once per reach_kind in a trailing 18h
+    window, so the 4-hourly pulse doesn't re-banner the same conference all night."""
+    decision = _reach_decision(p, conventions, tourism)
+    if not decision:
+        return
+    title, body, reach_kind = decision
+    cur.execute(
+        "SELECT 1 FROM luna_insights "
+        "WHERE created_at > now() - interval '18 hours' "
+        "AND data->>'reach' = 'true' AND data->>'reach_kind' = %s LIMIT 1",
+        (reach_kind,),
+    )
+    if cur.fetchone():
+        return
+    data = {
+        "reach": True, "reach_kind": reach_kind, "band": p["band"], "deep_link": "/luna",
+        "action": {"type": "navigate", "label": "See tonight's read", "deep_link": "/luna"},
+    }
+    cur.execute(
+        "INSERT INTO luna_insights (kind, title, body, status, data) "
+        "VALUES ('alert', %s, %s, 'new', %s::jsonb)",
+        (title, body, json.dumps(data)),
+    )
+    log(f"pulse: reached out ({reach_kind}) — {title!r}")
 
 
 def run_pulse(conn) -> None:
@@ -2079,9 +2264,10 @@ def run_pulse(conn) -> None:
     try:
         w = fetch_pulse_weather()
         conventions = fetch_conventions()
+        tourism = fetch_tourism()
         calib = fetch_demand_calibration(conn)
-        p = compute_pulse(w, conventions, date.today(), calib)
-        user = build_pulse_user(p, w, conventions)
+        p = compute_pulse(w, conventions, date.today(), calib, tourism=tourism)
+        user = build_pulse_user(p, w, conventions, tourism)
         log(f"pulse: band={p['band']} score={p['score']} drivers={len(p['drivers'])}; phrasing via operator")
         # Clean direct call (NOT ask_luna/api/chat) — her persona made the read a
         # standby-ack ("Context loaded... Ready for whatever's next.") on 6/15.
@@ -2116,6 +2302,9 @@ def run_pulse(conn) -> None:
                 "base_score = EXCLUDED.base_score, drivers = EXCLUDED.drivers, updated_at = now()",
                 (date.today(), p["band"], p["score"], p["base_score"], json.dumps(data["drivers"])),
             )
+            # If tonight is a plannable surprise (a conference in town, a mega
+            # day), reach out — once per kind per evening, not every 4h tick.
+            maybe_reach(cur, p, conventions, tourism)
         conn.commit()
         log(f"pulse: wrote '{title}' ({len(body)} chars)")
     except DB_ERRORS:
