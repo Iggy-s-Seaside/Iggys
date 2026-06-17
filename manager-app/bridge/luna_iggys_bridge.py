@@ -568,6 +568,13 @@ KNOWLEDGE_PACK = (
     "GUARDRAILS: plain text only. Never invent facts/prices/comps. Honor marketing_opt_in "
     "before outreach. Escalate legal/health/dram-shop to human-only. Never gate reviews by "
     "sentiment. End a data-grounded answer with a short 'Sources:' line naming the rows used.\n"
+    "NO TOOLS / NO SHELL: everything you need is already in THIS prompt - the knowledge pack, "
+    "the live menu, and the CONTEXT/data below - plus your own memory. Answer ONLY from what is "
+    "provided here. Do NOT run shell commands, curl, open files, fetch URLs, search the web, or "
+    "query a database: there is NO local Iggy's database to open (the bar's data lives in the app "
+    "and is already injected below). Reaching for a command cannot help - it only stalls you "
+    "behind an approval gate the night staff can't answer. Just answer from the context and your "
+    "memory.\n"
     "GLOSSARY: 'the back room'/'upstairs' -> space='upstairs'; 'the DJ night' -> "
     "events.category='DJ Night'; 'the 40-top' -> a party with guest_count about 40."
 )
