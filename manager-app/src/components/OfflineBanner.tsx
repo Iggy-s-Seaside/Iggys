@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { WifiOff, X } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useOutboxPending } from '../hooks/useOutboxPending';
 
 /**
  * Slim, on-brand awareness banner shown while the browser reports it is
@@ -13,6 +14,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
  */
 export function OfflineBanner() {
   const online = useOnlineStatus();
+  const pending = useOutboxPending();
   const [dismissed, setDismissed] = useState(false);
 
   // Clear the dismissal once we're back online, so a fresh drop shows it again.
@@ -30,7 +32,10 @@ export function OfflineBanner() {
     >
       <WifiOff size={16} className="shrink-0 text-accent" aria-hidden="true" />
       <span className="flex-1 min-w-0">
-        You&rsquo;re offline &mdash; changes may not save.
+        You&rsquo;re offline &mdash; changes are saved on this device.
+        {pending > 0 && (
+          <> &middot; <strong className="font-semibold">{pending}</strong> queued to sync</>
+        )}
       </span>
       <button
         type="button"
