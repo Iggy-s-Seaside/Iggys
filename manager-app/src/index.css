@@ -234,6 +234,53 @@ button, a, label, [role="button"] {
   overscroll-behavior: none;
 }
 
+/* ── Notch flourish: a seaside "tide" in the top safe-area band ───────────────
+   Fills the strip behind the iPhone status bar / around the notch with a subtle
+   branded teal tide: a gentle idle drift, a launch "tide-in" sweep, and a glowing
+   waterline. pointer-events:none so it never intercepts taps; the host element's
+   height is driven by env(safe-area-inset-top), so it's simply absent on devices
+   without a notch (NotchBar returns null when the inset is 0). The reduced-motion
+   rule below collapses all of this to a static dark band + faint waterline. */
+.notch-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+  background: #0a0f0f;
+}
+.notch-bar > div { position: absolute; }
+.notch-tide {
+  inset: -50% -20% auto -20%;
+  height: 200%;
+  opacity: 0.7;
+  background:
+    radial-gradient(120px 60px at 22% 120%, rgba(45, 212, 191, 0.45), transparent 70%),
+    radial-gradient(160px 70px at 78% 130%, rgba(13, 148, 136, 0.4), transparent 70%);
+  animation: notch-tide 9s ease-in-out infinite alternate;
+}
+.notch-sweep {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.55), transparent);
+  animation: notch-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) 0.15s 1 both;
+}
+.notch-line {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.9) 30%, rgba(45, 212, 191, 0.9) 70%, transparent);
+  animation: notch-glow 4s ease-in-out infinite;
+}
+@keyframes notch-tide { 0% { transform: translateX(-8%); } 100% { transform: translateX(8%); } }
+@keyframes notch-sweep { 0% { transform: translateX(-120%); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateX(230%); opacity: 0; } }
+@keyframes notch-glow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.8; } }
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

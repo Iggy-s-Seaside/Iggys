@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ConfirmProvider } from './hooks/useConfirm';
 import App from './App';
 import { registerSW } from './pwa/registerSW';
+import { NotchBar } from './components/NotchBar';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -32,6 +33,7 @@ createRoot(document.getElementById('root')!).render(
                             },
                         }}
                     />
+                    <NotchBar />
                 </AuthProvider>
             </ThemeProvider>
         </BrowserRouter>
