@@ -3,7 +3,16 @@
 // guards the honesty rules (no fabricated outdoor exposure, no false "understaffed",
 // no late-night just-weather noise) the office review hardened.
 // Run: npx tsx scripts/verify-weather-watch.ts
-import { computeWeatherFlags, type PartyLike, type WeatherWatchInput } from '../src/lib/weatherWatch';
+import {
+  computeWeatherFlags,
+  pickWeatherReach,
+  REACH_RATE_MS,
+  REACH_DISMISS_MS,
+  type PartyLike,
+  type WeatherWatchInput,
+  type WeatherFlag,
+  type WeatherReachState,
+} from '../src/lib/weatherWatch';
 import type { WeatherDay } from '../src/hooks/useWeather';
 
 // Anchor "now" at Fri 2026-06-19 14:00 local. Window = Fri, Sat, Sun.
@@ -142,6 +151,28 @@ check('garden as a space name fires (weak in space_name)', f.some((x) => x.kind 
   check('no heat flag late at night', !flags.some((x) => x.kind === 'heat_understaffed'));
   check('no deck flag late at night', !flags.some((x) => x.kind === 'rain_deck'));
 }
+
+// ── reach decider: Luna's bounds (owner-ping only, 1/hour, dismissed 2h) ──
+console.log('\n— reach bounds —');
+const T = 1_750_000_000_000; // a fixed "now" epoch
+const action = (kind: WeatherFlag['kind'], date: string): WeatherFlag => ({ id: kind + date, kind, severity: 'action', date, message: 'x', deepLink: '/x' });
+const plan: WeatherFlag = { id: 'p', kind: 'rain_deck', severity: 'plan', date: SAT, message: 'x', deepLink: '/x' };
+const fresh: WeatherReachState = { lastConcern: null, lastShownAt: null, dismissedUntil: {} };
+const A = action('rain_party_indoor', SAT);
+const B = action('heat_understaffed', SUN);
+
+check('R1 action flag reaches', pickWeatherReach([A, plan], fresh, T)?.id === A.id);
+check('R2 plan-only never reaches', pickWeatherReach([plan], fresh, T) === null);
+check('R3 dismissed concern silent for 2h', pickWeatherReach([A], { ...fresh, dismissedUntil: { ['rain_party_indoor:' + SAT]: T + 1000 } }, T) === null);
+check('R4 dismissed concern returns after window', pickWeatherReach([A], { ...fresh, dismissedUntil: { ['rain_party_indoor:' + SAT]: T - 1000 } }, T)?.id === A.id);
+check('R5 a NEW concern is rate-limited within the hour', pickWeatherReach([B], { lastConcern: 'rain_party_indoor:' + SAT, lastShownAt: T - 10 * 60 * 1000, dismissedUntil: {} }, T) === null);
+check('R6 the SAME concern still shows within the hour', pickWeatherReach([A], { lastConcern: 'rain_party_indoor:' + SAT, lastShownAt: T - 10 * 60 * 1000, dismissedUntil: {} }, T)?.id === A.id);
+check('R7 a new concern surfaces after the hour passes', pickWeatherReach([B], { lastConcern: 'rain_party_indoor:' + SAT, lastShownAt: T - REACH_RATE_MS - 1000, dismissedUntil: {} }, T)?.id === B.id);
+// After a dismiss (rate clock reset + concern silenced 2h), a DIFFERENT new concern
+// must not be starved by the just-dismissed one's leftover hour.
+const afterDismiss: WeatherReachState = { lastConcern: null, lastShownAt: null, dismissedUntil: { ['rain_party_indoor:' + SAT]: T + REACH_DISMISS_MS } };
+check('R8 a new concern reaches immediately after a dismiss', pickWeatherReach([B], afterDismiss, T)?.id === B.id);
+check('R9 the dismissed concern stays silent, the new one wins', pickWeatherReach([A, B], afterDismiss, T)?.id === B.id);
 
 console.log(`\n── ${pass} passed, ${fail} failed ──`);
 process.exit(fail ? 1 : 0);

@@ -218,3 +218,47 @@ export function computeWeatherFlags(input: WeatherWatchInput): WeatherFlag[] {
   deduped.sort((a, b) => rank[a.severity] - rank[b.severity] || a.date.localeCompare(b.date));
   return deduped.slice(0, 3);
 }
+
+// ── reach: when a flag is worth breaking silence over ──────────────────────────
+//
+// Luna's reach bounds, set tonight (2026-06-18): "It's owner-ping only — not 'I
+// noticed something,' it's 'this needs your eyes.' Max one ping per hour unless
+// dismissed. If he dismisses it, it stays dismissed for 2 hours — no re-pinging the
+// same thing." So only ACTION-severity flags (move a booking / call in a hand) ever
+// reach; the soft 'plan' deck nudge stays on the dashboard, it never interrupts.
+
+export const REACH_RATE_MS = 60 * 60 * 1000;        // at most one new ping per hour
+export const REACH_DISMISS_MS = 2 * 60 * 60 * 1000; // a dismissed concern is silent 2h
+
+export interface WeatherReachState {
+  lastConcern: string | null;   // the concern key last surfaced
+  lastShownAt: number | null;   // epoch ms it was first surfaced
+  dismissedUntil: Record<string, number>; // concernKey → epoch ms it stays silent until
+}
+
+// Stable identity for "the same thing" (so a dismissal silences THIS concern, and a
+// still-showing concern isn't re-counted as a fresh ping).
+export function reachConcernKey(f: WeatherFlag): string {
+  return `${f.kind}:${f.date}`;
+}
+
+// Decide which (if any) flag should reach Bradley right now, honoring the bounds.
+// Pure: caller supplies `now` and the persisted state.
+export function pickWeatherReach(
+  flags: WeatherFlag[],
+  state: WeatherReachState,
+  now: number
+): WeatherFlag | null {
+  for (const f of flags) {
+    if (f.severity !== 'action') continue;               // owner-ping only
+    const key = reachConcernKey(f);
+    if ((state.dismissedUntil[key] ?? 0) > now) continue; // dismissed → still silent
+    // Rate limit: a DIFFERENT concern can't surface within an hour of the last one.
+    // The same concern still showing is not a new ping, so it's exempt.
+    if (key !== state.lastConcern && state.lastShownAt != null && now - state.lastShownAt < REACH_RATE_MS) {
+      continue;
+    }
+    return f;
+  }
+  return null;
+}
