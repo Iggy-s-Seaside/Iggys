@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   Ban,
   AlertTriangle,
@@ -478,14 +479,18 @@ function EightySixSheet({
       .slice(0, 50);
   }, [menuItems, query]);
 
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-t-2xl sm:rounded-xl shadow-lg w-full sm:max-w-md max-h-[85dvh] flex flex-col pb-[max(0px,env(safe-area-inset-bottom,0px))]">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-t-2xl sm:rounded-xl shadow-lg w-full sm:max-w-md max-h-[85dvh] flex flex-col pb-[max(0px,env(safe-area-inset-bottom,0px))] focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <h2 id={titleId} className="font-semibold text-text-primary flex items-center gap-2">
             <Ban size={18} className="text-danger" /> 86 an item
           </h2>
           <button
