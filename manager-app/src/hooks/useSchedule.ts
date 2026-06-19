@@ -39,7 +39,9 @@ export function timeInputToMin(value: string): number {
 
 /** Shift length in hours (handles past-midnight end_min < start_min). */
 export function shiftHours(startMin: number, endMin: number): number {
-  const span = endMin > startMin ? endMin - startMin : endMin + 1440 - startMin;
+  // >= so a zero-length shift (start == end) is 0h, not a full 24h day. Only a
+  // genuine past-midnight end (endMin < startMin) wraps by +1440.
+  const span = endMin >= startMin ? endMin - startMin : endMin + 1440 - startMin;
   return span / 60;
 }
 
