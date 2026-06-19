@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useId, useRef } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   Megaphone, Users, Search, Mail, MessageSquare, Send, Loader2, ShieldCheck,
   ShieldAlert, Cake, UserMinus, CheckCircle2, Phone, X, Sparkles, Inbox,
@@ -408,6 +409,9 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
   const [body, setBody] = useState('');
   const [segmentId, setSegmentId] = useState('all');
   const [sending, setSending] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onClose });
 
   const activeSegment = SEGMENTS.find((s) => s.id === segmentId) ?? SEGMENTS[0];
 
@@ -532,12 +536,12 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[92dvh] overflow-y-auto mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[92dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface z-10">
-          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <h2 id={titleId} className="font-semibold text-text-primary flex items-center gap-2">
             <Sparkles size={16} className="text-primary" /> New Campaign
           </h2>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
             <X size={18} />
           </button>
         </div>

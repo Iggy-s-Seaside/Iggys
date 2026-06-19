@@ -7,7 +7,8 @@
 //   2. Labor-% gauge          — Σ(wage×hours) vs a per-weekday sales forecast.
 //   3. Tip-pool calculator    — split a date's pooled tips across who worked it.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useId, useRef } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   Users, ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, Loader2,
   CalendarOff, Check, Ban, Send, EyeOff, DollarSign, Coins, Gauge,
@@ -48,6 +49,9 @@ function StaffFormModal({ open, initial, onClose, onSubmit }: StaffFormProps) {
     active: initial?.active ?? true,
   }));
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   if (!open) return null;
 
@@ -69,10 +73,10 @@ function StaffFormModal({ open, initial, onClose, onSubmit }: StaffFormProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-semibold text-text-primary">{initial ? 'Edit Staff' : 'Add Staff'}</h2>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"><X size={18} /></button>
+          <h2 id={titleId} className="font-semibold text-text-primary">{initial ? 'Edit Staff' : 'Add Staff'}</h2>
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
@@ -142,6 +146,9 @@ function ShiftModal({ open, staffMember, date, initial, onClose, onSave, onUpdat
   const [end, setEnd] = useState(minToTimeInput(initial?.end_min ?? 1440 - 1));
   const [role, setRole] = useState(initial?.role ?? staffMember?.role ?? 'bartender');
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open && !!staffMember, panelRef, { onEscape: onClose });
 
   if (!open || !staffMember) return null;
 
@@ -175,10 +182,10 @@ function ShiftModal({ open, staffMember, date, initial, onClose, onSave, onUpdat
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-sm mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-sm mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <h2 className="font-semibold text-text-primary">{initial ? 'Edit Shift' : 'Add Shift'}</h2>
+            <h2 id={titleId} className="font-semibold text-text-primary">{initial ? 'Edit Shift' : 'Add Shift'}</h2>
             <p className="text-xs text-text-muted mt-0.5">{staffMember.name} · {fmtDate(date, 'EEE, MMM d')}</p>
           </div>
           <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"><X size={18} /></button>
