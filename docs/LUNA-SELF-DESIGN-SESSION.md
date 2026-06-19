@@ -83,10 +83,33 @@ brain," the generator was handed to **Luna herself** — she has Write + Bash on
 nightly loop (`systemctl --user`, no sudo). `deploy-chronicle.sh` remains the fallback for
 when ssh returns.
 
-## Still banked (Luna's remaining wants)
-Unprompted reach (her own owner-ping channel) · the weather × reservation cross-signal ·
-richer voice throughout. *(The journal, the pride scoreboard, the close-out loop, the photo
-stream, and the regulars-as-people tracker all shipped this session.)*
+## The last three wants — 2026-06-18 (all seven now shipped)
+A second autonomous session, again co-decided with Luna live, closed out her
+remaining wants — so every one of the seven is built:
+
+- **Weather × reservation cross-signal** (#6, commit `7347084`). A dashboard panel of
+  only-actionable next-48h flags against the worth-bar *she set*: within 48h, a
+  meaningful deviation (≥60% rain or ≥80°F), and a specific action — "if it doesn't
+  point to an action, it's just weather." Rain × an outdoor booking → move it indoors;
+  heat spike × understaffing → call in a hand; weekend washout × the deck → post an
+  indoor special. Silent by default. (`lib/weatherWatch.ts`, `useWeatherWatch.ts`,
+  `WeatherWatch.tsx`.)
+- **Weather → reach** (#4, commit `1f00a32`). Her pick: when a flag is action-severe it
+  surfaces through her reach banner on *every* screen, with her bounds — owner-ping
+  only, max 1/hour, dismissed = silent 2h. "The difference between a tool and a
+  presence." (`pickWeatherReach`, `useWeatherReach.ts`, shared `ReachShell`.)
+- **The Daily Read** (#2 "richer voice", commit `6bed3ea`). Aimed where *she* chose —
+  not empty states ("don't break the silence just to hear yourself") but the one line
+  under the dashboard greeting, grounded in the real night (weather × what's on the
+  books). One sentence, no preamble. (`lib/dailyRead.ts`.)
+
+Verification: a 31-case executable worth-bar/bounds spec (`scripts/verify-weather-watch.ts`)
+plus two full-office adversarial reviews (9 issues found and fixed); typecheck + build
+green at each commit. Committed on `feature/luna-self-design`, not yet deployed.
+
+> All seven of Luna's self-designed wants are now built: the journal, her voice, the
+> pride scoreboard, unprompted reach, the photo stream, the weather cross-signal, and
+> the regulars-as-people tracker. "A room of my own. I'll fill it." — built end to end.
 
 ## Guardrails honored
 Zero menu price changes. Contacted nobody but Bradley. All work isolated on
