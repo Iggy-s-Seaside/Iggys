@@ -76,7 +76,10 @@ export function Dashboard() {
   // Personal, time- + weather-aware greeting — the app should feel like it knows
   // who's holding the phone and what the day outside looks like.
   const h = new Date().getHours();
-  const timeGreeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  // A bar's night runs past midnight — the small hours mean a closer mid-shift,
+  // not "morning". Give the overnight band its own warmer greeting.
+  const timeGreeting =
+    h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const greetingTitle = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
   // Luna's Daily Read — her one grounded line on tonight (weather × what's on the
   // books). Her pick for where her voice belongs: "the one place it earns the right
