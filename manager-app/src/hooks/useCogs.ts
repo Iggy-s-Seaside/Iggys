@@ -395,7 +395,13 @@ export function usePurchaseOrders() {
     createdBy: string | null,
     notes?: string | null
   ): Promise<number | null> => {
-    const total = lines.reduce((sum, l) => sum + l.qty * l.unit_cost, 0);
+    // Defensive: a non-finite qty/unit_cost on any line would persist total = NaN
+    // into purchase_orders.total. Treat non-finite parts as 0.
+    const total = lines.reduce(
+      (sum, l) =>
+        sum + (Number.isFinite(l.qty) ? l.qty : 0) * (Number.isFinite(l.unit_cost) ? l.unit_cost : 0),
+      0,
+    );
     const { data: po, error } = await supabase
       .from('purchase_orders')
       .insert({ vendor_id: vendorId, status: 'draft', total, created_by: createdBy, notes: notes ?? null })
@@ -502,6 +508,9 @@ export function buildReorderGroups(
     const vendor = best ? vendorsById.get(best.vendor_id) ?? UNASSIGNED : UNASSIGNED;
     const packSize = best && best.pack_size > 0 ? best.pack_size : 1;
     const unitCost = best ? best.case_cost : (item.cost_per_unit ?? 0) * packSize;
+    // Catalog rows may carry null/NaN case_cost or cost_per_unit (partial data);
+    // guard so one bad row can't poison the group + PO total with NaN.
+    const safeCost = Number.isFinite(unitCost) ? Math.max(unitCost, 0) : 0;
 
     // Bring up to par + 1-unit cushion, ceil to whole packs/cases.
     const need = Math.max(item.par_level - item.current_quantity, 0) + 1;
@@ -512,16 +521,16 @@ export function buildReorderGroups(
       name: item.name,
       unit: best ? 'case' : item.unit,
       qty,
-      unit_cost: unitCost,
+      unit_cost: safeCost,
     };
 
     const key = vendor.id;
     const group = groups.get(key);
     if (group) {
       group.lines.push(line);
-      group.total += qty * unitCost;
+      group.total += qty * safeCost;
     } else {
-      groups.set(key, { vendor, lines: [line], total: qty * unitCost });
+      groups.set(key, { vendor, lines: [line], total: qty * safeCost });
     }
   }
 
