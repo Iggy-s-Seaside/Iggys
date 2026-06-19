@@ -19,6 +19,12 @@ import type { Staff, Shift } from '../types';
 const FOH_ROLES = new Set(['server', 'bartender', 'barback']);
 const MIN_BASELINE_SAMPLES = 3; // need this many same-weekday nights before we trust a "typical"
 
+// This hook is mounted twice on the dashboard (the WeatherWatch panel + the reach
+// banner via useWeatherReach), so each realtime channel needs a unique name — two
+// channels of the same name collide. Same pattern as useLuna/useLunaChronicle.
+let channelSeq = 0;
+const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
+
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -50,7 +56,7 @@ export function useWeatherWatch(): { flags: WeatherFlag[]; loading: boolean } {
   // (mirrors useSchedule's shifts channel) and bump a key to re-run the loader.
   useEffect(() => {
     const ch = supabase
-      .channel('weatherwatch-inputs')
+      .channel(uniqueTopic('weatherwatch-inputs'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => setRefetchKey((k) => k + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'demand_log' }, () => setRefetchKey((k) => k + 1))
       .subscribe();
