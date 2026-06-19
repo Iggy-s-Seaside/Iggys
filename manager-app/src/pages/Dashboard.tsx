@@ -21,6 +21,8 @@ import { OwnerMoneyStrip } from '../components/dashboard/OwnerMoneyStrip';
 import { useDemandLog } from '../hooks/useDemandLog';
 import { useAuth } from '../context/AuthContext';
 import { useWeather } from '../hooks/useWeather';
+import { useParties } from '../hooks/useParties';
+import { composeDailyRead } from '../lib/dailyRead';
 import { needsReplyNow } from '../utils/triage';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -41,6 +43,7 @@ export function Dashboard() {
   const { current: openShift } = useShift();
   const { firstName, role } = useAuth();
   const { weather } = useWeather();
+  const { parties } = useParties();
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
   const needsReplyMessages = messages.filter(needsReplyNow);
@@ -68,13 +71,27 @@ export function Dashboard() {
   const h = new Date().getHours();
   const timeGreeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const greetingTitle = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
-  const stateLine = (() => {
-    if (weather?.goodBeachDay) return "Beach weather — the deck's gonna fill.";
-    if (weather && weather.precipProb >= 60) return 'Grey and wet — a good day for a cozy special.';
-    if (unreadMessages.length > 0) return `${unreadMessages.length} unread message${unreadMessages.length === 1 ? '' : 's'} waiting.`;
-    if (weather) return `${weather.summary}.`;
-    return 'Welcome back.';
-  })();
+  // Luna's Daily Read — her one grounded line on tonight (weather × what's on the
+  // books). Her pick for where her voice belongs: "the one place it earns the right
+  // to speak every day, because it's grounded in what's actually happening."
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const weekday = format(new Date(), 'EEEE');
+  const eventsTonight = activeEvents.filter(
+    (e) => e.date === todayKey || (e.is_recurring && e.recurring_day === weekday)
+  ).length;
+  const todaysParties = parties.filter((p) => p.status === 'confirmed' && p.event_date === todayKey);
+  const pulseData = (latestPulse?.data ?? {}) as Record<string, unknown>;
+  const stateLine = composeDailyRead({
+    now: new Date(),
+    goodBeachDay: !!weather?.goodBeachDay,
+    precipProb: weather?.precipProb ?? 0,
+    highF: weather?.highF ?? 0,
+    hasWeather: !!weather,
+    eventsTonight,
+    partiesTonight: todaysParties.length,
+    guestsTonight: todaysParties.reduce((sum, p) => sum + (p.guest_count ?? 0), 0),
+    band: typeof pulseData.band === 'string' ? pulseData.band : null,
+  });
 
   return (
     <div>
