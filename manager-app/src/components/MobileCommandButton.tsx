@@ -15,7 +15,7 @@ export function MobileCommandButton() {
       onClick={openCommandPalette}
       aria-label="Search & quick actions"
       aria-haspopup="dialog"
-      className="fixed top-2 left-3 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-surface border border-border text-text-secondary shadow-card hover:bg-surface-hover hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 lg:hidden"
+      className="fixed top-[calc(0.5rem+env(safe-area-inset-top,0px))] left-3 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-surface border border-border text-text-secondary shadow-card hover:bg-surface-hover hover:text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:hidden"
     >
       <Search size={20} aria-hidden="true" />
     </button>

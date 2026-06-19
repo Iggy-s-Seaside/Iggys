@@ -41,7 +41,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
   if (messages.length === 0) {
     return (
       <div className="card p-5">
-        <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">{fallback}</p>
+        <p className="text-sm text-text-primary whitespace-pre-wrap break-words leading-relaxed">{fallback}</p>
       </div>
     );
   }
@@ -60,7 +60,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
               {safeFmtDate(m.date, 'MMM d, h:mm a')}
             </span>
           </div>
-          <p className="text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">{m.body}</p>
+          <p className="text-sm text-text-secondary whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
         </div>
       ))}
     </div>
@@ -463,7 +463,8 @@ export function Messages() {
           type="checkbox"
           checked={selectedIds.has(msg.id)}
           onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
-          className="mt-1 accent-primary"
+          aria-label="Select message"
+          className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
@@ -698,7 +699,7 @@ export function Messages() {
                   <GmailThreadView messages={thread} loading={threadLoading} fallback={selected.message} />
                 ) : (
                   <div className="card p-5">
-                    <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-text-primary whitespace-pre-wrap break-words leading-relaxed">
                       {selected.message}
                     </p>
                   </div>
@@ -714,7 +715,7 @@ export function Messages() {
                         {selected.replied_by && ` by ${selected.replied_by}`}
                       </span>
                     </div>
-                    <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.reply_text}</p>
+                    <p className="text-sm text-text-secondary whitespace-pre-wrap break-words">{selected.reply_text}</p>
                   </div>
                 )}
 

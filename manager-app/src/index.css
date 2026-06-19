@@ -77,7 +77,7 @@
      per-button text-xs/py-1.5 overrides. active:scale gives the <100ms pressed
      feedback that hover: never provides on touch (rushed bartender needs it). */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 min-h-[44px] text-sm font-medium transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 min-h-[44px] text-sm font-medium transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
     @apply btn bg-primary text-white hover:bg-primary-hover active:bg-primary-hover focus:ring-primary;
@@ -90,6 +90,13 @@
   }
   :root:not(.dark) .btn-primary:hover {
     background-color: #115e59;
+  }
+  /* Dark mode (the default theme): keep the vivid brand teal background but use a
+     near-black label instead of white. white-on-#2dd4bf is only 1.86:1; near-black
+     on #2dd4bf is ~11:1 — clears WCAG AA while preserving the brand pop. Icons use
+     currentColor, so they darken to match. */
+  .dark .btn-primary {
+    color: #03201c;
   }
   .btn-secondary {
     @apply btn bg-surface border border-border text-text-secondary hover:bg-surface-hover active:bg-surface-active focus:ring-primary;

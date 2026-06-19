@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
 
@@ -35,7 +36,7 @@ export function useMessages() {
   // Realtime subscription for new messages
   useEffect(() => {
     const channel = supabase
-      .channel('messages-realtime')
+      .channel(uniqueTopic('messages-realtime'))
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -163,7 +164,7 @@ export function useUnreadCount() {
 
     // Realtime for count updates
     const channel = supabase
-      .channel('unread-count')
+      .channel(uniqueTopic('unread-count'))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },

@@ -28,7 +28,7 @@
  * Bump CACHE_VERSION on any change to this file to evict old caches.
  */
 
-const CACHE_VERSION = 'iggys-mgr-v1';
+const CACHE_VERSION = 'iggys-mgr-v2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -41,6 +41,9 @@ const SHELL_URLS = [
   '/favicon-16x16.png',
   '/favicon-32x32.png',
   '/apple-touch-icon.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-512-maskable.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -105,9 +108,13 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           const fresh = await fetch(request);
-          // Keep the shell fallback fresh for offline use.
-          const cache = await caches.open(SHELL_CACHE);
-          cache.put('/', fresh.clone());
+          // Keep the shell fallback fresh for offline use — but never cache an
+          // error/redirect (non-2xx) response as the offline shell, or an
+          // offline user could be served a cached error page.
+          if (fresh && fresh.ok) {
+            const cache = await caches.open(SHELL_CACHE);
+            cache.put('/', fresh.clone());
+          }
           return fresh;
         } catch {
           // Offline: serve the last good shell, then the precached root.

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import toast from 'react-hot-toast';
 import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 
@@ -86,7 +87,7 @@ export function useSocialPosts() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('social-posts-realtime')
+      .channel(uniqueTopic('social-posts-realtime'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
         refresh();
       })

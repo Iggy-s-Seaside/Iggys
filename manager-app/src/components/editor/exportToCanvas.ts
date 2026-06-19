@@ -487,6 +487,13 @@ export async function exportToCanvasAsync(
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
 
+  // 0a. Ensure web fonts are loaded before rasterizing any text. The display
+  //     families (Bebas Neue, Playfair Display, …) are loaded asynchronously, so
+  //     without this an export could draw a fallback font for the first render.
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    try { await document.fonts.ready; } catch { /* Font Loading API unsupported — proceed */ }
+  }
+
   // 0. Preload EVERY image up-front (background + visible image layers) so nothing
   //    renders from an uncached <img>. idb:// blob URLs and fresh Supabase URLs are a
   //    cache race for the synchronous path — decoding here guarantees they're ready.

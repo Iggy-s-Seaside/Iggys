@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import type { ShiftSession } from '../types';
 import { todaysBusinessDay } from '../utils/businessDay';
 import toast from 'react-hot-toast';
@@ -61,7 +62,7 @@ export function useShift() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('shift-sessions-realtime')
+      .channel(uniqueTopic('shift-sessions-realtime'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_sessions' }, () => {
         refresh();
       })

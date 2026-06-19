@@ -112,7 +112,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 id={titleId} className="text-lg font-semibold text-text-primary">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted">
+          <button onClick={onClose} aria-label="Close" className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <X size={18} />
           </button>
         </div>
