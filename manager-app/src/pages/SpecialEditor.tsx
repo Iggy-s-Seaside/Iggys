@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { buzz } from '../utils/haptics';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Plus, Undo2, Redo2, Download, Save, Upload, RectangleVertical, RectangleHorizontal, Square,
@@ -426,7 +427,7 @@ export function SpecialEditor() {
         const y = Math.round((state.canvasHeight - h) / 2);
         dispatch({ type: 'UPDATE_LAYER', id: layerId, changes: { width: w, imageHeight: h, x, y } });
         toast.success('Fit to canvas');
-        if ('vibrate' in navigator) navigator.vibrate([15, 30, 15]);
+        buzz([15, 30, 15]);
       };
       img.src = src;
     } else {
@@ -446,7 +447,7 @@ export function SpecialEditor() {
       const y = Math.round((state.canvasHeight - h) / 2);
       dispatch({ type: 'UPDATE_LAYER', id: layerId, changes: { width: w, imageHeight: h, x, y } });
       toast.success('Fit to canvas');
-      if ('vibrate' in navigator) navigator.vibrate([15, 30, 15]);
+      buzz([15, 30, 15]);
     }
   }, [state.layers, state.canvasWidth, state.canvasHeight, dispatch]);
 

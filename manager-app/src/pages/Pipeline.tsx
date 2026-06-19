@@ -16,11 +16,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PipelineCard } from '../components/pipeline/PipelineCard';
 import type { Party } from '../types';
-
-/** A short, guarded haptic tap — mirrors the app's existing `navigator.vibrate` convention. */
-function buzz(pattern: number | number[]) {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern);
-}
+import { buzz } from '../utils/haptics';
 
 /**
  * Pipeline stages are *derived* (see usePipeline), so advancing a card means

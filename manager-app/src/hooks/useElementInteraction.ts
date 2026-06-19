@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
+import { buzz } from '../utils/haptics';
 import type { TextLayer } from '../types';
 
 const SNAP_THRESHOLD = 5;
@@ -197,7 +198,7 @@ export function useElementInteraction({
     };
 
     // Haptic on select
-    if ('vibrate' in navigator) navigator.vibrate(10);
+    buzz(10);
 
     // Listen for global move/up on this pointer
     const onMove = (me: PointerEvent) => {
@@ -246,7 +247,7 @@ export function useElementInteraction({
             }
           }
           // Haptic on snap
-          if ('vibrate' in navigator) navigator.vibrate([5, 5, 5]);
+          buzz([5, 5, 5]);
         }
 
         // Clamp to canvas bounds — keep element fully within canvas
@@ -422,7 +423,7 @@ export function useElementInteraction({
         for (const snap of ROTATION_SNAP_ANGLES) {
           if (Math.abs(angle - snap) <= ROTATION_SNAP_THRESHOLD) {
             angle = snap === 360 ? 0 : snap;
-            if ('vibrate' in navigator) navigator.vibrate(10);
+            buzz(10);
             break;
           }
         }
