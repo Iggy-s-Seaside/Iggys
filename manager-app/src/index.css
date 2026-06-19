@@ -193,6 +193,11 @@ button, a, label, [role="button"] {
   touch-action: manipulation;
 }
 
+/* ── Brand-tint native form controls instead of the OS blue/grey ── */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #2dd4bf;
+}
+
 /* ── Mobile safe area ── */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
