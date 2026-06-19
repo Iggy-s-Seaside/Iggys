@@ -88,7 +88,7 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
           <h2 id={titleId} className="font-semibold text-text-primary">
             {initial ? 'Edit Item' : 'Add Item'}
           </h2>
-          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors">
             <X size={18} />
           </button>
         </div>

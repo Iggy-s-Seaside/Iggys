@@ -106,7 +106,7 @@ export function PromoteEventModal({
             <Globe size={18} className="text-primary" />
             <h2 id={titleId} className="font-semibold text-text-primary">Add to public calendar</h2>
           </div>
-          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-surface-hover text-text-muted">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-surface-hover transition-colors text-text-muted">
             <X size={18} />
           </button>
         </div>

@@ -183,7 +183,7 @@ export function QuickPostModal({ open, onClose, onSaved }: QuickPostModalProps) 
             <span className="text-xs text-text-muted">
               Step {step === 'photo' ? 1 : step === 'text' ? 2 : 3} of 3
             </span>
-            <button onClick={handleClose} className="p-1 rounded-lg hover:bg-surface-hover">
+            <button onClick={handleClose} className="p-1 rounded-lg hover:bg-surface-hover transition-colors">
               <X size={18} className="text-text-muted" />
             </button>
           </div>

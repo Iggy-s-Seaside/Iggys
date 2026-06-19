@@ -42,7 +42,7 @@ const CHIP_STYLES: Record<
   },
   half: {
     active: 'bg-surface-active text-text-primary border-border',
-    idle: 'border-border text-text-secondary hover:bg-surface-hover',
+    idle: 'border-border text-text-secondary hover:bg-surface-hover transition-colors',
   },
   ok: {
     active: 'bg-emerald-500 text-white border-emerald-500',

@@ -502,7 +502,7 @@ export function Messages() {
           {showMobileDetail && (
             <button
               onClick={() => setShowMobileDetail(false)}
-              className="md:hidden min-h-[44px] min-w-[44px] -ml-1.5 inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"
+              className="md:hidden min-h-[44px] min-w-[44px] -ml-1.5 inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
               aria-label="Back to messages"
             >
               <ArrowLeft size={18} className="text-text-primary" />

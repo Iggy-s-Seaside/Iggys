@@ -158,7 +158,7 @@ export function MenuManager() {
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               activeSchema.table === schema.table
                 ? 'bg-primary text-white'
-                : 'bg-surface border border-border text-text-secondary hover:bg-surface-hover'
+                : 'bg-surface border border-border text-text-secondary hover:bg-surface-hover transition-colors'
             }`}
           >
             {schema.label}

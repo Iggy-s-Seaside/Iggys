@@ -1121,10 +1121,10 @@ export function SpecialEditor() {
 
         <div className="w-px h-6 bg-border" />
 
-        <button onClick={() => dispatch({ type: 'UNDO' })} disabled={!canUndo} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted disabled:opacity-30" title="Undo (Cmd+Z)" aria-label="Undo">
+        <button onClick={() => dispatch({ type: 'UNDO' })} disabled={!canUndo} className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted disabled:opacity-30" title="Undo (Cmd+Z)" aria-label="Undo">
           <Undo2 size={16} />
         </button>
-        <button onClick={() => dispatch({ type: 'REDO' })} disabled={!canRedo} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted disabled:opacity-30" title="Redo (Cmd+Shift+Z)" aria-label="Redo">
+        <button onClick={() => dispatch({ type: 'REDO' })} disabled={!canRedo} className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted disabled:opacity-30" title="Redo (Cmd+Shift+Z)" aria-label="Redo">
           <Redo2 size={16} />
         </button>
 
@@ -1133,7 +1133,7 @@ export function SpecialEditor() {
         {/* Zoom controls */}
         <button
           onClick={() => setZoom(z => Math.max(0.25, (z ?? canvasRef.current?.getScale() ?? 0.5) - 0.1))}
-          className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted"
+          className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted"
           title="Zoom Out"
           aria-label="Zoom out"
         >
@@ -1144,7 +1144,7 @@ export function SpecialEditor() {
         </span>
         <button
           onClick={() => setZoom(z => Math.min(2, (z ?? canvasRef.current?.getScale() ?? 0.5) + 0.1))}
-          className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted"
+          className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted"
           title="Zoom In"
           aria-label="Zoom in"
         >

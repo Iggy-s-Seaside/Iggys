@@ -242,7 +242,7 @@ export function Sidebar() {
         <button
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation menu"
-          className="p-2.5 -ml-1 rounded-lg hover:bg-surface-hover min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="p-2.5 -ml-1 rounded-lg hover:bg-surface-hover transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <Menu size={20} />
         </button>
@@ -265,7 +265,7 @@ export function Sidebar() {
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface-hover"
+              className="absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
             >
               <X size={18} />
             </button>

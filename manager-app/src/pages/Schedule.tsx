@@ -76,7 +76,7 @@ function StaffFormModal({ open, initial, onClose, onSubmit }: StaffFormProps) {
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 id={titleId} className="font-semibold text-text-primary">{initial ? 'Edit Staff' : 'Add Staff'}</h2>
-          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
@@ -188,7 +188,7 @@ function ShiftModal({ open, staffMember, date, initial, onClose, onSave, onUpdat
             <h2 id={titleId} className="font-semibold text-text-primary">{initial ? 'Edit Shift' : 'Add Shift'}</h2>
             <p className="text-xs text-text-muted mt-0.5">{staffMember.name} · {fmtDate(date, 'EEE, MMM d')}</p>
           </div>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"><X size={18} /></button>
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">

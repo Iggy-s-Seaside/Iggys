@@ -543,7 +543,7 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
           <h2 id={titleId} className="font-semibold text-text-primary flex items-center gap-2">
             <Sparkles size={16} className="text-primary" /> New Campaign
           </h2>
-          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -562,7 +562,7 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
                     className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
                       channel === ch
                         ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-border text-text-secondary hover:bg-surface-hover'
+                        : 'border-border text-text-secondary hover:bg-surface-hover transition-colors'
                     }`}
                   >
                     <Icon size={15} /> {ch === 'sms' ? 'SMS' : 'Email'}

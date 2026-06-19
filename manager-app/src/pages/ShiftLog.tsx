@@ -499,7 +499,7 @@ function EightySixSheet({
           </h2>
           <button
             onClick={onClose}
-            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
             aria-label="Close"
           >
             <X size={18} />

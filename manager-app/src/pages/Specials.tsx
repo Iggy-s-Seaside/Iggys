@@ -111,7 +111,7 @@ export function Specials() {
                 </Link>
                 <button
                   onClick={() => handleDiscardDraft(draft)}
-                  className="text-xs text-text-muted hover:text-danger px-3 py-2 min-h-[44px] flex items-center rounded-lg hover:bg-surface-hover"
+                  className="text-xs text-text-muted hover:text-danger px-3 py-2 min-h-[44px] flex items-center rounded-lg hover:bg-surface-hover transition-colors"
                 >
                   Discard
                 </button>

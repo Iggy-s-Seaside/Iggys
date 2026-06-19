@@ -117,7 +117,7 @@ function WaitlistForm({ partiesWaiting, onAdd }: WaitlistFormProps) {
                 className={`min-w-[40px] min-h-[40px] px-2 rounded-lg text-sm font-semibold tabular-nums transition-colors ${
                   active
                     ? 'bg-primary text-white'
-                    : 'bg-surface border border-border text-text-secondary hover:bg-surface-hover'
+                    : 'bg-surface border border-border text-text-secondary hover:bg-surface-hover transition-colors'
                 }`}
               >
                 {n}

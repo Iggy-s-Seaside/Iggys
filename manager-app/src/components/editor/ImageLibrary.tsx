@@ -82,10 +82,10 @@ export function ImageLibrary({ open, onClose, onSelect }: ImageLibraryProps) {
             <span className="text-xs text-text-muted">{items.length} images</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => refresh()} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted" title="Refresh">
+            <button onClick={() => refresh()} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-muted" title="Refresh">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted">
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-muted">
               <X size={18} />
             </button>
           </div>
