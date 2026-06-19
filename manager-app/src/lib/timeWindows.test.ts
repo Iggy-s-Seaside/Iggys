@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { spacesConflict, windowsOverlap, minToLabel, formatRange } from './timeWindows';
+import {
+  spacesConflict, windowsOverlap, minToLabel, formatRange,
+  spaceLabel, timeText, timeOptions, timeSelectOptions, type TimeSlotOption,
+} from './timeWindows';
+
+const byVal = (arr: TimeSlotOption[], v: number) => arr.find((o) => o.value === v)!;
 
 describe('spacesConflict — do two bookings share physical space?', () => {
   it('the whole building conflicts with any space', () => {
@@ -56,5 +61,66 @@ describe('formatRange', () => {
   it('says "All day" when all-day or start is null', () => {
     expect(formatRange(540, 1290, true)).toBe('All day');
     expect(formatRange(null, 1290)).toBe('All day');
+  });
+});
+
+describe('spaceLabel / timeText / timeOptions', () => {
+  it('spaceLabel maps a space, "" for null', () => {
+    expect(spaceLabel('upstairs')).toBe('Upstairs');
+    expect(spaceLabel('whole')).toBe('Entire building');
+    expect(spaceLabel(null)).toBe('');
+  });
+  it('timeText is a 12h label, "" for null', () => {
+    expect(timeText(540)).toBe('9:00 AM');
+    expect(timeText(null)).toBe('');
+  });
+  it('timeOptions spans 8:00 AM..next-day in 30-min steps with a "next day" suffix past midnight', () => {
+    const opts = timeOptions();
+    expect(opts).toHaveLength(37); // 480..1560 step 30 inclusive
+    expect(opts[0]).toEqual({ value: 480, label: '8:00 AM' });
+    expect(opts.find((o) => o.value === 1440)!.label).toBe('12:00 AM (next day)');
+  });
+});
+
+describe('timeSelectOptions — time-picker slots + inline disabling', () => {
+  it('with no constraints, nothing is disabled and groups/next-day hints are set', () => {
+    const opts = timeSelectOptions();
+    expect(opts.every((o) => !o.disabled)).toBe(true);
+    expect(byVal(opts, 660).group).toBe('Morning'); // 11:00 AM (< 720 = Morning)
+    expect(byVal(opts, 780).group).toBe('Afternoon'); // 1:00 PM
+    expect(byVal(opts, 1440).hint).toBe('next day');
+  });
+
+  it('END picker (minValue) disables slots at or before the start', () => {
+    const opts = timeSelectOptions({ minValue: 600 });
+    expect(byVal(opts, 600).disabled).toBe(true);
+    expect(byVal(opts, 630).disabled).toBe(false);
+  });
+
+  it('START picker disables slots inside a busy window (end-exclusive)', () => {
+    const opts = timeSelectOptions({ busyWindows: [{ start_min: 600, end_min: 720, all_day: false }] });
+    expect(byVal(opts, 600).disabled).toBe(true);
+    expect(byVal(opts, 690).disabled).toBe(true);
+    expect(byVal(opts, 690).hint).toBe('booked');
+    expect(byVal(opts, 720).disabled).toBe(false); // end is exclusive
+  });
+
+  it('END picker disables slots whose [start, slot] window overlaps a busy window', () => {
+    const opts = timeSelectOptions({ minValue: 540, busyWindows: [{ start_min: 600, end_min: 720, all_day: false }] });
+    expect(byVal(opts, 660).disabled).toBe(true);
+    expect(byVal(opts, 660).hint).toBe('overlaps');
+  });
+
+  it('an all-day busy window disables every slot', () => {
+    const opts = timeSelectOptions({ busyWindows: [{ start_min: null, end_min: null, all_day: true }] });
+    expect(opts.every((o) => o.disabled)).toBe(true);
+  });
+
+  it('a non-conflicting space (upstairs busy vs downstairs query) does NOT disable', () => {
+    const opts = timeSelectOptions({
+      space: 'downstairs',
+      busyWindows: [{ start_min: 600, end_min: 720, all_day: false, space: 'upstairs' }],
+    });
+    expect(byVal(opts, 660).disabled).toBe(false);
   });
 });
