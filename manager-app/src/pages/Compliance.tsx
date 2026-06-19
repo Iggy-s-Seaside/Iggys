@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useId, useRef } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   ShieldCheck,
   Ban,
@@ -53,13 +54,16 @@ function ModalShell({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onClose });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-modal w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-modal w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface">
-          <h2 className="font-semibold text-text-primary">{title}</h2>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <h2 id={titleId} className="font-semibold text-text-primary">{title}</h2>
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
             <X size={18} />
           </button>
         </div>
