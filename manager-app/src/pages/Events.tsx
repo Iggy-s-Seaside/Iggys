@@ -56,21 +56,21 @@ export function Events() {
           }
         />
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-surface-hover/50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Event</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider hidden sm:table-cell">Date</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider hidden md:table-cell">Category</th>
-                <th className="text-center px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Active</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
+                <th className="text-left px-3 sm:px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Event</th>
+                <th className="text-left px-3 sm:px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider hidden sm:table-cell">Date</th>
+                <th className="text-left px-3 sm:px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider hidden md:table-cell">Category</th>
+                <th className="text-center px-3 sm:px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Active</th>
+                <th className="text-right px-3 sm:px-5 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {sorted.map((event) => (
                 <tr key={event.id} className="hover:bg-surface-hover/50 transition-colors">
-                  <td className="px-5 py-3.5">
+                  <td className="px-3 sm:px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       {event.image_url ? (
                         <img src={event.image_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
@@ -92,16 +92,16 @@ export function Events() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 hidden sm:table-cell">
+                  <td className="px-3 sm:px-5 py-3.5 hidden sm:table-cell">
                     <p className="text-sm text-text-secondary">
                       {safeFmtDate(event.date)}
                     </p>
                     <p className="text-xs text-text-muted">{event.time}</p>
                   </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
+                  <td className="px-3 sm:px-5 py-3.5 hidden md:table-cell">
                     {event.category ? <span className="badge-primary">{event.category}</span> : <span className="text-xs text-text-muted">--</span>}
                   </td>
-                  <td className="px-5 py-3.5 text-center">
+                  <td className="px-3 sm:px-5 py-3.5 text-center">
                     <Toggle
                       checked={event.active}
                       onChange={(checked) => update(event.id, { active: checked })}
@@ -109,7 +109,7 @@ export function Events() {
                       className="align-middle"
                     />
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-3 sm:px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <AddToCalendarButton event={event} />
                       <Link to={`/events/${event.id}/edit`} aria-label="Edit event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
