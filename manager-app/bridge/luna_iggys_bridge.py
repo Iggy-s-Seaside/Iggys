@@ -663,6 +663,12 @@ SPECIAL_PREAMBLE = (
     "cheeky, easy to actually pour from common spirits + mixers). Favor a FRESH, quirky angle "
     "over the single most obvious/famous fact - and do NOT reuse any fact, theme, or name from "
     "the RECENTLY-USED list below (if one is given); pick a clearly different one. "
+    "VARY THE RECIPE, not just the fact: rotate the BASE SPIRIT run to run (gin, rum, tequila, "
+    "mezcal, bourbon/rye, whiskey, vodka, even beer or bubbles) and pick a DIFFERENT base than the "
+    "RECENT BASE SPIRITS listed below. You lean far too hard on vodka + blue curaçao - STOP "
+    "defaulting to it; use blue curaçao only if it truly fits, otherwise reach for a different "
+    "spirit, modifier, and color. Match the spirit to the vibe (smoky -> mezcal, autumnal -> "
+    "whiskey, tropical -> rum, bright/herbal -> gin, celebratory -> bubbles). "
     "Keep it light and CELEBRATORY - riff on upbeat, quirky, fun facts (holidays, birthdays, "
     "whimsical milestones, inventions). NEVER build a drink on a tragedy, disaster, death, war, "
     "crime, or anything somber or in poor taste; if today's only facts are grim, skip them and "
@@ -2402,9 +2408,32 @@ def fetch_on_this_day() -> dict:
     return out
 
 
+# Spirits/bases listed roughly specific-first; _base_spirit picks the one that
+# appears EARLIEST in the build line (the primary pour). Word-boundary matched so
+# "gin" doesn't fire on "ginger beer".
+SPIRIT_KEYWORDS = [
+    "mezcal", "tequila", "bourbon", "rye", "scotch", "whiskey", "whisky",
+    "gin", "rum", "cachaça", "cachaca", "pisco", "brandy", "cognac", "aquavit",
+    "vodka", "absinthe", "prosecco", "champagne", "sparkling", "pilsner",
+    "lager", "beer", "cider", "wine",
+]
+
+
+def _base_spirit(text):
+    """The primary base of a build = the first spirit/base mentioned."""
+    t = (text or "").lower()
+    best, best_pos = "", len(t) + 1
+    for kw in SPIRIT_KEYWORDS:
+        m = re.search(r"\b" + re.escape(kw) + r"\b", t)
+        if m and m.start() < best_pos:
+            best, best_pos = kw, m.start()
+    return best
+
+
 def fetch_recent_specials(conn, days=7, limit=10):
-    """Recent specials (name + the 'Why' hook they riffed on) so Luna can avoid
-    repeating a fact, theme, or name. Rolling ~N-day window; read-only."""
+    """Recent specials (name + 'Why' hook + build/base spirit) so Luna can avoid
+    repeating a fact, theme, name, OR recipe - she over-defaults to vodka + blue
+    curaçao. Rolling ~N-day window; read-only."""
     out = []
     try:
         with conn.cursor() as cur:
@@ -2415,13 +2444,15 @@ def fetch_recent_specials(conn, days=7, limit=10):
                 (days, limit))
             for title, body in cur.fetchall():
                 name = re.sub(r"^Special idea:\s*", "", title or "").strip()
-                why = ""
+                why, build = "", ""
                 for line in (body or "").splitlines():
-                    if line.strip().lower().startswith("why:"):
+                    low = line.strip().lower()
+                    if not why and low.startswith("why:"):
                         why = line.split(":", 1)[1].strip()
-                        break
+                    elif not build and low.startswith("build:"):
+                        build = line.split(":", 1)[1].strip()
                 if name:
-                    out.append((name, why))
+                    out.append((name, why, build[:70], _base_spirit(build or body)))
         conn.rollback()
     except Exception:
         try:
@@ -2448,10 +2479,17 @@ def build_special_user(otd, d, recent=None, replacing=None) -> str:
     ]
     if recent:
         used = "; ".join(
-            f'"{n}"' + (f" (riffed on: {w})" if w else "") for n, w in recent)
+            f'"{n}"' + (f" (riffed on: {w})" if w else "") + (f" [built on {b}]" if b else "")
+            for (n, w, b, _base) in recent)
         lines.append(
             "RECENTLY-USED specials - do NOT reuse these facts, themes, or names; "
             "pick a clearly different angle: " + used)
+        bases = [base for (_n, _w, _b, base) in recent if base]
+        if bases:
+            lines.append(
+                "RECENT BASE SPIRITS (you keep reaching for the same ones - pick a "
+                "DIFFERENT base than these, and do NOT default to vodka + blue curaçao): "
+                + ", ".join(bases))
     if replacing:
         lines.append(
             f'The manager just rejected "{replacing}" and tapped Try Again - give a '
