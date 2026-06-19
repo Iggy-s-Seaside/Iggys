@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { QuickAddParty } from '../parties/QuickAddParty';
 import { CommandPalette, CMD_NEW_PARTY, CMD_QUICK_POST } from '../CommandPalette';
+import { ShortcutsSheet } from '../ShortcutsSheet';
 import { OfflineBanner } from '../OfflineBanner';
 import { SyncPendingPill } from '../SyncPendingPill';
 import { LunaReachBanner } from '../LunaReachBanner';
@@ -76,6 +77,9 @@ export function DashboardLayout() {
 
       {/* Global Cmd/Ctrl+K command palette — mounted once, event-driven */}
       <CommandPalette />
+
+      {/* "?" keyboard-shortcuts cheatsheet — mounted once, opens on the ? key */}
+      <ShortcutsSheet />
 
       {/* Global notification bell — self-contained, fixed top-right */}
       <NotificationBell />
