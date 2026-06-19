@@ -24,7 +24,9 @@ export function CloseOutCard({
   saving: boolean;
   onLog: (band: Band, note?: string) => void;
 }) {
-  const logged = todayRow?.actual_band ?? null;
+  // actual_band is a free-text column in the DB but only ever holds a Band value;
+  // narrow it so the close-out handler (which takes a Band) typechecks.
+  const logged = (todayRow?.actual_band ?? null) as Band | null;
   const [note, setNote] = useState(todayRow?.note ?? '');
 
   // Keep the field in sync as the row loads / changes over realtime.

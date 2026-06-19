@@ -14,6 +14,7 @@ import { MessageWidget } from '../components/messages/MessageWidget';
 import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
+import { WeatherWatch } from '../components/dashboard/WeatherWatch';
 import { SpecialIdeaCard } from '../components/dashboard/SpecialIdeaCard';
 import { CloseOutCard } from '../components/dashboard/CloseOutCard';
 import { OwnerMoneyStrip } from '../components/dashboard/OwnerMoneyStrip';
@@ -93,6 +94,10 @@ export function Dashboard() {
         pulse={latestPulse}
         accuracy={demand.accuracy}
       />
+
+      {/* Weather × reservation cross-signal — only the next-48h flags that point
+          to an action (move a booking indoors, call in a hand). Silent otherwise. */}
+      <WeatherWatch />
 
       {/* Luna's creative special-of-the-day */}
       <SpecialIdeaCard special={latestSpecial} />
