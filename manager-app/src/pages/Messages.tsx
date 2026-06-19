@@ -553,6 +553,8 @@ export function Messages() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 className="input-field pl-8 text-xs py-2"
+                type="search"
+                aria-label="Search messages"
                 placeholder="Search messages..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

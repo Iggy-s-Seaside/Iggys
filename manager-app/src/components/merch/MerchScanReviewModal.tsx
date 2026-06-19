@@ -216,6 +216,7 @@ export function MerchScanReviewModal({
                 <img
                   src={imageUrl}
                   alt="Scanned invoice"
+                  loading="lazy"
                   className="w-16 h-16 object-cover rounded-lg border border-border flex-shrink-0"
                 />
               )}

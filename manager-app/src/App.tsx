@@ -48,8 +48,9 @@ const Compliance = lazy(() => import('./pages/Compliance').then((m) => ({ defaul
 
 function PageFallback() {
   return (
-    <div className="flex items-center justify-center py-24 text-text-muted">
+    <div role="status" aria-live="polite" className="flex items-center justify-center py-24 text-text-muted">
       <Loader2 className="w-6 h-6 animate-spin" />
+      <span className="sr-only">Loading…</span>
     </div>
   );
 }

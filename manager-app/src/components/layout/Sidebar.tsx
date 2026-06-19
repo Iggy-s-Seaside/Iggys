@@ -158,7 +158,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+      <nav aria-label="Primary" className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
         {visibleSections.map((section) => {
           // The active route's section is always shown, even if the user collapsed it.
           const isOpen = !collapsed.includes(section.id) || section.id === activeSection;
@@ -238,7 +238,7 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-surface border-b border-border">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-surface border-b border-border">
         <button
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation menu"
@@ -255,7 +255,7 @@ export function Sidebar() {
             <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
           </NavLink>
         )}
-      </div>
+      </header>
 
       {/* Mobile overlay */}
       {mobileOpen && (

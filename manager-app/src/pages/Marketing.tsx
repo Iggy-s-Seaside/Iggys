@@ -210,6 +210,8 @@ export function Marketing() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 className="input-field pl-9 text-sm"
+                type="search"
+                aria-label="Search customers"
                 placeholder="Search customers..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

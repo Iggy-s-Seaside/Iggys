@@ -73,7 +73,7 @@ export function Events() {
                   <td className="px-3 sm:px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       {event.image_url ? (
-                        <img src={event.image_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                        <img src={event.image_url} alt="" loading="lazy" width={40} height={40} className="w-10 h-10 rounded-lg object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
                           <Calendar size={16} className="text-primary" />

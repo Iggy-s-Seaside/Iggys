@@ -210,7 +210,7 @@ export function Specials() {
           {filteredSpecials.map((special) => (
             <div key={special.id} className="card-hover overflow-hidden">
               {special.image_url ? (
-                <img src={special.image_url} alt={special.title} className="w-full h-44 object-cover" />
+                <img src={special.image_url} alt={special.title} loading="lazy" className="w-full h-44 object-cover" />
               ) : (
                 <div className="w-full h-44 bg-gradient-to-br from-surface-hover to-surface-active flex items-center justify-center">
                   <Image size={32} className="text-text-muted" />

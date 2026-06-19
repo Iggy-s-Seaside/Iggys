@@ -164,7 +164,7 @@ export function CreateSocialPostModal({ open, onClose, preset, onCreated }: Crea
         {/* Image preview */}
         <div className="rounded-lg overflow-hidden border border-border bg-surface-hover">
           {imageUrl ? (
-            <img src={imageUrl} alt="" className="w-full h-44 object-cover" />
+            <img src={imageUrl} alt="" loading="lazy" className="w-full h-44 object-cover" />
           ) : (
             <div className="w-full h-44 flex flex-col items-center justify-center text-text-muted gap-1.5">
               <ImageIcon size={28} />

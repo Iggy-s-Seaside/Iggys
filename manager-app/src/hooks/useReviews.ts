@@ -30,8 +30,8 @@ export function useReviews() {
   const refresh = useCallback(async () => {
     if (!loadedRef.current) setLoading(true);
     const [revRes, fbRes, srcRes] = await Promise.all([
-      supabase.from('reviews').select('*').order('created_at', { ascending: false }),
-      supabase.from('feedback').select('*').order('created_at', { ascending: false }),
+      supabase.from('reviews').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('feedback').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('review_sources').select('*').order('label'),
     ]);
 

@@ -142,6 +142,7 @@ function ChecklistItemRow({
             <img
               src={photoUrl}
               alt={`${item.label} proof`}
+              loading="lazy"
               className="mt-3 h-28 w-auto rounded-lg border border-border object-cover"
             />
           )}

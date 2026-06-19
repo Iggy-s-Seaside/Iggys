@@ -59,6 +59,9 @@ function ProductRow({
           <img
             src={product.image}
             alt=""
+            loading="lazy"
+            width={44}
+            height={44}
             className="w-11 h-11 rounded-lg object-cover border border-border shrink-0"
           />
         ) : (
@@ -196,6 +199,8 @@ export function Merch() {
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
+            type="search"
+            aria-label="Search merch"
             className="input-field pl-9 w-full sm:w-56"
             placeholder="Search merch..."
             value={search}

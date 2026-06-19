@@ -89,6 +89,7 @@ export function ScanReviewModal({
                 <img
                   src={imageUrl}
                   alt="Scanned order"
+                  loading="lazy"
                   className="w-16 h-16 object-cover rounded-lg border border-border flex-shrink-0"
                 />
               )}

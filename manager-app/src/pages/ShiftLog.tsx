@@ -214,6 +214,7 @@ export function ShiftLog({ shiftId }: ShiftLogProps = {}) {
             <img
               src={photoUrl}
               alt="Attached"
+              loading="lazy"
               className="h-24 w-24 object-cover rounded-lg border border-border"
             />
             <button
@@ -273,6 +274,8 @@ export function ShiftLog({ shiftId }: ShiftLogProps = {}) {
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
+            type="search"
+            aria-label="Search the log"
             className="input-field pl-9 w-full"
             placeholder="Search the log…"
             value={search}
@@ -386,6 +389,7 @@ export function ShiftLog({ shiftId }: ShiftLogProps = {}) {
                         <img
                           src={entry.photo_url}
                           alt="Log photo"
+                          loading="lazy"
                           className="h-28 w-28 object-cover rounded-lg border border-border"
                         />
                       </a>
@@ -547,6 +551,8 @@ function EightySixSheet({
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 id={pickItemId}
+                type="search"
+                aria-label="Search menu items"
                 className="input-field pl-9"
                 placeholder="Search menu…"
                 value={query}

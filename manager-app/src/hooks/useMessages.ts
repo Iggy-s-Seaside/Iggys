@@ -15,7 +15,8 @@ export function useMessages() {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error) {
       toast.error('Failed to load messages');

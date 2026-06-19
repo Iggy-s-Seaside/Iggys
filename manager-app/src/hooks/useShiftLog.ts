@@ -55,7 +55,8 @@ export function useShiftLog(shiftId?: number | null) {
     let query = supabase
       .from('shift_log')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     if (effectiveShiftId != null) query = query.eq('shift_id', effectiveShiftId);
 
     const { data, error } = await query;

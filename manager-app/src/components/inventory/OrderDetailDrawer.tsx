@@ -58,6 +58,7 @@ export function OrderDetailDrawer({ open, onClose, order }: OrderDetailDrawerPro
             <img
               src={order.image_url}
               alt="Order sheet"
+              loading="lazy"
               className="w-full rounded-xl border border-border"
             />
 

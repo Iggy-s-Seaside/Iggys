@@ -64,6 +64,9 @@ export function OrderHistory({ open, onClose }: OrderHistoryProps) {
                     <img
                       src={order.image_url}
                       alt=""
+                      loading="lazy"
+                      width={48}
+                      height={48}
                       className="w-12 h-12 object-cover rounded-lg border border-border flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">

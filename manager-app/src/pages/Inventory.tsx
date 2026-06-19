@@ -333,6 +333,8 @@ export function Inventory() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               className="input-field pl-9 w-full sm:w-64"
+              type="search"
+              aria-label="Search inventory items"
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
