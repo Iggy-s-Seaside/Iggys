@@ -660,11 +660,18 @@ SPECIAL_PREAMBLE = (
     "Seaside, Oregon coast bar. Use the 'on this day' facts below - a quirky holiday, a famous "
     "birthday, or a fun historical event - and INVENT a brand-new special riffed on it. Do NOT "
     "just name an existing menu drink; CREATE something playful and on-brand (coastal, a little "
-    "cheeky, easy to actually pour from common spirits + mixers). Pick the single most fun hook. "
-    "Plain text, no markdown, EXACTLY:\n"
-    "Line 1: the special NAME + a punchy one-line concept (what's in it / the vibe).\n"
-    "Line 2: 'Why: ' the fun fact it riffs on, in one sentence.\n"
-    "Line 3: 'Build: ' a simple recipe (spirits + mixers + garnish) + a suggested price.\n"
+    "cheeky, easy to actually pour from common spirits + mixers). Favor a FRESH, quirky angle "
+    "over the single most obvious/famous fact - and do NOT reuse any fact, theme, or name from "
+    "the RECENTLY-USED list below (if one is given); pick a clearly different one. "
+    "Keep it light and CELEBRATORY - riff on upbeat, quirky, fun facts (holidays, birthdays, "
+    "whimsical milestones, inventions). NEVER build a drink on a tragedy, disaster, death, war, "
+    "crime, or anything somber or in poor taste; if today's only facts are grim, skip them and "
+    "invent something seasonal + coastal instead. "
+    "Plain text, no markdown - write EXACTLY three lines, with NO line labels or numbering "
+    "(do not print 'Line 1', '1)', etc.):\n"
+    "First line = the special NAME, then ' - ', then a punchy one-line concept (what's in it / the vibe).\n"
+    "Second line = start with 'Why: ' then the fun fact it riffs on, in one sentence.\n"
+    "Third line = start with 'Build: ' then a simple recipe (spirits + mixers + garnish) + a suggested price.\n"
     "Then a final line 'ACTION:' with compact JSON {action:{type:\"draft_special\", "
     "label:\"Make this special\", draft:\"<name + concept + build, ready to drop into the special "
     "designer>\"}}. Keep it tight and genuinely fun."
@@ -1121,7 +1128,9 @@ def run_briefing() -> int:
             cur.execute(
                 """
                 SELECT 1 FROM luna_insights
-                WHERE kind = 'briefing' AND created_at::date = current_date
+                WHERE kind = 'briefing'
+                  AND (created_at AT TIME ZONE 'America/Los_Angeles')::date
+                    = (now() AT TIME ZONE 'America/Los_Angeles')::date
                 LIMIT 1
                 """
             )
@@ -1944,7 +1953,7 @@ def fetch_demand_calibration(conn) -> dict:
                 "FROM demand_log "
                 "WHERE actual_band IS NOT NULL "
                 "AND COALESCE(base_score, predicted_score) IS NOT NULL "
-                "AND business_day >= (CURRENT_DATE - %s::int) "
+                "AND business_day >= ((now() AT TIME ZONE 'America/Los_Angeles')::date - %s::int) "
                 "ORDER BY business_day DESC",
                 (CALIB_WINDOW_DAYS,),
             )
@@ -2293,12 +2302,40 @@ def run_pulse(conn) -> None:
         if action:
             data.update(action)
         title = f"Tonight's read: {p['band']}"
+        # Identity of tonight's read, taken from the TRUSTED deterministic drivers
+        # (p["drivers"]), NOT the LLM-merged `data` dict - so a stray key in Luna's
+        # ACTION json can never reshape the comparison and skip a tick. Each driver
+        # is (name, sign); sign matters (a driver flipping +/- is a real shift), but
+        # the volatile detail string is excluded so it can't defeat the dedupe.
+        this_key = sorted((n, s) for (n, s, _d) in p["drivers"])
+        unchanged = False
         with conn.cursor() as cur:
+            # Card dedupe: keep the 4h cadence (so a real shift still refreshes the
+            # dinner read), but don't post a freshly-worded REPEAT when the band +
+            # drivers are identical to today's last pulse card - that churn is what
+            # reads as "the pulse keeps repeating". demand_log + reach still update
+            # every tick below regardless.
             cur.execute(
-                "INSERT INTO luna_insights (kind, title, body, status, data) "
-                "VALUES ('pulse', %s, %s, 'new', %s::jsonb)",
-                (title, body or f"{p['band']} tonight.", json.dumps(data)),
-            )
+                "SELECT data FROM luna_insights WHERE kind = 'pulse' "
+                "AND (created_at AT TIME ZONE 'America/Los_Angeles')::date "
+                "= (now() AT TIME ZONE 'America/Los_Angeles')::date "
+                "ORDER BY created_at DESC LIMIT 1")
+            prev = cur.fetchone()
+            if prev and prev[0]:
+                pj = prev[0]
+                if isinstance(pj, str):
+                    pj = json.loads(pj)
+                prev_key = sorted(
+                    (n, s) for (n, s) in
+                    ((x.get("name"), x.get("sign")) for x in (pj.get("drivers") or []))
+                    if n)
+                unchanged = (pj.get("band") == p["band"] and prev_key == this_key)
+            if not unchanged:
+                cur.execute(
+                    "INSERT INTO luna_insights (kind, title, body, status, data) "
+                    "VALUES ('pulse', %s, %s, 'new', %s::jsonb)",
+                    (title, body or f"{p['band']} tonight.", json.dumps(data)),
+                )
             # Log the prediction for the forecast-vs-actual trust loop. The
             # manager's nightly close-out fills actual_band on the same row.
             cur.execute(
@@ -2313,7 +2350,11 @@ def run_pulse(conn) -> None:
             # day), reach out — once per kind per evening, not every 4h tick.
             maybe_reach(cur, p, conventions, tourism)
         conn.commit()
-        log(f"pulse: wrote '{title}' ({len(body)} chars)")
+        if unchanged:
+            log(f"pulse: band={p['band']} unchanged since today's last card; "
+                "refreshed demand_log + reach, skipped duplicate card")
+        else:
+            log(f"pulse: wrote '{title}' ({len(body)} chars)")
     except DB_ERRORS:
         raise
     except LunaUnavailable as e:
@@ -2361,7 +2402,36 @@ def fetch_on_this_day() -> dict:
     return out
 
 
-def build_special_user(otd, d) -> str:
+def fetch_recent_specials(conn, days=7, limit=10):
+    """Recent specials (name + the 'Why' hook they riffed on) so Luna can avoid
+    repeating a fact, theme, or name. Rolling ~N-day window; read-only."""
+    out = []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, body FROM luna_insights WHERE kind = 'special' "
+                "AND created_at >= now() - make_interval(days => %s) "
+                "ORDER BY created_at DESC LIMIT %s",
+                (days, limit))
+            for title, body in cur.fetchall():
+                name = re.sub(r"^Special idea:\s*", "", title or "").strip()
+                why = ""
+                for line in (body or "").splitlines():
+                    if line.strip().lower().startswith("why:"):
+                        why = line.split(":", 1)[1].strip()
+                        break
+                if name:
+                    out.append((name, why))
+        conn.rollback()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    return out
+
+
+def build_special_user(otd, d, recent=None, replacing=None) -> str:
     facts = []
     if otd["holidays"]:
         facts.append("Observances today: " + " | ".join(otd["holidays"]))
@@ -2372,11 +2442,23 @@ def build_special_user(otd, d) -> str:
     hol = _major_holiday(d)
     if hol:
         facts.append(f"Major holiday: {hol}")
-    return "\n".join([
+    lines = [
         f"Today is {d.strftime('%A, %B %d, %Y')}.",
         ("\n".join(facts) if facts else "(no notable facts found - invent something seasonal + coastal)"),
-        "Invent the special now.",
-    ])
+    ]
+    if recent:
+        used = "; ".join(
+            f'"{n}"' + (f" (riffed on: {w})" if w else "") for n, w in recent)
+        lines.append(
+            "RECENTLY-USED specials - do NOT reuse these facts, themes, or names; "
+            "pick a clearly different angle: " + used)
+    if replacing:
+        lines.append(
+            f'The manager just rejected "{replacing}" and tapped Try Again - give a '
+            "GENUINELY different special (a different fact, or a wildly different drink), "
+            "not a variation on that one.")
+    lines.append("Invent the special now.")
+    return "\n".join(lines)
 
 
 def run_special(conn, force=False) -> None:
@@ -2388,19 +2470,30 @@ def run_special(conn, force=False) -> None:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT 1 FROM luna_insights WHERE kind = 'special' "
-                    "AND created_at::date = current_date LIMIT 1")
+                    "AND (created_at AT TIME ZONE 'America/Los_Angeles')::date "
+                    "= (now() AT TIME ZONE 'America/Los_Angeles')::date LIMIT 1")
                 if cur.fetchone():
                     conn.rollback()
                     return
             conn.rollback()
+        recent = fetch_recent_specials(conn)
+        replacing = recent[0][0] if (force and recent) else None
         otd = fetch_on_this_day()
-        user = build_special_user(otd, date.today())
+        user = build_special_user(otd, date.today(), recent, replacing)
         log("special: inventing today's creative special via operator")
         reply = plainify(ask_operator(SPECIAL_PREAMBLE, user))
         body, action = extract_action(reply)
         if not body or _looks_like_nonanswer(body):
             log("special: no usable special this pass")
             return
+        # Defensive: strip any format scaffolding the model sometimes echoes
+        # ("Line 1:", "1)", "First line -") so it never leaks into the title/body.
+        cleaned = [
+            re.sub(r"(?i)^\s*(line\s*\d+|first line|second line|third line|\d+)\s*[.):=\-]\s*",
+                   "", ln)
+            for ln in body.splitlines()
+        ]
+        body = "\n".join(cleaned).strip()
         first = (body.splitlines() or [""])[0]
         name = re.split(r"[—:\-]", first, maxsplit=1)[0].strip()[:60] or "Today's special"
         data = {"special": True, "source": "on-this-day"}
