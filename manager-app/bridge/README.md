@@ -111,6 +111,35 @@ journalctl -u luna-iggys-briefing --no-pager -n 20
 # then: SELECT * FROM luna_insights ORDER BY id DESC LIMIT 1;
 ```
 
+## Email triage (proactive inbox reading)
+
+The daemon folds an inbox triage pass into its **idle ticks** (interactive Q&A
+always takes priority). Every `LUNA_TRIAGE_SECONDS` (default 1200) of quiet it:
+
+1. **Classifies** unclassified inbound `messages` in one Luna call → writes
+   `importance` / `category` / `needs_reply` / `luna_classification` (`by:'luna'`).
+   Requires the `add_message_triage` migration + `GRANT UPDATE ON messages TO
+   luna_bridge` (both already applied to the project).
+2. **Drafts + alerts** the high-priority unanswered ones (≤`TRIAGE_MAX_DRAFTS`
+   per pass): a guest-voice reply goes into a `luna_insights` row
+   (`kind='alert'`, `action.type='draft_reply'`, `payload.messageId`) — the
+   dashboard's existing handoff pre-fills the reply box on one tap. Each message
+   is marked `reminded` so it never re-alerts.
+
+The app also runs a fast keyword heuristic client-side, so the "Needs a reply"
+board is populated instantly even before Luna's first pass; her verdict then wins.
+
+Run a triage pass by hand (one-shot, exits):
+
+```bash
+/usr/bin/python3 /home/bradley/projects/iggys-bridge/luna_iggys_bridge.py --triage
+# then: SELECT id, importance, category, needs_reply FROM messages
+#       WHERE luna_classified_at IS NOT NULL ORDER BY id DESC LIMIT 10;
+```
+
+Tunables (env): `LUNA_TRIAGE_SECONDS`, and in-file `TRIAGE_CLASSIFY_BATCH`,
+`TRIAGE_MAX_DRAFTS`, `TRIAGE_LOOKBACK_DAYS`.
+
 ## Behavior notes
 
 - **Serial by design.** One question at a time, so a single Luna sessionId

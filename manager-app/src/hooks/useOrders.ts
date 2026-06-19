@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Order } from '../types';
 
@@ -6,9 +6,10 @@ import type { Order } from '../types';
 export function useOrders(enabled: boolean) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -19,6 +20,7 @@ export function useOrders(enabled: boolean) {
     } else {
       setOrders((data as Order[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

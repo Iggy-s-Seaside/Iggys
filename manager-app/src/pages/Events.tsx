@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Calendar, RefreshCw, Download } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { Toggle } from '../components/ui/Toggle';
 import { AddToCalendarButton } from '../components/events/AddToCalendarButton';
 import { downloadBulkIcs } from '../utils/calendarSync';
+import { safeFmtDate } from '../utils/format';
 import type { IggyEvent } from '../types';
-import { format, parseISO } from 'date-fns';
-
-function formatDate(dateStr: string, fmt = 'MMM d, yyyy') {
-  try { return format(parseISO(dateStr), fmt); } catch { return dateStr; }
-}
 
 export function Events() {
   const { data: events, loading, update, remove } = useSupabaseCRUD<IggyEvent>('events');
@@ -20,45 +20,41 @@ export function Events() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Events</h1>
-          <p className="text-sm text-text-muted mt-1">{events.length} total events</p>
-        </div>
-        <div className="flex gap-2">
-          {events.filter(e => e.active).length > 0 && (
-            <button
-              onClick={() => downloadBulkIcs(events.filter(e => e.active))}
-              className="btn-secondary"
-              title="Export all active events as .ics"
-            >
-              <Download size={18} /> Export All
-            </button>
-          )}
-          <Link to="/events/new" className="btn-primary">
-            <Plus size={18} /> New Event
-          </Link>
-        </div>
-      </div>
+      <PageHeader title="Events" subtitle={`${events.length} total events`}>
+        {events.filter(e => e.active).length > 0 && (
+          <button
+            onClick={() => downloadBulkIcs(events.filter(e => e.active))}
+            className="btn-secondary"
+            title="Export all active events as .ics"
+          >
+            <Download size={18} /> Export All
+          </button>
+        )}
+        <Link to="/events/new" className="btn-primary">
+          <Plus size={18} /> New Event
+        </Link>
+      </PageHeader>
 
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card p-4 animate-pulse">
-              <div className="h-5 bg-surface-hover rounded w-1/3 mb-2" />
-              <div className="h-4 bg-surface-hover rounded w-1/4" />
+            <div key={i} className="card p-4">
+              <Skeleton className="h-5 w-1/3 mb-2" />
+              <Skeleton className="h-4 w-1/4" />
             </div>
           ))}
         </div>
       ) : events.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Calendar size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">No events yet</p>
-          <p className="text-sm text-text-muted mt-1">Create your first event to get started</p>
-          <Link to="/events/new" className="btn-primary mt-4 inline-flex">
-            <Plus size={18} /> Create Event
-          </Link>
-        </div>
+        <EmptyState
+          icon={Calendar}
+          title="No events yet"
+          description="Create your first event to get started"
+          action={
+            <Link to="/events/new" className="btn-primary inline-flex">
+              <Plus size={18} /> Create Event
+            </Link>
+          }
+        />
       ) : (
         <div className="card overflow-hidden">
           <table className="w-full">
@@ -86,7 +82,7 @@ export function Events() {
                       <div>
                         <p className="text-sm font-medium text-text-primary">{event.title}</p>
                         <p className="text-xs text-text-muted sm:hidden">
-                          {formatDate(event.date, 'MMM d')}
+                          {safeFmtDate(event.date, 'MMM d')}
                         </p>
                         {event.is_recurring && (
                           <span className="inline-flex items-center gap-1 text-xs text-primary">
@@ -98,7 +94,7 @@ export function Events() {
                   </td>
                   <td className="px-5 py-3.5 hidden sm:table-cell">
                     <p className="text-sm text-text-secondary">
-                      {formatDate(event.date)}
+                      {safeFmtDate(event.date)}
                     </p>
                     <p className="text-xs text-text-muted">{event.time}</p>
                   </td>
@@ -106,24 +102,20 @@ export function Events() {
                     {event.category ? <span className="badge-primary">{event.category}</span> : <span className="text-xs text-text-muted">--</span>}
                   </td>
                   <td className="px-5 py-3.5 text-center">
-                    <button
-                      onClick={() => update(event.id, { active: !event.active })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        event.active ? 'bg-primary' : 'bg-surface-active'
-                      }`}
-                    >
-                      <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${
-                        event.active ? 'translate-x-6' : 'translate-x-1'
-                      }`} />
-                    </button>
+                    <Toggle
+                      checked={event.active}
+                      onChange={(checked) => update(event.id, { active: checked })}
+                      ariaLabel={event.active ? 'Set event inactive' : 'Set event active'}
+                      className="align-middle"
+                    />
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1.5">
                       <AddToCalendarButton event={event} />
-                      <Link to={`/events/${event.id}/edit`} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                      <Link to={`/events/${event.id}/edit`} aria-label="Edit event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
                         <Edit2 size={15} />
                       </Link>
-                      <button onClick={() => setDeleteId(event.id)} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
+                      <button onClick={() => setDeleteId(event.id)} aria-label="Delete event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
                         <Trash2 size={15} />
                       </button>
                     </div>

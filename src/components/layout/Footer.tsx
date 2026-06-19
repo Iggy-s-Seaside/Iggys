@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Clock, Mail, Phone, Instagram, Facebook } from 'lucide-react';
+import NewsletterSignup from '../NewsletterSignup';
 
 const ctaOptions = [
   { path: '/', label: 'View Our Menu', to: '/cocktails' },
@@ -68,6 +69,28 @@ export default function Footer() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/[0.015] rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+          {/* Newsletter / SMS opt-in — the list-growth surface */}
+          <div className="mb-12 pb-12 border-b border-white/[0.06] grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div>
+              <p className="text-xs font-bold tracking-widest uppercase text-primary/80 mb-3">
+                Get the inside scoop
+              </p>
+              <h3 className="font-display text-2xl sm:text-3xl text-white leading-tight">
+                Drinks, events &amp; happy hour
+              </h3>
+              <p className="text-white/40 text-sm mt-3 max-w-sm leading-relaxed">
+                Be first to know about new pours, live events, and happy-hour
+                deals on the Oregon Coast.
+              </p>
+            </div>
+            <div className="lg:max-w-md lg:ml-auto w-full">
+              <NewsletterSignup
+                title="Join the list"
+                subtitle="Pick email, text, or both — opt out anytime."
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
             {/* Col 1: Brand */}
             <div className="sm:col-span-2 lg:col-span-1">

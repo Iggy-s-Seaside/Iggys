@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Party } from '../types';
 import toast from 'react-hot-toast';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
+
+// Unique realtime channel name per mount — this hook can be mounted several times on
+// one screen (e.g. the dashboard's pulse + daily read + weather cross-signal), and
+// two channels of the same name collide. Same pattern as useLuna/useLunaChronicle.
+let channelSeq = 0;
+const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
 /** All parties, with realtime updates (used by the pipeline list + dashboard). */
 export function useParties() {
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('parties')
       .select('*')
@@ -18,9 +27,13 @@ export function useParties() {
     if (error) {
       toast.error('Failed to load parties');
       console.error(error);
+      setError(error.message);
     } else {
-      setParties((data as Party[]) || []);
+      // filterPendingDeletes keeps a mid-undo-window row hidden if a realtime tick re-pulls it.
+      setParties(filterPendingDeletes('parties', (data as Party[]) || []));
+      setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -30,7 +43,7 @@ export function useParties() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('parties-realtime')
+      .channel(uniqueTopic('parties-realtime'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'parties' }, () => {
         refresh();
       })
@@ -67,23 +80,29 @@ export function useParties() {
   };
 
   const remove = async (id: number): Promise<boolean> => {
-    const { error } = await supabase.from('parties').delete().eq('id', id);
-    if (error) {
-      toast.error('Failed to delete party');
-      return false;
+    const item = parties.find((r) => r.id === id);
+    if (!item) {
+      // Fallback: row not in local cache — delete directly.
+      const { error } = await supabase.from('parties').delete().eq('id', id);
+      if (error) {
+        toast.error('Failed to delete party');
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Party deleted');
-    await refresh();
+    undoableDelete('parties', id, item, setParties, 'Party removed');
     return true;
   };
 
-  return { parties, loading, refresh, create, update, remove };
+  return { parties, loading, error, refresh, create, update, remove };
 }
 
 /** A single party by id (used by the profile page) — fetched fresh, no realtime. */
 export function useParty(id: number | null) {
   const [party, setParty] = useState<Party | null>(null);
   const [loading, setLoading] = useState(true);
+  const partyLoadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (id == null) {
@@ -91,7 +110,7 @@ export function useParty(id: number | null) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!partyLoadedRef.current) setLoading(true);
     const { data, error } = await supabase.from('parties').select('*').eq('id', id).maybeSingle();
     if (error) {
       toast.error('Failed to load party');
@@ -99,7 +118,14 @@ export function useParty(id: number | null) {
     } else {
       setParty((data as Party) ?? null);
     }
+    partyLoadedRef.current = true;
     setLoading(false);
+  }, [id]);
+
+  // Reset the first-load guard on a genuine party switch so the spinner shows
+  // for the new party instead of flashing the previous party's row.
+  useEffect(() => {
+    partyLoadedRef.current = false;
   }, [id]);
 
   useEffect(() => {

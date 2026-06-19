@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, CheckCircle2, XCircle, RotateCcw, Pencil, Send,
-  CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine,
+  CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine, FileText,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useParty } from '../hooks/useParties';
+import { EmptyState } from '../components/ui/EmptyState';
+import { safeFmtDate } from '../utils/format';
 import { usePartyPackages } from '../hooks/usePackages';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { PackagePicker } from '../components/packages/PackagePicker';
 import { InvoicePanel } from '../components/parties/InvoicePanel';
+import { DepositPanel } from '../components/parties/DepositPanel';
+import { ProposalPanel } from '../components/parties/ProposalPanel';
 import { ConfirmPartyModal } from '../components/parties/ConfirmPartyModal';
 import { PartyEmailModal } from '../components/parties/PartyEmailModal';
 import { PartyForm } from '../components/parties/PartyForm';
@@ -26,11 +30,11 @@ const STATUS_BADGE: Record<PartyStatus, string> = {
 
 function fmtDate(d: string | null, fmt = 'EEEE, MMMM d, yyyy') {
   if (!d) return null;
-  try { return format(parseISO(d), fmt); } catch { return d; }
+  return safeFmtDate(d, fmt);
 }
 function fmtStamp(d: string | null) {
   if (!d) return null;
-  try { return format(parseISO(d), 'MMM d, yyyy h:mm a'); } catch { return d; }
+  return safeFmtDate(d, 'MMM d, yyyy h:mm a');
 }
 
 function Field({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
@@ -50,6 +54,7 @@ export function PartyProfile() {
   const { id } = useParams();
   const pid = id ? Number(id) : null;
   const navigate = useNavigate();
+  const handoff = useLunaHandoff();
   const { party, loading, update, refresh } = useParty(pid);
   const { items, addPackage, updateLine, removeLine } = usePartyPackages(pid);
 
@@ -65,6 +70,9 @@ export function PartyProfile() {
   const [followDate, setFollowDate] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
 
+  const followDateId = useId();
+  const followNotesId = useId();
+
   useEffect(() => {
     if (party) {
       setFollowNotes(party.follow_up_notes ?? '');
@@ -72,6 +80,24 @@ export function PartyProfile() {
       setInternalNotes(party.internal_notes ?? '');
     }
   }, [party]);
+
+  // Luna handoff: a party_email insight deep-links here with Luna's drafted
+  // follow-up. Open the email composer ready to send, copy the draft to the
+  // clipboard, and stash it in the follow-up notes as a durable reference. The
+  // composer loads the template; the manager pastes/edits and sends themselves —
+  // nothing is ever sent automatically.
+  const handoffApplied = useRef(false);
+  useEffect(() => {
+    if (handoffApplied.current) return;
+    if (!party) return;
+    if (!handoff.draft) return;
+    handoffApplied.current = true;
+    setFollowNotes(handoff.draft);
+    setFollowUpOpen(true);
+    navigator.clipboard?.writeText(handoff.draft)
+      .then(() => toast.success("Luna's draft copied — paste it into the email"))
+      .catch(() => { /* clipboard blocked — draft is still saved in the notes field */ });
+  }, [party, handoff]);
 
   if (loading) {
     return (
@@ -82,12 +108,14 @@ export function PartyProfile() {
   }
   if (!party) {
     return (
-      <div className="card p-12 text-center">
-        <p className="text-text-secondary font-medium">Party not found</p>
-        <button onClick={() => navigate('/parties')} className="btn-secondary mt-4 inline-flex">
-          <ArrowLeft size={16} /> Back to Parties
-        </button>
-      </div>
+      <EmptyState
+        title="Party not found"
+        action={(
+          <button onClick={() => navigate('/parties')} className="btn-secondary inline-flex">
+            <ArrowLeft size={16} /> Back to Parties
+          </button>
+        )}
+      />
     );
   }
 
@@ -153,9 +181,14 @@ export function PartyProfile() {
             </p>
           )}
         </div>
-        <button onClick={() => setEditOpen(true)} className="btn-secondary text-sm shrink-0">
-          <Pencil size={15} /> Edit
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => navigate(`/parties/${party.id}/beo`)} className="btn-secondary text-sm">
+            <FileText size={15} /> View BEO
+          </button>
+          <button onClick={() => setEditOpen(true)} className="btn-secondary text-sm">
+            <Pencil size={15} /> Edit
+          </button>
+        </div>
       </div>
 
       {/* Status action bar */}
@@ -249,13 +282,13 @@ export function PartyProfile() {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div className="sm:col-span-1">
-                <label className="label">Follow up by</label>
-                <input type="date" className="input-field" value={followDate}
+                <label htmlFor={followDateId} className="label">Follow up by</label>
+                <input id={followDateId} type="date" className="input-field" value={followDate}
                   onChange={(e) => setFollowDate(e.target.value)} />
               </div>
             </div>
-            <label className="label">Notes</label>
-            <textarea className="input-field min-h-[70px] resize-y mb-3" value={followNotes}
+            <label htmlFor={followNotesId} className="label">Notes</label>
+            <textarea id={followNotesId} className="input-field min-h-[70px] resize-y mb-3" value={followNotes}
               onChange={(e) => setFollowNotes(e.target.value)} placeholder="What's pending, what to send next…" />
             <button
               onClick={() => update({ follow_up_notes: followNotes || null, follow_up_date: followDate || null })}
@@ -279,6 +312,12 @@ export function PartyProfile() {
 
         {/* Invoice */}
         <InvoicePanel party={party} lines={items} onSave={update} />
+
+        {/* Deposit & payment */}
+        <DepositPanel party={party} lines={items} onSave={update} />
+
+        {/* Proposal */}
+        <ProposalPanel party={party} />
 
         {/* Internal notes */}
         <div className="card p-5">

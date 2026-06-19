@@ -288,35 +288,42 @@ export const MobileToolbar = memo(function MobileToolbar({
         document.body
       )}
 
-      {/* Main toolbar — single row, anchored to bottom */}
-      <div className="flex items-center justify-around px-2 py-1.5 bg-surface/95 backdrop-blur-xl border-t border-border/30">
-        <ToolButton icon={Plus} label="Add" onClick={() => { if (!addMenuOpen) onCloseOverlays(); setAddMenuOpen(!addMenuOpen); setMoreOpen(false); }} active={addMenuOpen} />
-        <ToolButton icon={Layers} label="Layers" onClick={onOpenLayers} highlighted={activeSheet === 'layers'} />
-        {hasSelection && !isImageSelected && (
+      {/* Main toolbar — anchored to bottom. Save + More are pinned to the right
+          (shrink-0) so the primary Save action can NEVER be clipped off-screen;
+          the lower-frequency tools scroll horizontally in the remaining space on
+          narrow phones instead of pushing Save out of reach. */}
+      <div className="flex items-center px-2 py-1.5 bg-surface/95 backdrop-blur-xl border-t border-border/30">
+        <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto overscroll-x-contain scrollbar-hide">
+          <ToolButton icon={Plus} label="Add" onClick={() => { if (!addMenuOpen) onCloseOverlays(); setAddMenuOpen(!addMenuOpen); setMoreOpen(false); }} active={addMenuOpen} />
+          <ToolButton icon={Layers} label="Layers" onClick={onOpenLayers} highlighted={activeSheet === 'layers'} />
+          {hasSelection && !isImageSelected && (
+            <ToolButton
+              icon={TypeIcon}
+              label="Font"
+              onClick={onOpenFontPicker}
+            />
+          )}
+          {hasSelection && isImageSelected && (
+            <ToolButton
+              icon={Blend}
+              label="Blend"
+              onClick={onOpenBlendPicker}
+            />
+          )}
           <ToolButton
-            icon={TypeIcon}
-            label="Font"
-            onClick={onOpenFontPicker}
+            icon={SlidersHorizontal}
+            label="Edit"
+            onClick={onOpenProperties}
+            active={hasSelection}
+            highlighted={activeSheet === 'properties'}
           />
-        )}
-        {hasSelection && isImageSelected && (
-          <ToolButton
-            icon={Blend}
-            label="Blend"
-            onClick={onOpenBlendPicker}
-          />
-        )}
-        <ToolButton
-          icon={SlidersHorizontal}
-          label="Edit"
-          onClick={onOpenProperties}
-          active={hasSelection}
-          highlighted={activeSheet === 'properties'}
-        />
-        <ToolButton icon={Undo2} label="Undo" onClick={onUndo} disabled={!canUndo} />
-        <ToolButton icon={Redo2} label="Redo" onClick={onRedo} disabled={!canRedo} />
-        <ToolButton icon={Save} label="Save" onClick={onSave} primary />
-        <ToolButton icon={MoreHorizontal} label="More" onClick={() => { if (!moreOpen) onCloseOverlays(); setMoreOpen(!moreOpen); setAddMenuOpen(false); }} active={moreOpen} />
+          <ToolButton icon={Undo2} label="Undo" onClick={onUndo} disabled={!canUndo} />
+          <ToolButton icon={Redo2} label="Redo" onClick={onRedo} disabled={!canRedo} />
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0 ml-1 pl-1 border-l border-border/30">
+          <ToolButton icon={Save} label="Save" onClick={onSave} primary />
+          <ToolButton icon={MoreHorizontal} label="More" onClick={() => { if (!moreOpen) onCloseOverlays(); setMoreOpen(!moreOpen); setAddMenuOpen(false); }} active={moreOpen} />
+        </div>
       </div>
 
       {/* Toolbar-specific keyframe (shared ones are in index.css) */}

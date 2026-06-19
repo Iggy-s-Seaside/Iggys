@@ -1,0 +1,97 @@
+/*
+ * Print fidelity for the Reports page (owner-meeting PDF).
+ *
+ * Imported only by Reports.tsx so it never affects other routes' screen
+ * rendering — and every rule is wrapped in @media print so it can't touch the
+ * on-screen experience even of this page. We can't add classes to the shared
+ * layout chrome (Sidebar / BottomNav / mobile top bar), so the app-shell rules
+ * target those elements structurally: the desktop <aside>, any position:fixed
+ * <nav> (bottom tab bar / notification bars), and the mobile fixed top bar.
+ */
+
+@media print {
+  /* ── Hide the app shell: sidebar, bottom nav, mobile top bar, bell badges ── */
+  aside,
+  nav.fixed,
+  .lg\:hidden.fixed {
+    display: none !important;
+  }
+
+  /* Reclaim the full page width once the sidebar is gone. */
+  main {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Drop the screen padding meant to clear the (now-hidden) mobile bars. */
+  main > div {
+    padding: 0 !important;
+  }
+
+  /* Neutralize dark mode for print so cards aren't black ink-hogs. */
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* ── Simple report header — only visible on paper ── */
+  .reports-print-header {
+    display: block !important;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #111;
+  }
+  .reports-print-header .rp-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111;
+  }
+  .reports-print-header .rp-meta {
+    font-size: 12px;
+    color: #444;
+    margin-top: 2px;
+  }
+
+  /* Hide on-screen-only action controls (Print / Export / nav links). */
+  .reports-no-print {
+    display: none !important;
+  }
+
+  /* ── Card / chart fidelity: clean borders, no shadows, no mid-card breaks ── */
+  .card {
+    border: 1px solid #d4d4d4 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Keep headings with their content. */
+  h1,
+  h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* SVG charts can otherwise be split awkwardly across a page boundary. */
+  svg {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Print color accuracy for the chart bars / progress fills. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}
+
+/* The print header is hidden on screen; @media print flips it on. */
+.reports-print-header {
+  display: none;
+}

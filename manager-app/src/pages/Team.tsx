@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Users, UserPlus, KeyRound, Trash2, Copy, Check, Loader2, ShieldCheck,
+  Users, UserPlus, KeyRound, Trash2, Copy, Check, Loader2, ShieldCheck, Bell, Hash,
 } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
+import { useConfirm } from '../hooks/useConfirm';
+import { usePushSubscription } from '../hooks/usePushSubscription';
+import { Skeleton } from '../components/ui/Skeleton';
+import Select from '../components/ui/Select';
+import { InstallHelp } from '../components/InstallHelp';
+import { InstallQR } from '../components/InstallQR';
+import type { Role } from '../hooks/useRole';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 interface ManagerUser {
@@ -12,6 +20,34 @@ interface ManagerUser {
   created_at: string;
   last_sign_in_at: string | null;
   is_me: boolean;
+  role: Role;
+}
+
+const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'employee', label: 'Employee' },
+];
+
+const ROLE_LABEL: Record<Role, string> = {
+  owner: 'Owner',
+  manager: 'Manager',
+  employee: 'Employee',
+};
+
+/** Per-role badge tint — owner reads as the strongest, employee the quietest. */
+function RoleBadge({ role }: { role: Role }) {
+  const tint =
+    role === 'owner'
+      ? 'bg-primary/10 text-primary'
+      : role === 'manager'
+        ? 'bg-accent/10 text-accent'
+        : 'bg-surface-active text-text-muted';
+  return (
+    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${tint}`}>
+      {ROLE_LABEL[role]}
+    </span>
+  );
 }
 
 interface TempCredential {
@@ -82,10 +118,98 @@ function CredentialReveal({ cred, onDone }: { cred: TempCredential; onDone: () =
   );
 }
 
+/**
+ * Per-device push toggle. Subscribes THIS browser to Web Push and stores the
+ * subscription so the server can reach it. Safe no-op until VITE_VAPID_PUBLIC_KEY is
+ * set — in that case it shows a quiet setup hint instead of a live switch.
+ */
+function NotificationsToggle() {
+  const { supported, needsConfig, permission, subscribed, busy, enable, disable } = usePushSubscription();
+
+  const toggle = async () => {
+    if (busy) return;
+    if (subscribed) {
+      const res = await disable();
+      if (res.ok) toast.success('Notifications off for this device');
+      else toast.error(res.reason || 'Could not turn off notifications');
+      return;
+    }
+    const res = await enable();
+    if (res.ok) toast.success('Notifications on for this device');
+    else if (res.reason === 'permission denied') {
+      toast.error('Notifications are blocked — allow them in your browser settings');
+    } else if (res.reason === 'permission dismissed') {
+      // User closed the prompt without choosing; no need to nag.
+    } else {
+      toast.error(res.reason || 'Could not turn on notifications');
+    }
+  };
+
+  return (
+    <div className="card p-5 mb-6">
+      <h2 className="text-sm font-semibold text-text-primary mb-1 flex items-center gap-2">
+        <Bell size={15} className="text-primary" /> Notifications on this device
+      </h2>
+      <p className="text-xs text-text-muted mb-4">
+        Get a push alert on this phone or browser for new inquiries, low stock, and Luna's heads-ups.
+        This is per-device — turn it on wherever you want to be reached.
+      </p>
+
+      {needsConfig ? (
+        <p className="text-xs text-text-muted bg-surface-hover border border-border rounded-lg px-3 py-2.5">
+          Set <code className="font-mono text-text-secondary">VITE_VAPID_PUBLIC_KEY</code> to enable.
+        </p>
+      ) : !supported ? (
+        <p className="text-xs text-text-muted bg-surface-hover border border-border rounded-lg px-3 py-2.5">
+          This browser doesn't support push notifications.
+        </p>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text-primary">
+              {subscribed ? 'On for this device' : 'Off for this device'}
+            </p>
+            {permission === 'denied' && (
+              <p className="text-xs text-danger mt-0.5">
+                Blocked in browser settings — allow notifications, then try again.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={subscribed}
+            aria-label="Notifications on this device"
+            aria-busy={busy}
+            onClick={toggle}
+            disabled={busy}
+            className="relative inline-flex items-center justify-center shrink-0 min-h-[44px] min-w-[44px] disabled:opacity-60"
+          >
+            <span
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                subscribed ? 'bg-primary' : 'bg-surface-active'
+              }`}
+            >
+              <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full bg-white transition-transform shadow-sm ${
+                  subscribed ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              >
+                {busy && <Loader2 size={10} className="animate-spin text-text-muted" />}
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Team() {
   const [users, setUsers] = useState<ManagerUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState<Role>('manager');
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cred, setCred] = useState<TempCredential | null>(null);
@@ -93,6 +217,30 @@ export function Team() {
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
   const [changingPw, setChangingPw] = useState(false);
+
+  // Set-PIN modal
+  const [pinFor, setPinFor] = useState<ManagerUser | null>(null);
+  const [pinValue, setPinValue] = useState('');
+  const [pinName, setPinName] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
+
+  const confirm = useConfirm();
+
+  const handleSetPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinSaving || !pinFor) return;
+    if (!/^\d{4}$/.test(pinValue)) { toast.error('PIN must be exactly 4 digits.'); return; }
+    setPinSaving(true);
+    try {
+      await callManageUsers({ action: 'set_pin', user_id: pinFor.id, pin: pinValue, name: pinName.trim() || undefined });
+      toast.success(`PIN set for ${pinName.trim() || pinFor.email}`);
+      setPinFor(null);
+      setPinValue('');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to set PIN');
+    }
+    setPinSaving(false);
+  };
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -114,20 +262,27 @@ export function Team() {
     if (!email || adding) return;
     setAdding(true);
     try {
-      const data = await callManageUsers({ action: 'create', email });
+      const data = await callManageUsers({ action: 'create', email, role: newRole });
       setCred({ email, password: data.temp_password, kind: 'created' });
       setNewEmail('');
-      toast.success('Manager added');
+      setNewRole('manager');
+      toast.success('Teammate added');
       fetchUsers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to add manager');
+      toast.error(e instanceof Error ? e.message : 'Failed to add teammate');
     }
     setAdding(false);
   };
 
   const handleReset = async (u: ManagerUser) => {
     if (busyId) return;
-    if (!window.confirm(`Reset the password for ${u.email}? Their current password stops working immediately.`)) return;
+    const ok = await confirm({
+      title: 'Reset password',
+      message: `Reset the password for ${u.email}? Their current password stops working immediately.`,
+      confirmLabel: 'Reset password',
+      danger: true,
+    });
+    if (!ok) return;
     setBusyId(u.id);
     try {
       const data = await callManageUsers({ action: 'reset_password', user_id: u.id });
@@ -141,7 +296,13 @@ export function Team() {
 
   const handleRemove = async (u: ManagerUser) => {
     if (busyId) return;
-    if (!window.confirm(`Remove ${u.email}? They lose dashboard access immediately.`)) return;
+    const ok = await confirm({
+      title: 'Remove manager',
+      message: `Remove ${u.email}? They lose dashboard access immediately.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     setBusyId(u.id);
     try {
       await callManageUsers({ action: 'delete', user_id: u.id });
@@ -193,6 +354,11 @@ export function Team() {
         There is no public sign-up — accounts can only be created here.
       </p>
 
+      {/* Get your staff set up: install on-ramp (renders nothing once installed)
+          + a printable QR poster for the back office (owner/manager only). */}
+      <InstallHelp variant="card" className="mb-6" />
+      <InstallQR className="mb-6" />
+
       {cred && <div className="mb-6"><CredentialReveal cred={cred} onDone={() => setCred(null)} /></div>}
 
       {/* Managers list */}
@@ -201,7 +367,7 @@ export function Team() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (
-              <div key={i} className="h-12 rounded-lg bg-surface-hover animate-pulse" />
+              <Skeleton key={i} className="h-12 rounded-lg" />
             ))}
           </div>
         ) : (
@@ -209,16 +375,28 @@ export function Team() {
             {users.map((u) => (
               <li key={u.id} className="py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-primary truncate">
-                    {u.email}
-                    {u.is_me && (
-                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
-                        you
-                      </span>
-                    )}
-                  </p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">
+                      {u.email}
+                      {u.is_me && (
+                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                          you
+                        </span>
+                      )}
+                    </p>
+                    <RoleBadge role={u.role} />
+                  </div>
                   <p className="text-xs text-text-muted">Last sign-in {relativeTime(u.last_sign_in_at)}</p>
                 </div>
+                <button
+                  onClick={() => { setPinFor(u); setPinValue(''); setPinName((u.email ?? '').split('@')[0]); }}
+                  disabled={busyId === u.id}
+                  title="Set 4-digit PIN"
+                  aria-label={`Set PIN for ${u.email}`}
+                  className="p-2 rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  <Hash size={16} />
+                </button>
                 <button
                   onClick={() => handleReset(u)}
                   disabled={busyId === u.id}
@@ -232,7 +410,7 @@ export function Team() {
                   <button
                     onClick={() => handleRemove(u)}
                     disabled={busyId === u.id}
-                    title="Remove manager"
+                    title="Remove teammate"
                     aria-label={`Remove ${u.email}`}
                     className="p-2 rounded-lg text-text-muted hover:bg-surface-hover hover:text-danger transition-colors disabled:opacity-50"
                   >
@@ -245,29 +423,44 @@ export function Team() {
         )}
       </div>
 
-      {/* Add manager */}
+      {/* Add teammate */}
       <div className="card p-5 mb-6">
         <h2 className="text-sm font-semibold text-text-primary mb-1 flex items-center gap-2">
-          <UserPlus size={15} className="text-primary" /> Add a manager
+          <UserPlus size={15} className="text-primary" /> Add a teammate
         </h2>
         <p className="text-xs text-text-muted mb-4">
           Creates the account instantly and gives you a one-time temp password to hand them.
+          Pick what they can do: <span className="font-medium text-text-secondary">Owner</span> (full),
+          {' '}<span className="font-medium text-text-secondary">Manager</span> (operations), or
+          {' '}<span className="font-medium text-text-secondary">Employee</span> (waitlist, own schedule &amp; checklists).
         </p>
-        <form onSubmit={handleAdd} className="flex items-center gap-2">
+        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row sm:items-center gap-2">
           <input
             type="email"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="their-email@example.com"
-            aria-label="New manager email"
+            aria-label="New teammate email"
             className="input-field flex-1"
             required
           />
+          <div className="sm:w-40 shrink-0">
+            <Select<Role>
+              value={newRole}
+              onChange={setNewRole}
+              options={ROLE_OPTIONS}
+              variant="manager"
+              label="Role"
+            />
+          </div>
           <button type="submit" disabled={adding || !newEmail.trim()} className="btn-primary px-4 min-h-[44px] shrink-0">
             {adding ? <Loader2 size={16} className="animate-spin" /> : 'Add'}
           </button>
         </form>
       </div>
+
+      {/* Notifications on this device */}
+      <NotificationsToggle />
 
       {/* Change my password */}
       <div className="card p-5">
@@ -299,6 +492,32 @@ export function Team() {
           </button>
         </form>
       </div>
+
+      {/* Set 4-digit PIN */}
+      <Modal open={!!pinFor} onClose={() => setPinFor(null)} title="Set a 4-digit PIN">
+        <form onSubmit={handleSetPin} className="space-y-4">
+          <p className="text-sm text-text-muted">
+            {pinFor?.email} signs in by tapping their name and entering this PIN. They can change it later.
+          </p>
+          <div>
+            <label className="label" htmlFor="pin-name">Display name (shown on the sign-in pad)</label>
+            <input id="pin-name" value={pinName} onChange={(e) => setPinName(e.target.value)}
+              className="input-field" placeholder="e.g. Jasmine" />
+          </div>
+          <div>
+            <label className="label" htmlFor="pin-value">4-digit PIN</label>
+            <input id="pin-value" inputMode="numeric" autoComplete="off" maxLength={4}
+              value={pinValue} onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="input-field tracking-[0.5em] text-center text-lg" placeholder="••••" />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={() => setPinFor(null)} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={pinSaving || pinValue.length !== 4} className="btn-primary">
+              {pinSaving ? <Loader2 size={16} className="animate-spin" /> : 'Save PIN'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

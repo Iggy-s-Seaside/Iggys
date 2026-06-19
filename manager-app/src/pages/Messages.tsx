@@ -1,18 +1,26 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
-  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw
+  Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw,
+  PartyPopper, Zap, Moon
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
+import { ErrorState } from '../components/ui/ErrorState';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
-import { format, parseISO, formatDistanceToNow } from 'date-fns';
+import { createPartyFromLead } from '../utils/partyUpsell';
+import { parseISO, formatDistanceToNow } from 'date-fns';
+import { safeFmtDate } from '../utils/format';
 import type { Message } from '../types';
+import { needsReplyNow, messageTriage, categoryLabel } from '../utils/triage';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
 import { TemplateManager } from '../components/messages/TemplateManager';
 
-type StatusFilter = 'all' | 'unread' | 'read' | 'replied' | 'archived';
+type StatusFilter = 'all' | 'needs' | 'unread' | 'read' | 'replied' | 'archived';
 
 // Throttle Gmail auto-sync across page remounts (module-level, not per-mount).
 let lastAutoSync = 0;
@@ -49,7 +57,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
               {m.from_me ? "Iggy's Seaside" : (m.from_name || m.from_email)}
             </span>
             <span className="text-[11px] text-text-muted shrink-0">
-              {m.date ? format(parseISO(m.date), 'MMM d, h:mm a') : ''}
+              {safeFmtDate(m.date, 'MMM d, h:mm a')}
             </span>
           </div>
           <p className="text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">{m.body}</p>
@@ -61,10 +69,15 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
 
 export function Messages() {
   const {
-    messages, loading, refresh, markAsRead, markAsReplied,
+    messages, loading, error, refresh, markAsRead, markAsReplied,
     archiveMessage, updateNotes, bulkMarkRead, bulkArchive
   } = useMessages();
+  const handoff = useLunaHandoff();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
+  const [convertingParty, setConvertingParty] = useState(false);
+  const [drafting, setDrafting] = useState(false);
 
   const handleSyncGmail = async () => {
     if (syncing) return;
@@ -105,6 +118,10 @@ export function Messages() {
   }, [refresh]);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Tracks the live selection so an async Luna draft only lands if the user is
+  // still on the message it was requested for (no dropping A's draft into B).
+  const selectedIdRef = useRef<number | null>(null);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -118,7 +135,9 @@ export function Messages() {
 
   const filtered = useMemo(() => {
     let result = messages;
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'needs') {
+      result = result.filter(needsReplyNow);
+    } else if (statusFilter !== 'all') {
       result = result.filter((m) => m.status === statusFilter);
     }
     if (search) {
@@ -133,6 +152,26 @@ export function Messages() {
     }
     return result;
   }, [messages, statusFilter, search]);
+
+  // How many reservations/requests are still waiting on a reply (drives the
+  // filter-chip count + the pinned "Needs a reply" section).
+  const needsReplyCount = useMemo(() => messages.filter(needsReplyNow).length, [messages]);
+
+  // Split the current view into the pinned high-priority board + the rest.
+  // Oldest-waiting first so the most overdue reply is on top.
+  const { needsReplyList, regularList } = useMemo(() => {
+    const byOldest = (a: Message, b: Message) => a.created_at.localeCompare(b.created_at);
+    if (statusFilter === 'needs') {
+      return { needsReplyList: [...filtered].sort(byOldest), regularList: [] as Message[] };
+    }
+    const showSection = statusFilter === 'all' || statusFilter === 'unread' || statusFilter === 'read';
+    if (!showSection) return { needsReplyList: [] as Message[], regularList: filtered };
+    const nr: Message[] = [];
+    const rest: Message[] = [];
+    for (const m of filtered) (needsReplyNow(m) ? nr : rest).push(m);
+    nr.sort(byOldest);
+    return { needsReplyList: nr, regularList: rest };
+  }, [filtered, statusFilter]);
 
   const selected = useMemo(
     () => messages.find((m) => m.id === selectedId) ?? null,
@@ -151,6 +190,34 @@ export function Messages() {
     setNotes(selected?.notes || '');
     setReplyText('');
   }, [selected]);
+
+  // Luna handoff: a draft_reply insight deep-links here with the target message
+  // id in the payload and Luna's drafted reply. Select that message and pre-fill
+  // the reply box — the manager always reviews and taps Send themselves.
+  const handoffMsgId = useMemo(() => {
+    const raw = handoff.payload?.messageId ?? handoff.payload?.message_id;
+    return typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : null;
+  }, [handoff.payload]);
+  const replySeeded = useRef(false);
+
+  // Step 1: once messages load, open the target conversation from the handoff.
+  useEffect(() => {
+    if (replySeeded.current) return;
+    if (handoffMsgId == null) return;
+    if (!messages.some((m) => m.id === handoffMsgId)) return;
+    setSelectedId(handoffMsgId);
+    setShowMobileDetail(true);
+  }, [handoffMsgId, messages]);
+
+  // Step 2: when the target conversation is the active one, seed the drafted
+  // reply. Runs after the selection-reset effect above, so the draft survives.
+  useEffect(() => {
+    if (replySeeded.current) return;
+    if (!handoff.draft || handoffMsgId == null) return;
+    if (selected?.id !== handoffMsgId) return;
+    replySeeded.current = true;
+    setReplyText(handoff.draft);
+  }, [handoff.draft, handoffMsgId, selected]);
 
   // Load the Gmail conversation for the selected message (when it's from Gmail).
   const refetchThread = async () => {
@@ -235,10 +302,106 @@ export function Messages() {
     setReplying(false);
   };
 
+  // On-demand: ask the home-lab Luna to draft a reply via her existing bridge —
+  // insert a pending luna_messages row; when she answers (role='luna',
+  // reply_to=this id), drop her draft into the reply box. Reuses the same Q&A
+  // pipeline as the Luna chat (no bridge changes). The manager always reviews +
+  // taps Send themselves — nothing is auto-sent.
+  const askLunaToDraft = async () => {
+    if (!selected || drafting) return;
+    const targetId = selected.id;
+    setDrafting(true);
+    const prompt =
+      `Draft a short, warm reply in Bradley's voice to this customer email for Iggy's Seaside. ` +
+      `Return ONLY the ready-to-send reply body (a couple of sentences), no subject line and no preamble. ` +
+      `Answer their question if you can from what you know; otherwise be friendly and ask for the detail you need.\n\n` +
+      `From: ${selected.name} <${selected.email}>\n` +
+      `Subject: ${selected.subject}\n\n` +
+      `${selected.message}`;
+    const { data, error } = await supabase
+      .from('luna_messages')
+      .insert({ role: 'user', content: prompt, status: 'pending', author_email: user?.email ?? null })
+      .select('id')
+      .single();
+    if (error || !data) {
+      setDrafting(false);
+      toast.error('Could not reach Luna. Try again.');
+      return;
+    }
+    const reqId = (data as { id: number }).id;
+    toast('Luna is drafting a reply…', { icon: '🌙' });
+    let settled = false;
+    const finish = (text?: string) => {
+      if (settled) return;
+      settled = true;
+      supabase.removeChannel(channel);
+      setDrafting(false);
+      if (text) {
+        if (selectedIdRef.current === targetId) {
+          setReplyText(text.trim());
+          toast.success('Luna drafted a reply — review & send');
+        } else {
+          toast('Luna finished a draft for the other message.');
+        }
+      }
+    };
+    const channel = supabase
+      .channel(`luna-draft-${reqId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'luna_messages', filter: `reply_to=eq.${reqId}` },
+        (payload) => {
+          const row = payload.new as { role?: string; content?: string };
+          if (row.role === 'luna' && row.content) finish(row.content);
+        }
+      )
+      .subscribe();
+    // Luna reasons before answering (30-90s typical). Give her up to 2.5 min.
+    setTimeout(() => {
+      if (!settled) {
+        finish();
+        toast('Luna is taking a while — her draft will land in the Luna tab.');
+      }
+    }, 150000);
+  };
+
   const handleSaveNotes = async () => {
     if (!selected) return;
     await updateNotes(selected.id, notes);
     toast.success('Notes saved');
+  };
+
+  // Convert an inbox lead into a private-party inquiry, pre-filled from the
+  // sender and subject. Reuses the app's standard party-create path and sends no
+  // email — the message stays in the inbox; this is purely additive.
+  const handleMakeParty = async () => {
+    if (!selected || convertingParty) return;
+    setConvertingParty(true);
+    // Luna's extracted event details (date/time/guests/space/price) pre-fill the
+    // party form so the manager doesn't re-type what's already in the thread.
+    const ed = (selected.luna_classification?.event_details ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    const num = (v: unknown) => (typeof v === 'number' ? v : null);
+    const party = await createPartyFromLead({
+      contactName: selected.name,
+      contactEmail: selected.email,
+      contactPhone: selected.phone || str(ed.contact_phone),
+      title: selected.subject?.trim() || `Party — ${selected.name}`,
+      eventDate: str(ed.event_date),
+      startTime: str(ed.start_time),
+      endTime: str(ed.end_time),
+      guestCount: num(ed.guest_count),
+      space: str(ed.space),
+      depositAmount: num(ed.deposit),
+      estTotal: num(ed.est_total),
+      extractedNotes: str(ed.notes),
+      internalNotes: `Started from an inbox message${
+        selected.subject?.trim() ? ` (“${selected.subject.trim()}”)` : ''
+      }.${selected.message?.trim() ? `\n\n${selected.message.trim()}` : ''}`,
+      source: selected.source === 'gmail' ? 'email' : 'website',
+    });
+    setConvertingParty(false);
+    if (party) navigate(`/parties/${party.id}`);
   };
 
   const handleBulkAction = async (action: 'read' | 'archive') => {
@@ -283,35 +446,83 @@ export function Messages() {
 
   const unreadCount = messages.filter(m => m.status === 'unread').length;
 
+  // One inbox row. High-priority "needs a reply" items get an amber accent + a
+  // category pill (Reservation / Private event / Request) so they read as the
+  // priority queue.
+  const renderRow = (msg: Message) => {
+    const nr = needsReplyNow(msg);
+    return (
+      <div
+        key={msg.id}
+        onClick={() => handleSelect(msg)}
+        className={`flex items-start gap-3 px-3 py-3 border-b border-border cursor-pointer transition-colors hover:bg-surface-hover ${
+          selectedId === msg.id ? 'bg-surface-hover' : ''
+        } ${msg.status === 'unread' ? 'bg-primary/[0.03]' : ''} ${nr ? 'border-l-2 border-l-amber-500' : ''}`}
+      >
+        <input
+          type="checkbox"
+          checked={selectedIds.has(msg.id)}
+          onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
+          className="mt-1 accent-primary"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-sm truncate ${msg.status === 'unread' ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
+              {msg.name}
+            </span>
+            <span className="text-xs text-text-muted shrink-0">
+              {formatDistanceToNow(parseISO(msg.created_at), { addSuffix: true })}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {statusIcon(msg.status)}
+            <span className={`text-xs truncate ${msg.status === 'unread' ? 'font-medium text-text-primary' : 'text-text-muted'}`}>
+              {msg.subject}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {nr && (
+              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                {categoryLabel(messageTriage(msg).category)}
+              </span>
+            )}
+            <p className="text-xs text-text-muted truncate">{msg.message}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="h-[calc(100vh-3rem)] flex flex-col -m-6 lg:-m-8">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 lg:px-6 py-3 bg-surface border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col min-h-0 h-[calc(100dvh-4rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-4rem)]">
+      {/* Header — lg:pr-16 keeps the action buttons clear of the global fixed notification bell (top-right). */}
+      <div className="flex items-center justify-between gap-2 px-4 lg:px-6 lg:pr-16 py-3 bg-surface border-b border-border shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           {showMobileDetail && (
             <button
               onClick={() => setShowMobileDetail(false)}
-              className="md:hidden p-1.5 rounded-lg hover:bg-surface-hover"
+              className="md:hidden min-h-[44px] min-w-[44px] -ml-1.5 inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"
+              aria-label="Back to messages"
             >
               <ArrowLeft size={18} className="text-text-primary" />
             </button>
           )}
-          <h1 className="text-lg font-bold text-text-primary">Messages</h1>
+          <h1 className="text-lg font-bold text-text-primary truncate">Messages</h1>
           {unreadCount > 0 && (
-            <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full shrink-0">
               {unreadCount}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 flex-wrap justify-end">
           {selectedIds.size > 0 && (
             <>
-              <span className="text-xs text-text-muted">{selectedIds.size} selected</span>
-              <button onClick={() => handleBulkAction('read')} className="btn-ghost text-xs py-1 px-2">
-                <Check size={14} /> Mark Read
+              <span className="text-xs text-text-muted hidden sm:inline">{selectedIds.size} selected</span>
+              <button onClick={() => handleBulkAction('read')} className="btn-ghost text-xs py-1 px-2" aria-label="Mark read">
+                <Check size={14} /> <span className="hidden sm:inline">Mark Read</span>
               </button>
-              <button onClick={() => handleBulkAction('archive')} className="btn-ghost text-xs py-1 px-2">
-                <Archive size={14} /> Archive
+              <button onClick={() => handleBulkAction('archive')} className="btn-ghost text-xs py-1 px-2" aria-label="Archive">
+                <Archive size={14} /> <span className="hidden sm:inline">Archive</span>
               </button>
             </>
           )}
@@ -320,11 +531,12 @@ export function Messages() {
             disabled={syncing}
             title="Pull new emails from the Gmail inbox"
             className="btn-ghost text-xs py-1 px-2"
+            aria-label="Sync Gmail"
           >
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync Gmail
+            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} <span className="hidden sm:inline">Sync Gmail</span>
           </button>
-          <button onClick={() => setTemplatesOpen(true)} className="btn-ghost text-xs py-1 px-2">
-            <FileText size={14} /> Templates
+          <button onClick={() => setTemplatesOpen(true)} className="btn-ghost text-xs py-1 px-2" aria-label="Templates">
+            <FileText size={14} /> <span className="hidden sm:inline">Templates</span>
           </button>
         </div>
       </div>
@@ -346,6 +558,18 @@ export function Messages() {
               />
             </div>
             <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-0.5">
+              {needsReplyCount > 0 && (
+                <button
+                  onClick={() => setStatusFilter('needs')}
+                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                    statusFilter === 'needs'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25'
+                  }`}
+                >
+                  <Zap size={11} /> Needs reply ({needsReplyCount})
+                </button>
+              )}
               {(['all', 'unread', 'read', 'replied', 'archived'] as StatusFilter[]).map((f) => (
                 <button
                   key={f}
@@ -377,45 +601,39 @@ export function Messages() {
                   </div>
                 ))}
               </div>
+            ) : error && messages.length === 0 ? (
+              <ErrorState
+                onRetry={refresh}
+                offline
+                className="m-3"
+                description="We couldn't load your inbox. No messages were lost."
+              />
             ) : filtered.length === 0 ? (
               <div className="text-center py-12">
                 <MailWarning size={32} className="mx-auto text-text-muted mb-2" />
                 <p className="text-sm text-text-muted">No messages found</p>
               </div>
             ) : (
-              filtered.map((msg) => (
-                <div
-                  key={msg.id}
-                  onClick={() => handleSelect(msg)}
-                  className={`flex items-start gap-3 px-3 py-3 border-b border-border cursor-pointer transition-colors hover:bg-surface-hover ${
-                    selectedId === msg.id ? 'bg-surface-hover' : ''
-                  } ${msg.status === 'unread' ? 'bg-primary/[0.03]' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(msg.id)}
-                    onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
-                    className="mt-1 accent-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm truncate ${msg.status === 'unread' ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
-                        {msg.name}
-                      </span>
-                      <span className="text-xs text-text-muted shrink-0">
-                        {formatDistanceToNow(parseISO(msg.created_at), { addSuffix: true })}
-                      </span>
+              <>
+                {needsReplyList.length > 0 && (
+                  <div>
+                    <div className="sticky top-0 z-10 px-3 py-1.5 bg-amber-500/10 backdrop-blur-sm border-b border-amber-500/20 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <Zap size={12} /> Needs a reply ({needsReplyList.length})
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {statusIcon(msg.status)}
-                      <span className={`text-xs truncate ${msg.status === 'unread' ? 'font-medium text-text-primary' : 'text-text-muted'}`}>
-                        {msg.subject}
-                      </span>
-                    </div>
-                    <p className="text-xs text-text-muted truncate mt-0.5">{msg.message}</p>
+                    {needsReplyList.map(renderRow)}
                   </div>
-                </div>
-              ))
+                )}
+                {regularList.length > 0 && (
+                  <div>
+                    {needsReplyList.length > 0 && (
+                      <div className="px-3 py-1.5 bg-surface-hover/60 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                        Everything else
+                      </div>
+                    )}
+                    {regularList.map(renderRow)}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -426,28 +644,37 @@ export function Messages() {
             <>
               {/* Detail Header */}
               <div className="px-4 lg:px-6 py-4 bg-surface border-b border-border shrink-0">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <h2 className="text-lg font-semibold text-text-primary truncate">{selected.subject}</h2>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="flex items-center gap-1 text-sm text-text-secondary">
-                        <User size={13} /> {selected.name}
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 mt-1 min-w-0">
+                      <span className="flex items-center gap-1 text-sm text-text-secondary min-w-0">
+                        <User size={13} className="shrink-0" /> <span className="truncate">{selected.name}</span>
                       </span>
-                      <span className="text-sm text-text-muted">{selected.email}</span>
+                      <span className="text-sm text-text-muted truncate max-w-full">{selected.email}</span>
                       {selected.source === 'gmail' && (
-                        <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded self-start shrink-0">
                           via Gmail
                         </span>
                       )}
                       {selected.phone && (
                         <span className="flex items-center gap-1 text-sm text-text-muted">
-                          <Phone size={13} /> {selected.phone}
+                          <Phone size={13} className="shrink-0" /> {selected.phone}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
                     {statusBadge(selected.status)}
+                    <button
+                      onClick={handleMakeParty}
+                      disabled={convertingParty}
+                      title="Turn this inquiry into a private-party lead (no email sent)"
+                      className="btn-secondary text-xs py-1 px-2"
+                    >
+                      {convertingParty ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
+                      Make a party
+                    </button>
                     {selected.status !== 'archived' && (
                       <button
                         onClick={() => archiveMessage(selected.id)}
@@ -460,7 +687,7 @@ export function Messages() {
                 </div>
                 <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">
                   <Clock size={12} />
-                  {format(parseISO(selected.created_at), 'MMM d, yyyy h:mm a')}
+                  {safeFmtDate(selected.created_at, 'MMM d, yyyy h:mm a')}
                 </div>
               </div>
 
@@ -483,7 +710,7 @@ export function Messages() {
                     <div className="flex items-center gap-2 mb-3">
                       <CheckCheck size={14} className="text-green-500" />
                       <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                        Replied {selected.replied_at && format(parseISO(selected.replied_at), 'MMM d, yyyy h:mm a')}
+                        Replied {selected.replied_at && safeFmtDate(selected.replied_at, 'MMM d, yyyy h:mm a')}
                         {selected.replied_by && ` by ${selected.replied_by}`}
                       </span>
                     </div>
@@ -494,15 +721,26 @@ export function Messages() {
                 {/* Reply Form */}
                 {selected.status !== 'archived' && (
                   <div className="card p-5">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between gap-2 mb-3">
                       <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                         <Reply size={14} />
                         {selected.status === 'replied' ? 'Send Another Reply' : 'Reply'}
                       </h3>
-                      <TemplatePicker
-                        onPick={(body) => setReplyText((prev) => (prev ? `${prev}\n\n${body}` : body))}
-                        fillContext={{ contact_name: selected.name }}
-                      />
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={askLunaToDraft}
+                          disabled={drafting}
+                          className="btn-ghost text-xs"
+                          title="Ask Luna to draft a reply you can review"
+                        >
+                          {drafting ? <Loader2 size={14} className="animate-spin" /> : <Moon size={14} />}
+                          <span className="hidden sm:inline">Ask Luna to draft</span>
+                        </button>
+                        <TemplatePicker
+                          onPick={(body) => setReplyText((prev) => (prev ? `${prev}\n\n${body}` : body))}
+                          fillContext={{ contact_name: selected.name }}
+                        />
+                      </div>
                     </div>
                     <textarea
                       className="input-field min-h-[100px] resize-y mb-3"

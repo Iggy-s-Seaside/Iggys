@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Loader2, DollarSign } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, DollarSign, Search, X } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { Modal, ConfirmDialog } from '../components/ui/Modal';
 import Select from '../components/ui/Select';
@@ -21,6 +21,10 @@ export function MenuManager() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showMassPrice, setShowMassPrice] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Reset search when switching menu tabs so a stale query never hides a new view
+  useEffect(() => { setSearchQuery(''); }, [activeSchema.table]);
 
   // Dynamic FK options: fetch related tables for select dropdowns
   const [dynamicOptions, setDynamicOptions] = useState<Record<string, { id: number; label: string }[]>>({});
@@ -62,6 +66,23 @@ export function MenuManager() {
     }
     return map;
   }, [dynamicOptions]);
+
+  // Live search: case-insensitive substring match across this schema's column
+  // values (FK labels resolved too, so a category name matches). Read-only filter.
+  const filteredData = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter((item) =>
+      activeSchema.columns.some((col) => {
+        const raw = item[col.key];
+        if (raw == null) return false;
+        const label = col.dynamicOptionsTable && fkLookup[col.key]
+          ? fkLookup[col.key][Number(raw)]
+          : undefined;
+        return String(label ?? raw).toLowerCase().includes(q);
+      })
+    );
+  }, [data, searchQuery, activeSchema, fkLookup]);
 
   const openNew = () => {
     const initial: Record<string, string> = {};
@@ -145,10 +166,34 @@ export function MenuManager() {
         ))}
       </div>
 
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={`Search ${activeSchema.label}...`}
+          className="input-field pl-9 pr-9"
+          aria-label="Search menu items"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+            aria-label="Clear search"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       <div className="card overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-surface-hover/30">
-          <p className="text-sm font-medium text-text-secondary">{data.length} items</p>
+          <p className="text-sm font-medium text-text-secondary">
+            {searchQuery ? `${filteredData.length} of ${data.length} items` : `${data.length} items`}
+          </p>
           <button onClick={openNew} className="btn-primary text-xs py-1.5 px-3">
             <Plus size={14} /> Add Item
           </button>
@@ -168,6 +213,10 @@ export function MenuManager() {
           </div>
         ) : data.length === 0 ? (
           <div className="p-8 text-center text-text-muted text-sm">No items in {activeSchema.label}</div>
+        ) : filteredData.length === 0 ? (
+          <div className="p-8 text-center text-text-muted text-sm">
+            No items match "{searchQuery}"
+          </div>
         ) : (
           <>
             {/* Desktop table */}
@@ -184,7 +233,7 @@ export function MenuManager() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {data.map((item) => (
+                  {filteredData.map((item) => (
                     <tr key={item.id} className="hover:bg-surface-hover/50 transition-colors">
                       {displayColumns.map((col) => (
                         <td key={col.key} className="px-5 py-3 text-sm text-text-secondary max-w-[200px] truncate">
@@ -209,7 +258,7 @@ export function MenuManager() {
 
             {/* Mobile card list */}
             <div className="sm:hidden divide-y divide-border">
-              {data.map((item) => (
+              {filteredData.map((item) => (
                 <div key={item.id} className="px-4 py-3 flex items-center gap-3 active:bg-surface-hover/50 transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary truncate">

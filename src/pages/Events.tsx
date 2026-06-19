@@ -17,6 +17,7 @@ import EventsCalendar from '../components/events/EventsCalendar';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials } from '../hooks/useMenuData';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
+import { isSpecialLive } from '../utils/specialsWindow';
 import type { IggyEvent, Special } from '../types/menu';
 
 function formatDate(dateStr: string) {
@@ -174,7 +175,7 @@ export default function Events() {
     } = usePublicCalendar();
 
     const activeEvents = events.filter((e) => e.active);
-    const activeSpecials = specials.filter((s) => s.active);
+    const activeSpecials = specials.filter((s) => isSpecialLive(s));
 
     return (
         <div>

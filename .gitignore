@@ -16,3 +16,8 @@ __pycache__/
 *.pyc
 manager-app/supabase/.temp/
 *.jpeg
+
+# Ad-hoc multi-agent workflow scripts (review/audit/research — never committed)
+_wf_*.js
+manager-app/docs/_wf_*.js
+.env.*

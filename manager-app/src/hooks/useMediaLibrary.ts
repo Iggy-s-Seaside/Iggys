@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import type { MediaItem } from '../types';
@@ -10,9 +10,10 @@ const BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/
 export function useMediaLibrary() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const allItems: MediaItem[] = [];
 
     for (const folder of FOLDERS) {
@@ -60,6 +61,7 @@ export function useMediaLibrary() {
     }
 
     setItems(allItems);
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 

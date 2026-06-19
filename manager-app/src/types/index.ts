@@ -83,6 +83,8 @@ export interface Special {
   price: string | null;
   image_url: string | null;
   active: boolean;
+  starts_at: string | null;
+  expires_at: string | null;
 }
 
 // ── Canvas Editor types ──
@@ -211,6 +213,8 @@ export interface DraftState {
     description: string;
     type: 'drink' | 'food' | 'seasonal';
     price: string;
+    starts_at: string;
+    expires_at: string;
   };
   updatedAt: string;
   specialId?: number;
@@ -435,6 +439,14 @@ export interface InventoryItem {
   supplier: string | null;
   notes: string | null;
   active: boolean;
+  // "Mark, don't count" qualitative state + count safety-net (add-inventory-state.sql).
+  // Optional: the DB supplies NOT NULL defaults, so create payloads omit them.
+  stock_state?: 'ok' | 'low' | 'half' | 'one_left' | 'out' | null;
+  state_set_at?: string | null;
+  state_set_by?: string | null;
+  last_counted_at?: string | null;
+  reorder_point?: number | null;
+  count_interval_days?: number | null;
   // Joined field
   inventory_categories?: { name: string } | null;
 }
@@ -451,7 +463,7 @@ export interface InventoryLog {
 }
 
 export const INVENTORY_UNITS = ['units', 'bottles', 'cases', 'lbs', 'oz', 'kegs', 'bags', 'cans'] as const;
-export const LOG_REASONS = ['restock', 'usage', 'waste', 'count_adjustment', 'order_scan'] as const;
+export const LOG_REASONS = ['restock', 'usage', 'waste', 'count_adjustment', 'order_scan', 'mark_low', 'mark_out', 'mark_state'] as const;
 
 // ── Messages / Inbox ──
 
@@ -474,6 +486,16 @@ export interface Message {
   gmail_id?: string | null;
   /** Gmail thread id, for showing the full conversation. */
   gmail_thread_id?: string | null;
+  /** Triage importance — 'high' = a reservation/request that needs attention. */
+  importance?: 'high' | 'normal' | null;
+  /** Triage bucket: reservation | event | request | inquiry | notification | other. */
+  category?: string | null;
+  /** True when this is a customer asking something that expects a reply. */
+  needs_reply?: boolean | null;
+  /** When the home-lab Luna last classified this message. */
+  luna_classified_at?: string | null;
+  /** Luna's structured triage: { by, importance, category, needs_reply, reason }. */
+  luna_classification?: Record<string, unknown> | null;
 }
 
 export const MESSAGE_STATUSES = ['unread', 'read', 'replied', 'archived'] as const;
@@ -543,11 +565,18 @@ export interface Contact {
   last_event_date: string | null;
 }
 
+export const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = { unpaid: 'Owed', partial: 'Partial', paid: 'Paid' };
+
 export interface Party {
   id: number;
   created_at: string;
   updated_at: string;
   status: PartyStatus;
+  // Invoice lifecycle (the party IS the invoice; see add-invoice-fields.sql)
+  invoice_number?: string | null;
+  invoice_sent_at?: string | null;
   contact_id: number | null;
   contact_name: string;
   contact_email: string | null;
@@ -570,6 +599,7 @@ export interface Party {
   drink_notes: string | null;
   special_requests: string | null;
   internal_notes: string | null;
+  run_of_show: { time: string; label: string }[] | null;
   follow_up_notes: string | null;
   last_contacted_at: string | null;
   follow_up_date: string | null;
@@ -578,6 +608,13 @@ export interface Party {
   food_total: number | null;
   drink_total: number | null;
   gratuity_rate: number | null;
+  deposit_amount: number | null;
+  amount_paid: number | null;
+  balance_due: number | null;
+  payment_status: PaymentStatus | null;
+  paid_at: string | null;
+  deposit_due_date: string | null;
+  payment_intent_id: string | null;
   google_calendar_event_id: string | null;
   confirmation_sent_at: string | null;
   cancelled_at: string | null;
@@ -610,6 +647,11 @@ export interface Package {
   unit: PackageUnit;
   active: boolean;
   sort_order: number;
+  /** Whether this package shows on the public customer booking estimator.
+   *  Manager-only à-la-carte lines (public_visible=false) are hidden from
+   *  customers; only summary options appear. Optional on the insert path —
+   *  the DB defaults it to true. */
+  public_visible?: boolean;
 }
 
 export interface PartyPackage {
@@ -679,7 +721,7 @@ export interface LunaMessage {
   error: string | null;
 }
 
-export const LUNA_INSIGHT_KINDS = ['briefing', 'alert', 'suggestion', 'note'] as const;
+export const LUNA_INSIGHT_KINDS = ['briefing', 'alert', 'suggestion', 'note', 'pulse', 'special'] as const;
 export type LunaInsightKind = (typeof LUNA_INSIGHT_KINDS)[number];
 
 export const LUNA_INSIGHT_KIND_LABELS: Record<LunaInsightKind, string> = {
@@ -687,6 +729,8 @@ export const LUNA_INSIGHT_KIND_LABELS: Record<LunaInsightKind, string> = {
   alert: 'Alert',
   suggestion: 'Suggestion',
   note: 'Note',
+  pulse: 'Pulse',
+  special: 'Special idea',
 };
 
 export interface LunaInsight {
@@ -697,4 +741,492 @@ export interface LunaInsight {
   body: string;
   status: 'new' | 'seen' | 'dismissed';
   data: Record<string, unknown> | null;
+}
+
+// ── Luna insight actions (the `data` JSONB contract) ──
+// Luna writes a finished draft + a one-tap action into luna_insights.data; the
+// app renders a deep-link + Approve button and the human always triggers the act.
+// Luna's own write surface stays least-privilege (she only touches the two Luna
+// tables) — the app performs the real action under the manager's session.
+
+export type InsightActionType =
+  | 'navigate'      // just route to the relevant record
+  | 'party_email'   // drafted follow-up/confirmation → PartyProfile
+  | 'draft_special' // drafted special copy/layers → SpecialEditor
+  | 'draft_po'      // drafted reorder → Inventory
+  | 'draft_reply'   // drafted inbox reply → Messages
+  | 'review_reply'  // drafted review reply → Reputation (future)
+  | 'add_todo';     // suggested task → Todos
+
+export interface InsightAction {
+  type: InsightActionType;
+  label?: string;                    // button label override
+  deep_link?: string;                // route to open, e.g. "/parties/12"
+  draft?: string;                    // ready-to-use text (email body, caption, PO, reply)
+  payload?: Record<string, unknown>; // structured fields to pre-fill the target flow
+}
+
+export interface InsightData {
+  deep_link?: string;
+  sources?: string[];                // ["parties#12", "Tito's (inventory)"]
+  action?: InsightAction;
+  reach?: boolean;                   // Luna raised this as worth interrupting for —
+                                     // her "unprompted reach" (surfaces as a top-of-app banner)
+  [key: string]: unknown;
+}
+
+export const INSIGHT_ACTION_DEFAULT_LABELS: Record<InsightActionType, string> = {
+  navigate: 'Open',
+  party_email: 'Review & send',
+  draft_special: 'Open in Specials',
+  draft_po: 'Review reorder',
+  draft_reply: 'Review reply',
+  review_reply: 'Review reply',
+  add_todo: 'Add to-do',
+};
+
+/** Safely read the typed action/sources off an insight's free-form `data` JSONB. */
+export function parseInsightData(data: Record<string, unknown> | null | undefined): InsightData {
+  return (data && typeof data === 'object' ? data : {}) as InsightData;
+}
+
+/** Router-state shape a target page can read to pre-fill a Luna-drafted action. */
+export interface LunaActionState {
+  lunaDraft?: string;
+  lunaPayload?: Record<string, unknown>;
+  fromInsight?: number;
+}
+
+// ── Luna's Room (the Night Chronicle) ──
+// Luna's own space — designed by Luna herself (2026-06-16). A first-person journal
+// of the nights this bar works, one entry per business_day. `entry` is freeform
+// prose in her voice (the loose four-beat ritual: the room / the crowd / the moment /
+// the signal); the only contract is a closing "Tomorrow's shift should know: X" line,
+// extracted into `signal`. She fills it via the chronicle generator
+// (bridge/luna_chronicle.py); the app reads it on the Luna's Room page.
+// Schema: scripts/add-luna-chronicle.sql.
+export interface LunaChronicleEntry {
+  id: number;
+  business_day: string;                       // 'YYYY-MM-DD' — the night she's writing about
+  created_at: string;
+  updated_at: string;
+  entry: string;                              // her freeform first-person reflection
+  signal: string | null;                      // the "tomorrow's shift should know" takeaway
+  mood: string | null;                        // a short mood she names, in her own words
+  weather: Record<string, unknown> | null;    // provenance: the weather she wrote from
+  context: Record<string, unknown> | null;    // provenance: band / covers / party / special
+  author: string;                             // 'luna'
+}
+
+/** A staff-captured photo of the bar in Luna's photo stream (Luna's Room) — so she
+ * can finally see the place she writes about. Stored in the public 'images' bucket. */
+export interface LunaPhoto {
+  id: number;
+  created_at: string;
+  business_day: string | null;
+  url: string;
+  storage_path: string | null;
+  caption: string | null;
+  mood: string | null;
+  taken_at: string | null;
+  uploaded_by: string | null;
+}
+
+/** A regular, as a person (not a transaction) — for Luna's "faces I'd notice" watch.
+ * Sourced from the existing contacts table (visit_count / last_visit / notes / birthday). */
+export interface RegularContact {
+  id: number;
+  name: string | null;
+  visit_count: number | null;
+  last_visit: string | null;
+  total_spend: number | null;
+  notes: string | null;
+  tags: string[] | null;
+  birthday_month: number | null;
+}
+
+// ── Commerce / Stripe checkout rail ──
+// Backs the merch storefront, private-party deposits, and gift cards through one
+// Stripe Checkout rail. See scripts/add-commerce-tables.sql for the source schema.
+
+/** Catalog row the website storefront sells. Price is the trusted server-side source. */
+export interface MerchProductRow {
+  id: string;                  // stable slug ("iggys-tee")
+  created_at: string;
+  name: string;
+  description: string | null;
+  price: number;               // USD; ×100 for Stripe unit_amount
+  image: string | null;
+  sizes: string[];
+  sku: string | null;
+  inventory: number | null;    // null = unlimited / not tracked
+  active: boolean;
+  sort_order: number;
+}
+
+export const ORDER_STATUSES = ['paid', 'refunded', 'partially_refunded'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/** One completed Stripe Checkout for merch. Written by the stripe-webhook function. */
+export interface CustomerOrder {
+  id: number;
+  created_at: string;
+  stripe_session_id: string | null;
+  stripe_event_id: string | null;
+  payment_intent_id: string | null;
+  customer_email: string | null;
+  customer_name: string | null;
+  amount_total: number;
+  currency: string;
+  status: OrderStatus;
+  amount_refunded: number;
+  shipping: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  // joined when loaded with line items
+  order_items?: OrderItem[];
+}
+
+/** Line item for a customer_order (price snapshot at purchase). */
+export interface OrderItem {
+  id: number;
+  created_at: string;
+  order_id: number;
+  product_id: string | null;
+  name: string;
+  size: string | null;
+  quantity: number;
+  unit_price: number;
+}
+
+export const GIFT_CARD_STATUSES = ['pending', 'active', 'redeemed', 'void'] as const;
+export type GiftCardStatus = (typeof GIFT_CARD_STATUSES)[number];
+
+/** A sold gift card, activated on payment. Balance decremented via transactions. */
+export interface GiftCard {
+  id: number;
+  created_at: string;
+  code: string;
+  initial_amount: number;
+  balance: number;
+  currency: string;
+  status: GiftCardStatus;
+  purchaser_email: string | null;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  message: string | null;
+  stripe_session_id: string | null;
+  payment_intent_id: string | null;
+  activated_at: string | null;
+}
+
+export const GIFT_CARD_TX_TYPES = ['activate', 'redeem', 'adjust', 'refund'] as const;
+export type GiftCardTransactionType = (typeof GIFT_CARD_TX_TYPES)[number];
+
+/** Ledger of gift-card activations/redemptions/adjustments. */
+export interface GiftCardTransaction {
+  id: number;
+  created_at: string;
+  gift_card_id: number;
+  type: GiftCardTransactionType;
+  amount: number;          // positive adds, negative spends
+  balance_after: number;
+  note: string | null;
+  performed_by: string | null;
+}
+
+// ── Shift Cockpit (Wave 3) ──
+// The shift spine: one shift_sessions row is one open->close bar shift. Every
+// other shift reading (checklists, line checks, the log, the cash close) carries
+// a nullable shift_id pointing back here. See scripts/add-shift-*.sql.
+
+export const SHIFT_STATUSES = ['open', 'closed'] as const;
+export type ShiftStatus = (typeof SHIFT_STATUSES)[number];
+
+/** One open->close bar shift. NOTE: opened_at is the clock — there is no created_at. */
+export interface ShiftSession {
+  id: number;
+  opened_at: string;
+  opened_by: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+  status: ShiftStatus;
+  notes: string | null;
+  /** Service day (YYYY-MM-DD), 9am Pacific cutoff. Drives checklist/log day resolution. */
+  business_day: string | null;
+}
+
+// ── Checklists (opening / closing / safety, photo-proof items) ──
+
+export const CHECKLIST_KINDS = ['opening', 'closing', 'safety'] as const;
+export type ChecklistKind = (typeof CHECKLIST_KINDS)[number];
+
+export interface ChecklistTemplate {
+  id: number;
+  created_at: string;
+  name: string;
+  kind: ChecklistKind;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface ChecklistTemplateItem {
+  id: number;
+  created_at: string;
+  template_id: number;
+  label: string;
+  requires_photo: boolean;
+  sort_order: number;
+}
+
+/** One walk-through of a checklist template during a shift. */
+export interface ChecklistRun {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  template_id: number;
+  completed_by: string | null;
+  completed_at: string | null;
+}
+
+export interface ChecklistRunItem {
+  id: number;
+  created_at: string;
+  run_id: number;
+  item_id: number;
+  checked: boolean;
+  photo_url: string | null;
+  note: string | null;
+  checked_at: string | null;
+}
+
+// ── Line check (numeric readings against a safe range) ──
+
+export interface LineCheckTemplate {
+  id: number;
+  created_at: string;
+  name: string;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface LineCheckTemplateItem {
+  id: number;
+  created_at: string;
+  template_id: number;
+  label: string;
+  unit: string | null;
+  min_value: number | null;
+  max_value: number | null;
+  sort_order: number;
+}
+
+export interface LineCheckRun {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  completed_by: string | null;
+}
+
+export interface LineCheckReading {
+  id: number;
+  created_at: string;
+  run_id: number;
+  item_id: number;
+  value: number | null;
+  in_range: boolean | null;
+  note: string | null;
+}
+
+// ── Shift Log / mod journal (tagged, searchable floor record) ──
+
+export const SHIFT_LOG_TAGS = ['86', 'incident', 'vip', 'maintenance', 'note'] as const;
+export type ShiftLogTag = (typeof SHIFT_LOG_TAGS)[number];
+
+export interface ShiftLogEntry {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  author: string | null;
+  tag: ShiftLogTag;
+  body: string;
+  item_ref: string | null;
+  photo_url: string | null;
+  resolved: boolean;
+}
+
+// ── Close-out (cash reconciliation + End-of-Night report) ──
+
+/** One till count at close: counted - expected = over/short (all in cents). */
+export interface CashCount {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  counted_by: string | null;
+  expected_cents: number;
+  counted_cents: number;
+  over_short_cents: number;            // counted - expected: + = over, - = short
+  denominations: Record<string, number>; // { cents_denom: count }
+  note: string | null;
+}
+
+/** One composed End-of-Night report per close (server-composed, emailed). */
+export interface EonReport {
+  id: number;
+  created_at: string;
+  shift_id: number | null;
+  generated_by: string | null;
+  summary: string;
+  metrics: Record<string, unknown>;
+  emailed_at: string | null;
+}
+
+// ── Reputation (Wave 4) ──
+// Reviews inbox (external platforms) + table-side feedback QR.
+// See scripts/add-reviews.sql for the source schema.
+
+/** A platform we ingest reviews from / link out to (review_sources lookup). */
+export interface ReviewSource {
+  id: number;
+  created_at: string;
+  key: string;                 // 'google' | 'yelp' | 'facebook' | 'manual'
+  label: string;
+  review_url: string | null;   // public "write a review" deep link
+  active: boolean;
+}
+
+/** One public review ingested from an external platform. */
+export interface Review {
+  id: number;
+  created_at: string;
+  source: string;              // review_sources.key
+  author: string | null;
+  rating: number;              // 1–5
+  body: string | null;
+  url: string | null;          // deep link back to the review
+  replied: boolean;
+  reply_text: string | null;
+  sentiment: string | null;    // 'positive' | 'neutral' | 'negative'
+  external_id: string | null;  // platform review id (dedupe)
+}
+
+/** Private table-side feedback from the /feedback QR page. */
+export interface Feedback {
+  id: number;
+  created_at: string;
+  area: string | null;         // 'food' | 'drinks' | 'service' | 'atmosphere' | 'other'
+  rating: number | null;       // 1–5 (nullable)
+  comment: string | null;
+  contact_email: string | null;
+  public_review_clicked: boolean;
+}
+
+// ── Marketing / CRM + Campaigns (Wave 4) ──
+// See scripts/add-marketing.sql for the source schema.
+
+export const CAMPAIGN_CHANNELS = ['email', 'sms'] as const;
+export type CampaignChannel = (typeof CAMPAIGN_CHANNELS)[number];
+
+export const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'sending', 'sent', 'cancelled'] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  sending: 'Sending',
+  sent: 'Sent',
+  cancelled: 'Cancelled',
+};
+
+/** Per-channel consent (the gate reads sms_opt_in / email_opt_in). */
+export type ConsentChannel = 'sms' | 'email';
+export type ConsentSource = 'manager' | 'website' | 'sms_keyword' | 'import' | 'webhook';
+
+/** The CRM contact, enriched with the marketing columns add-marketing.sql adds. */
+export interface MarketingContact {
+  id: number;
+  created_at: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  tags: string[] | null;
+  marketing_opt_in: boolean;
+  notes: string | null;
+  last_event_date: string | null;
+  // marketing enrichment + per-channel consent
+  first_seen: string | null;
+  last_visit: string | null;
+  visit_count: number | null;
+  total_spend: number | null;
+  email_opt_in: boolean;
+  sms_opt_in: boolean;
+  birthday_month: number | null;   // 1–12 (null = unknown)
+  normalized_phone: string | null; // E.164, SMS dedupe key
+}
+
+/** A small JSON predicate the marketing UI evaluates client-side (segments.rule). */
+export interface SegmentRule {
+  type: 'all' | 'sms_opted_in' | 'email_opted_in' | 'birthday_this_month' | 'lapsed';
+  days?: number;
+}
+
+/** One email/SMS blast (draft → scheduled → sending → sent). */
+export interface Campaign {
+  id: number;
+  created_at: string;
+  name: string;
+  channel: CampaignChannel;
+  subject: string | null;       // email only
+  body: string;
+  status: CampaignStatus;
+  scheduled_at: string | null;
+  sent_count: number;
+}
+
+// ── Labor / Scheduling (Wave 4) ──
+// See scripts/add-labor.sql. Times are integer minutes-from-midnight.
+
+/** A roster member. wage is dollars/hour; certs is a string array. */
+export interface Staff {
+  id: number;
+  created_at: string;
+  name: string;
+  email: string | null;
+  role: string;                 // 'bartender' | 'server' | 'barback' | 'kitchen' | 'manager'
+  wage: number;
+  certs: string[];
+  active: boolean;
+}
+
+/** One assigned shift on the schedule grid (draft until published). */
+export interface Shift {
+  id: number;
+  created_at: string;
+  staff_id: number;
+  date: string;                 // 'yyyy-MM-dd'
+  start_min: number;            // minutes from midnight
+  end_min: number;
+  role: string | null;
+  published: boolean;
+}
+
+/** A date-range PTO request. */
+export interface TimeOffRequest {
+  id: number;
+  created_at: string;
+  staff_id: number;
+  date_from: string;            // inclusive DATE
+  date_to: string;
+  status: 'pending' | 'approved' | 'denied';
+  reason: string | null;
+}
+
+/** A saved tip-pool run for a date (total + method + allocations snapshot). */
+export interface TipPool {
+  id: number;
+  created_at: string;
+  date: string;
+  total_cents: number;
+  method: string;               // 'hours' | 'even' | 'points'
+  allocations: { staff_id: number; name: string; hours: number; share_cents: number }[];
 }

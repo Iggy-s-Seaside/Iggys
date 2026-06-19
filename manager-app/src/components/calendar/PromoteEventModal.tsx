@@ -89,7 +89,7 @@ export function PromoteEventModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
       <div
-        className="bg-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-card max-h-[92vh] overflow-y-auto"
+        className="bg-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-card max-h-[92dvh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface">

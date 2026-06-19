@@ -1,29 +1,59 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight } from 'lucide-react';
+import { Calendar, Sparkles, UtensilsCrossed, Plus, TrendingUp, Camera, MessageSquare, Moon, ChevronRight, ClipboardCheck, Zap } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useInventoryItems, getLowStockItems } from '../hooks/useInventory';
 import { useMessages } from '../hooks/useMessages';
 import { useTodos } from '../hooks/useTodos';
-import { useLunaInsights } from '../hooks/useLuna';
+import { useLunaInsights, useLunaReach } from '../hooks/useLuna';
+import { useShift } from '../hooks/useShift';
+import { useAutoOpenShift } from '../hooks/useAutoOpenShift';
 import { QuickPostModal } from '../components/editor/QuickPostModal';
 import { LowStockWidget } from '../components/inventory/LowStockWidget';
 import { MessageWidget } from '../components/messages/MessageWidget';
 import { PartiesTodayWidget } from '../components/parties/PartiesTodayWidget';
 import { TodoWidget } from '../components/todos/TodoWidget';
+import { TodaysPulse } from '../components/dashboard/TodaysPulse';
+import { WeatherWatch } from '../components/dashboard/WeatherWatch';
+import { SpecialIdeaCard } from '../components/dashboard/SpecialIdeaCard';
+import { CloseOutCard } from '../components/dashboard/CloseOutCard';
+import { OwnerMoneyStrip } from '../components/dashboard/OwnerMoneyStrip';
+import { useDemandLog } from '../hooks/useDemandLog';
+import { useAuth } from '../context/AuthContext';
+import { useWeather } from '../hooks/useWeather';
+import { useParties } from '../hooks/useParties';
+import { composeDailyRead } from '../lib/dailyRead';
+import { parseInsightData } from '../types';
+import { needsReplyNow } from '../utils/triage';
+import { OnboardingChecklist } from '../components/OnboardingChecklist';
+import { PageHeader } from '../components/ui/PageHeader';
 import type { IggyEvent, Special } from '../types';
 import { format, parseISO, isFuture } from 'date-fns';
 
 export function Dashboard() {
+  // Auto-open the bar during posted business hours (renders nothing).
+  useAutoOpenShift();
   const { data: events } = useSupabaseCRUD<IggyEvent>('events');
   const { data: specials, refresh: refreshSpecials } = useSupabaseCRUD<Special>('specials');
   const { items: inventoryItems } = useInventoryItems();
   const lowStockItems = getLowStockItems(inventoryItems);
   const { messages, loading: messagesLoading } = useMessages();
   const { todos, loading: todosLoading, toggle: toggleTodo } = useTodos();
-  const { insights } = useLunaInsights();
+  const { insights, latestPulse, latestSpecial } = useLunaInsights();
+  const demand = useDemandLog();
+  const { current: openShift } = useShift();
+  const { firstName, role } = useAuth();
+  const { weather } = useWeather();
+  const { parties } = useParties();
+  // The reach banner (in the layout) escalates one weather flag as a server insight;
+  // suppress that exact one from the panel below so it isn't shown twice on the dashboard.
+  // The bridge tags a weather reach with data.reach_kind = "weather:<kind>:<date>".
+  const { reach: lunaReach } = useLunaReach();
+  const reachKind = lunaReach ? ((parseInsightData(lunaReach.data) as Record<string, unknown>).reach_kind as string | undefined) : undefined;
+  const excludeReachKey = reachKind && reachKind.startsWith('weather:') ? reachKind.slice('weather:'.length) : null;
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
+  const needsReplyMessages = messages.filter(needsReplyNow);
   const newInsights = insights.filter((i) => i.status === 'new');
   const latestInsight = newInsights[0] ?? null;
 
@@ -43,25 +73,86 @@ export function Dashboard() {
     { label: 'Total Events', value: events.length, icon: TrendingUp, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-500/10' },
   ];
 
+  // Personal, time- + weather-aware greeting — the app should feel like it knows
+  // who's holding the phone and what the day outside looks like.
+  const h = new Date().getHours();
+  const timeGreeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const greetingTitle = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
+  // Luna's Daily Read — her one grounded line on tonight (weather × what's on the
+  // books). Her pick for where her voice belongs: "the one place it earns the right
+  // to speak every day, because it's grounded in what's actually happening."
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const weekday = format(new Date(), 'EEEE');
+  const eventsTonight = activeEvents.filter(
+    (e) => e.date === todayKey || (e.is_recurring && e.recurring_day === weekday)
+  ).length;
+  const todaysParties = parties.filter((p) => p.status === 'confirmed' && p.event_date === todayKey);
+  const pulseData = (latestPulse?.data ?? {}) as Record<string, unknown>;
+  const stateLine = composeDailyRead({
+    now: new Date(),
+    goodBeachDay: !!weather?.goodBeachDay,
+    precipProb: weather?.precipProb ?? 0,
+    highF: weather?.highF ?? 0,
+    hasWeather: !!weather,
+    eventsTonight,
+    partiesTonight: todaysParties.length,
+    guestsTonight: todaysParties.reduce((sum, p) => sum + (p.guest_count ?? 0), 0),
+    band: typeof pulseData.band === 'string' ? pulseData.band : null,
+  });
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
-          <p className="text-sm text-text-muted mt-1">
-            {(() => {
-              const h = new Date().getHours();
-              const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-              return unreadMessages.length > 0
-                ? `${greeting} — ${unreadMessages.length} unread message${unreadMessages.length === 1 ? '' : 's'}`
-                : `${greeting}`;
-            })()}
-          </p>
-        </div>
-      </div>
+      <OnboardingChecklist />
+      <PageHeader title={greetingTitle} subtitle={stateLine} />
+
+      {/* Owner-only money strip — for the owner, the money leads; for everyone
+          else the ops cockpit (shift/low-stock/messages) is what matters. */}
+      {role === 'owner' && <OwnerMoneyStrip />}
+
+      {/* Today's Pulse — the 5-second state of the bar + weather */}
+      <TodaysPulse
+        events={events}
+        activeSpecials={activeSpecials}
+        lowStockCount={lowStockItems.length}
+        unreadCount={unreadMessages.length}
+        pulse={latestPulse}
+        accuracy={demand.accuracy}
+      />
+
+      {/* Weather × reservation cross-signal — only the next-48h flags that point
+          to an action (move a booking indoors, call in a hand). Silent otherwise.
+          The one flag the reach banner is escalating is suppressed here to avoid an echo. */}
+      <WeatherWatch excludeReachKey={excludeReachKey} />
+
+      {/* Luna's creative special-of-the-day */}
+      <SpecialIdeaCard special={latestSpecial} />
+
+      {/* Nightly close-out — teaches Luna's forecast */}
+      <CloseOutCard todayRow={demand.todayRow} saving={demand.saving} onLog={demand.logActual} />
 
       {/* Needs your attention — parties surfaced first */}
       <PartiesTodayWidget />
+
+      {/* Needs a reply — reservations & requests Luna flagged in the inbox */}
+      {needsReplyMessages.length > 0 && (
+        <Link
+          to="/messages"
+          className="card-hover p-4 mb-6 flex items-center gap-3 group active:scale-[0.99] transition-transform border-amber-500/30 bg-amber-500/5"
+        >
+          <div className="p-2.5 rounded-lg bg-amber-500/15 shrink-0">
+            <Zap size={20} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-text-primary">
+              {needsReplyMessages.length} email{needsReplyMessages.length === 1 ? '' : 's'} need a reply
+            </p>
+            <p className="text-xs text-text-muted mt-0.5">
+              Reservations &amp; requests waiting — Luna flagged these as high priority.
+            </p>
+          </div>
+          <ChevronRight size={18} className="text-text-muted shrink-0 group-hover:text-text-primary transition-colors" />
+        </Link>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
@@ -79,6 +170,30 @@ export function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Shift status — quick link to the Service cockpit (no longer leads the page) */}
+      <Link
+        to="/shift"
+        className="card-hover p-4 mb-6 flex items-center gap-3 group active:scale-[0.99] transition-transform"
+      >
+        <div className={`p-2.5 rounded-lg shrink-0 ${openShift ? 'bg-green-50 dark:bg-green-500/10' : 'bg-surface-hover'}`}>
+          <ClipboardCheck size={20} className={openShift ? 'text-green-600 dark:text-green-400' : 'text-text-muted'} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-text-primary">Shift</p>
+            <span className={openShift ? 'badge-success' : 'badge'}>
+              {openShift ? 'Bar is OPEN' : 'Bar is closed'}
+            </span>
+          </div>
+          <p className="text-xs text-text-muted mt-0.5">
+            {openShift
+              ? 'Run line checks, log the floor, close out the night.'
+              : 'Open the bar to start checks, the log, and close-out.'}
+          </p>
+        </div>
+        <ChevronRight size={18} className="text-text-muted shrink-0 group-hover:text-text-primary transition-colors" />
+      </Link>
 
       {/* Luna */}
       <Link

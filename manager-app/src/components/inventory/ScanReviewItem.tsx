@@ -55,7 +55,8 @@ export function ScanReviewItem({ item, index, onUpdate }: ScanReviewItemProps) {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onUpdate(index, { quantity: Math.max(0, item.quantity - 1) })}
-                className="w-7 h-7 rounded-lg bg-surface-hover flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Decrease quantity"
+                className="w-11 h-11 rounded-lg bg-surface-hover flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-transform"
               >
                 -
               </button>
@@ -63,11 +64,13 @@ export function ScanReviewItem({ item, index, onUpdate }: ScanReviewItemProps) {
                 type="number"
                 value={item.quantity}
                 onChange={(e) => onUpdate(index, { quantity: Math.max(0, parseInt(e.target.value) || 0) })}
-                className="w-12 h-7 text-center text-sm bg-surface border border-border rounded-lg text-text-primary"
+                aria-label="Quantity"
+                className="w-12 h-11 text-center text-sm bg-surface border border-border rounded-lg text-text-primary"
               />
               <button
                 onClick={() => onUpdate(index, { quantity: item.quantity + 1 })}
-                className="w-7 h-7 rounded-lg bg-surface-hover flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Increase quantity"
+                className="w-11 h-11 rounded-lg bg-surface-hover flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-transform"
               >
                 +
               </button>
@@ -83,7 +86,7 @@ export function ScanReviewItem({ item, index, onUpdate }: ScanReviewItemProps) {
                   : 'skipped',
               })
             }
-            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+            className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors active:scale-95 ${
               item.status === 'skipped'
                 ? 'bg-surface-hover text-text-muted hover:text-primary'
                 : 'bg-surface-hover text-text-muted hover:text-red-400'

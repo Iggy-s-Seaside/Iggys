@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ArrowRight, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { useConfirm } from '../../hooks/useConfirm';
 import { createParty } from '../../hooks/useParties';
 import { findOrCreateContact } from '../../hooks/useContacts';
 import { PARTY_PRESETS, DEFAULT_PRESET_ID } from '../../data/partyPresets';
@@ -13,17 +14,58 @@ interface QuickAddPartyProps {
 }
 
 /**
+ * Sensible upcoming default for a new party's date: tomorrow, local time,
+ * as the `YYYY-MM-DD` string the native date input + `event_date` expect.
+ * Mirrors the manual local-formatting approach Reservations uses for its
+ * `defaultReservedFor()` (no `toISOString()` — that would shift the day in
+ * timezones west of UTC). Stays fully overrideable by the manager.
+ */
+function defaultEventDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
  * Dead-simple capture for on-the-fly bookings: just a name + date to start.
  * Picking a type pre-fills sensible defaults. Everything else is enriched later.
  */
 export function QuickAddParty({ open, onClose }: QuickAddPartyProps) {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [name, setName] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(defaultEventDate);
   const [presetId, setPresetId] = useState(DEFAULT_PRESET_ID);
   const [saving, setSaving] = useState(false);
 
-  const reset = () => { setName(''); setDate(''); setPresetId(DEFAULT_PRESET_ID); };
+  const reset = () => { setName(''); setDate(defaultEventDate()); setPresetId(DEFAULT_PRESET_ID); };
+
+  // "Dirty" = the manager has meaningfully entered something we'd lose on a
+  // stray backdrop tap / Escape. The prefilled default date alone is not dirty;
+  // changing it (or typing a name, or picking a non-default type) is.
+  const isDirty =
+    name.trim() !== '' ||
+    presetId !== DEFAULT_PRESET_ID ||
+    date !== defaultEventDate();
+
+  // Modal routes both backdrop click and Escape through onClose. Intercept it:
+  // a clean form closes freely; a dirty one asks before discarding.
+  const handleRequestClose = async () => {
+    if (saving) return;
+    if (isDirty) {
+      const ok = await confirm({
+        title: 'Discard this party?',
+        message: "You've started entering details. Close without saving?",
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    reset();
+    onClose();
+  };
 
   const handleSave = async (mode: 'open' | 'again') => {
     if (!name.trim() || saving) return;
@@ -43,6 +85,8 @@ export function QuickAddParty({ open, onClose }: QuickAddPartyProps) {
     if (created) {
       reset();
       if (mode === 'open') {
+        // Form is already clean (reset above), so close directly without the
+        // dirty-guard prompt and head to the new party's details.
         onClose();
         navigate(`/parties/${created.id}`);
       }
@@ -51,7 +95,7 @@ export function QuickAddParty({ open, onClose }: QuickAddPartyProps) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Quick add a party" maxWidth="max-w-md">
+    <Modal open={open} onClose={handleRequestClose} title="Quick add a party" maxWidth="max-w-md">
       <div className="space-y-4">
         <p className="text-sm text-text-muted">Just a name and date to start — fill in the rest whenever you have a moment.</p>
 

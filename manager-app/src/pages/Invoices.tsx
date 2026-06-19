@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, ChevronRight } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Receipt, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useParties } from '../hooks/useParties';
-import { computeInvoice, partyToInvoiceInputs } from '../utils/invoice';
-import { PARTY_STATUS_LABELS, type PartyPackage, type PartyStatus } from '../types';
-
-const money = (n: number) => `$${(n || 0).toFixed(2)}`;
+import { computeInvoice, partyToInvoiceInputs, getInvoiceSentAt } from '../utils/invoice';
+import { money, safeFmtDate } from '../utils/format';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { PARTY_STATUS_LABELS, type Party, type PartyPackage, type PartyStatus } from '../types';
 
 const STATUS_BADGE: Record<PartyStatus, string> = {
   inquiry: 'badge-accent',
@@ -15,9 +16,12 @@ const STATUS_BADGE: Record<PartyStatus, string> = {
   cancelled: 'badge-danger',
 };
 
-function fmtDate(d: string | null) {
-  if (!d) return null;
-  try { return format(parseISO(d), 'MMM d, yyyy'); } catch { return d; }
+/** Paid is derived from the stored payment_status (no second source of truth). */
+function isPaid(p: Party): boolean {
+  return p.payment_status === 'paid';
+}
+function isPartial(p: Party): boolean {
+  return p.payment_status === 'partial';
 }
 
 export function Invoices() {
@@ -60,52 +64,69 @@ export function Invoices() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text-primary">Invoices</h1>
-        <p className="text-sm text-text-muted mt-1">Every party with billing details — open one to edit or send it</p>
-      </div>
+      <PageHeader
+        title="Invoices"
+        subtitle="Every party with billing details — open one to edit or send it"
+      />
 
       {!busy && rows.length > 0 && (
         <div className="card p-5 mb-5 flex items-center justify-between">
           <span className="text-sm text-text-secondary">Confirmed events total</span>
-          <span className="text-xl font-bold text-text-primary">{money(confirmedTotal)}</span>
+          <span className="text-xl font-bold text-text-primary">{money(confirmedTotal, { cents: true })}</span>
         </div>
       )}
 
       {busy ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="card p-4 animate-pulse h-16" />)}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}
         </div>
       ) : rows.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Receipt size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">No invoices yet</p>
-          <p className="text-sm text-text-muted mt-1">Add packages or totals to a party and it'll show up here.</p>
-        </div>
+        <EmptyState
+          icon={Receipt}
+          title="No invoices yet"
+          description="Add packages or totals to a party and it'll show up here."
+        />
       ) : (
         <div className="card divide-y divide-border overflow-hidden">
-          {rows.map(({ party, breakdown }) => (
-            <button
-              key={party.id}
-              onClick={() => navigate(`/parties/${party.id}`)}
-              className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-surface-hover transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
-                <Receipt size={18} className="text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-text-primary truncate">{party.title?.trim() || party.contact_name}</p>
-                  <span className={STATUS_BADGE[party.status]}>{PARTY_STATUS_LABELS[party.status]}</span>
+          {rows.map(({ party, breakdown }) => {
+            const sent = getInvoiceSentAt(party);
+            const paid = isPaid(party);
+            const partial = isPartial(party);
+            return (
+              <button
+                key={party.id}
+                onClick={() => navigate(`/parties/${party.id}/invoice`)}
+                className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-surface-hover transition-colors"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
+                  <Receipt size={18} className="text-primary" />
                 </div>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {party.title?.trim() ? `${party.contact_name} · ` : ''}{fmtDate(party.event_date) || 'No date'}
-                </p>
-              </div>
-              <span className="text-base font-bold text-text-primary shrink-0">{money(breakdown.grandTotal)}</span>
-              <ChevronRight size={16} className="text-text-muted shrink-0" />
-            </button>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-text-primary truncate">{party.title?.trim() || party.contact_name}</p>
+                    <span className={STATUS_BADGE[party.status]}>{PARTY_STATUS_LABELS[party.status]}</span>
+                    {paid ? (
+                      <span className="badge-success inline-flex items-center gap-1">
+                        <CheckCircle2 size={11} /> Paid
+                      </span>
+                    ) : partial ? (
+                      <span className="badge-accent">Partial</span>
+                    ) : null}
+                    {sent && (
+                      <span className="badge-accent inline-flex items-center gap-1" title={`Sent ${safeFmtDate(sent, 'MMM d, yyyy')}`}>
+                        <Send size={10} /> Sent
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {party.title?.trim() ? `${party.contact_name} · ` : ''}{safeFmtDate(party.event_date) || 'No date'}
+                  </p>
+                </div>
+                <span className="text-base font-bold text-text-primary shrink-0">{money(breakdown.grandTotal, { cents: true })}</span>
+                <ChevronRight size={16} className="text-text-muted shrink-0" />
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

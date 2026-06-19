@@ -36,6 +36,15 @@ const clean = (v: unknown, max = 2000): string | null => {
   return t ? t.slice(0, max) : null;
 };
 
+/** Best-effort E.164 normalization for US numbers (matches contacts.normalized_phone). */
+function normalizePhone(raw: string): string | null {
+  const digits = raw.replace(/[^\d+]/g, "");
+  if (digits.startsWith("+")) return digits.length >= 8 ? digits : null;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return null;
+}
+
 /** Best-effort owner heads-up via Gmail. Never throws into the request path. */
 async function notifyOwner(lines: string[], subject: string): Promise<void> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID");
@@ -86,6 +95,10 @@ serve(async (req: Request) => {
     const name = clean(body.name, 120);
     const email = clean(body.email, 254)?.toLowerCase() ?? null;
     const phone = clean(body.phone, 40);
+    // OPTIONAL marketing consent (default false — nothing changes unless checked).
+    const wantEmail = body.email_opt_in === true;
+    const wantSms = body.sms_opt_in === true;
+    const normalizedPhone = phone ? normalizePhone(phone) : null;
     if (!name) return json({ error: "Please tell us your name." }, 400);
     if (!email && !phone) return json({ error: "Please leave an email or phone number." }, 400);
     if (email && !isValidEmail(email)) return json({ error: "That email doesn't look right." }, 400);
@@ -105,14 +118,44 @@ serve(async (req: Request) => {
       const { data } = await admin.from("contacts").select("id").eq("phone", phone).limit(1).maybeSingle();
       if (data) contactId = (data as { id: number }).id;
     }
+    // Set ONLY the opt-in channels the visitor explicitly checked (default false).
+    const optFields: Record<string, unknown> = {};
+    if (wantEmail) optFields.email_opt_in = true;
+    if (wantSms) optFields.sms_opt_in = true;
+
     if (!contactId) {
       const { data, error } = await admin
         .from("contacts")
-        .insert({ name, email, phone, company: clean(body.company, 120) })
+        .insert({
+          name,
+          email,
+          phone,
+          normalized_phone: normalizedPhone,
+          company: clean(body.company, 120),
+          ...optFields,
+        })
         .select("id")
         .single();
       if (error) throw new Error(`contact: ${error.message}`);
       contactId = (data as { id: number }).id;
+    } else if (wantEmail || wantSms || normalizedPhone) {
+      // Existing contact: flip on any newly-checked opt-in; backfill normalized phone.
+      const patch: Record<string, unknown> = { ...optFields };
+      if (normalizedPhone) patch.normalized_phone = normalizedPhone;
+      await admin.from("contacts").update(patch).eq("id", contactId);
+    }
+
+    // Append a consent_events row per opted channel (immutable audit trail).
+    // Best-effort: a consent-logging hiccup must not fail the booking.
+    if (wantEmail || wantSms) {
+      try {
+        const events: Array<Record<string, unknown>> = [];
+        if (wantEmail) events.push({ contact_id: contactId, channel: "email", action: "opt_in", source: "website" });
+        if (wantSms) events.push({ contact_id: contactId, channel: "sms", action: "opt_in", source: "website" });
+        if (events.length) await admin.from("consent_events").insert(events);
+      } catch (e) {
+        console.error("consent capture failed (non-fatal):", e);
+      }
     }
 
     const partyType = clean(body.party_type, 60);

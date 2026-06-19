@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { X, Trash2, ShoppingBag, Minus, Plus } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
 export default function CartDrawer() {
   const {
@@ -10,11 +14,42 @@ export default function CartDrawer() {
     isCartOpen,
     setIsCartOpen,
   } = useCart();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   if (!isCartOpen) return null;
 
-  const handleCheckout = () => {
-    alert('Stripe checkout coming soon!');
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          purpose: 'merch',
+          line_items: items.map((i) => ({
+            product_id: i.product.id,
+            size: i.size ?? null,
+            quantity: i.quantity,
+          })),
+          success_url: `${window.location.origin}/checkout/success?purpose=merch`,
+          cancel_url: `${window.location.origin}/checkout/cancel`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || 'Checkout failed. Please try again.');
+      }
+      window.location.href = data.url;
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Checkout failed. Please try again.');
+      setCheckoutLoading(false);
+    }
   };
 
   return (
@@ -107,8 +142,15 @@ export default function CartDrawer() {
                 ${totalPrice.toFixed(2)}
               </span>
             </div>
-            <button onClick={handleCheckout} className="btn-primary w-full">
-              Checkout with Stripe
+            {checkoutError && (
+              <p className="text-amber-400 text-sm mb-3">{checkoutError}</p>
+            )}
+            <button
+              onClick={handleCheckout}
+              disabled={checkoutLoading}
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {checkoutLoading ? 'Redirecting…' : 'Checkout with Stripe'}
             </button>
           </div>
         )}

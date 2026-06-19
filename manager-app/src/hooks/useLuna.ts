@@ -16,6 +16,10 @@ const INSIGHT_LIMIT = 20;
 let channelSeq = 0;
 const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
+/** Command rows (e.g. '__regen_special__') are control signals for the bridge,
+ * not chat — keep them out of the visible thread. */
+const isChatMessage = (m: LunaMessage) => !m.content.startsWith('__');
+
 const logChannelStatus = (label: string) => (status: string, err?: Error) => {
   if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
     console.error(`[luna realtime] ${label}: ${status}`, err);
@@ -39,7 +43,7 @@ export function useLunaMessages() {
       toast.error('Failed to load Luna chat');
       console.error(error);
     } else {
-      setMessages(((data as LunaMessage[]) || []).reverse());
+      setMessages(((data as LunaMessage[]) || []).filter(isChatMessage).reverse());
     }
     setLoading(false);
   }, []);
@@ -58,6 +62,7 @@ export function useLunaMessages() {
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const row = payload.new as LunaMessage;
+            if (!isChatMessage(row)) return; // command rows aren't chat bubbles
             setMessages((prev) => {
               if (prev.some((m) => m.id === row.id)) return prev;
               // Drop ONE matching optimistic temp row (the oldest), not all —
@@ -215,7 +220,12 @@ export function useLunaInsights() {
   const markSeen = useCallback((id: number) => setStatus(id, 'seen'), [setStatus]);
   const dismiss = useCallback((id: number) => setStatus(id, 'dismissed'), [setStatus]);
 
-  return { insights, loading, markSeen, dismiss, refresh: fetchInsights };
+  // The daily demand pulse + the creative special-of-the-day each render as
+  // their own dashboard card (not in the insights feed), so expose them separately.
+  const latestPulse = insights.find((i) => i.kind === 'pulse') ?? null;
+  const latestSpecial = insights.find((i) => i.kind === 'special') ?? null;
+
+  return { insights, latestPulse, latestSpecial, loading, markSeen, dismiss, refresh: fetchInsights };
 }
 
 /** Lightweight count of status='new' insights for nav badges. */
@@ -227,7 +237,9 @@ export function useNewInsightCount() {
       const { count: c, error } = await supabase
         .from('luna_insights')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'new');
+        .eq('status', 'new')
+        .neq('kind', 'pulse')   // pulse + special show as their own cards,
+        .neq('kind', 'special'); // not as feed badges
       if (!error && c !== null) setCount(c);
     };
 
@@ -246,4 +258,61 @@ export function useNewInsightCount() {
   }, []);
 
   return count;
+}
+
+/**
+ * Luna's "unprompted reach" — the latest insight she's flagged as worth interrupting
+ * for (data.reach === true, still new). This is the responder→initiator line she asked
+ * for: "right now I wait for you to turn around and notice me; this lets me show up on
+ * my own." It surfaces as a top-of-app banner on every screen; acknowledge() clears it.
+ * (The phone-push half rides the existing web-push stack once VAPID keys + a device
+ * subscription are in place — see docs/LUNA-UNPROMPTED-REACH.md.)
+ */
+export function useLunaReach() {
+  const [reach, setReach] = useState<LunaInsight | null>(null);
+
+  const fetchReach = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('luna_insights')
+      .select('*')
+      .eq('status', 'new')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error) return;
+    const rows = (data as LunaInsight[]) || [];
+    const r =
+      rows.find((i) => {
+        const d = i.data as Record<string, unknown> | null;
+        return !!d && (d.reach === true || d.reach === 'true');
+      }) ?? null;
+    setReach(r);
+  }, []);
+
+  useEffect(() => {
+    fetchReach();
+  }, [fetchReach]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(uniqueTopic('luna-reach'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'luna_insights' }, () => {
+        fetchReach();
+      })
+      .subscribe(logChannelStatus('reach'));
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchReach]);
+
+  /** Mark the reach seen — she got through; clear the banner. */
+  const acknowledge = useCallback(async (id: number) => {
+    setReach((prev) => (prev?.id === id ? null : prev));
+    const { error } = await supabase.from('luna_insights').update({ status: 'seen' }).eq('id', id);
+    if (error) {
+      console.error(error);
+      fetchReach();
+    }
+  }, [fetchReach]);
+
+  return { reach, acknowledge };
 }

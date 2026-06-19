@@ -6,9 +6,11 @@ import toast from 'react-hot-toast';
 export function useMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -17,9 +19,12 @@ export function useMessages() {
     if (error) {
       toast.error('Failed to load messages');
       console.error(error);
+      setError(error.message);
     } else {
       setMessages((data as Message[]) || []);
+      setError(null);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -129,6 +134,7 @@ export function useMessages() {
   return {
     messages,
     loading,
+    error,
     refresh: fetchMessages,
     markAsRead,
     markAsReplied,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Loader2, Eye } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
@@ -8,6 +8,8 @@ import PreviewPanel from '../components/preview/PreviewPanel';
 import { AddToCalendarButton } from '../components/events/AddToCalendarButton';
 import Select from '../components/ui/Select';
 import TimeSelect from '../components/ui/TimeSelect';
+import { Field } from '../components/ui/Field';
+import { Toggle } from '../components/ui/Toggle';
 import { EVENT_CATEGORIES, type IggyEvent } from '../types';
 import { formatRange, SPACES, type Space } from '../lib/timeWindows';
 
@@ -16,6 +18,7 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 export function EventForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: events, create, update, loading: dataLoading } = useSupabaseCRUD<IggyEvent>('events');
   const isEdit = Boolean(id);
 
@@ -59,6 +62,15 @@ export function EventForm() {
       }
     }
   }, [isEdit, id, events]);
+
+  // Deep-link from the calendar's "New Event" chooser: /events/new?date=YYYY-MM-DD
+  // seeds the date once for a brand-new event (never overrides an edit).
+  useEffect(() => {
+    if (!isEdit) {
+      const d = searchParams.get('date');
+      if (d) setForm((f) => ({ ...f, date: d }));
+    }
+  }, [isEdit, searchParams]);
 
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -147,8 +159,7 @@ export function EventForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="card p-6 space-y-5">
-          <div>
-            <label className="label">Title *</label>
+          <Field label="Title *">
             <input
               className="input-field"
               value={form.title}
@@ -156,10 +167,9 @@ export function EventForm() {
               placeholder="DJ Night with DJ Seaside"
               required
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="label">Description *</label>
+          <Field label="Description *">
             <textarea
               className="input-field min-h-[100px] resize-y"
               value={form.description}
@@ -167,11 +177,10 @@ export function EventForm() {
               placeholder="Join us for an incredible night of music..."
               required
             />
-          </div>
+          </Field>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Date *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Date *">
               <input
                 type="date"
                 className="input-field"
@@ -179,68 +188,69 @@ export function EventForm() {
                 onChange={(e) => setField('date', e.target.value)}
                 required
               />
-            </div>
-            <div className="flex items-end gap-3 pb-2">
-              <button
-                type="button"
-                onClick={() => setField('all_day', !form.all_day)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  form.all_day ? 'bg-primary' : 'bg-surface-active'
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${
-                  form.all_day ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
-              <span className="text-sm text-text-secondary">All day</span>
+            </Field>
+            <div className="flex items-end pb-2">
+              <Toggle
+                checked={form.all_day}
+                onChange={(checked) => setField('all_day', checked)}
+                label="All day"
+              />
             </div>
           </div>
 
           {!form.all_day && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Start *</label>
-                <TimeSelect
-                  variant="manager"
-                  value={form.start_min}
-                  onChange={(v) => setField('start_min', v)}
-                  placeholder="Select time..."
-                />
-              </div>
-              <div>
-                <label className="label">End</label>
-                <TimeSelect
-                  variant="manager"
-                  value={form.end_min}
-                  onChange={(v) => setField('end_min', v)}
-                  minValue={form.start_min}
-                  placeholder="Select time..."
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Start *">
+                {({ id }) => (
+                  <TimeSelect
+                    id={id}
+                    variant="manager"
+                    value={form.start_min}
+                    onChange={(v) => setField('start_min', v)}
+                    placeholder="Select time..."
+                  />
+                )}
+              </Field>
+              <Field label="End">
+                {({ id }) => (
+                  <TimeSelect
+                    id={id}
+                    variant="manager"
+                    value={form.end_min}
+                    onChange={(v) => setField('end_min', v)}
+                    minValue={form.start_min}
+                    placeholder="Select time..."
+                  />
+                )}
+              </Field>
             </div>
           )}
 
-          <div>
-            <label className="label">Category</label>
-            <Select<string>
-              variant="manager"
-              value={form.category || null}
-              onChange={(v) => setField('category', v)}
-              options={[{ value: '', label: 'Uncategorized' }, ...EVENT_CATEGORIES.map((cat) => ({ value: cat, label: cat }))]}
-              placeholder="Select category..."
-            />
-          </div>
+          <Field label="Category">
+            {({ id }) => (
+              <Select<string>
+                id={id}
+                variant="manager"
+                value={form.category || null}
+                onChange={(v) => setField('category', v)}
+                options={[{ value: '', label: 'Uncategorized' }, ...EVENT_CATEGORIES.map((cat) => ({ value: cat, label: cat }))]}
+                placeholder="Select category..."
+              />
+            )}
+          </Field>
 
-          <div>
-            <label className="label">Space</label>
-            <Select<Space>
-              variant="manager"
-              value={form.space}
-              onChange={(v) => setField('space', v)}
-              options={SPACES}
-              placeholder="Select space..."
-            />
-          </div>
+          <Field label="Space">
+            {({ id }) => (
+              <Select<Space>
+                id={id}
+                variant="manager"
+                value={form.space}
+                onChange={(v) => setField('space', v)}
+                options={SPACES}
+                placeholder="Select space..."
+              />
+            )}
+          </Field>
 
           <div>
             <label className="label">Event Image</label>
@@ -251,48 +261,32 @@ export function EventForm() {
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setField('is_recurring', !form.is_recurring)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                form.is_recurring ? 'bg-primary' : 'bg-surface-active'
-              }`}
-            >
-              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${
-                form.is_recurring ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </button>
-            <span className="text-sm text-text-secondary">Recurring event</span>
-          </div>
+          <Toggle
+            checked={form.is_recurring}
+            onChange={(checked) => setField('is_recurring', checked)}
+            label="Recurring event"
+          />
 
           {form.is_recurring && (
-            <div>
-              <label className="label">Recurring Day</label>
-              <Select<string>
-                variant="manager"
-                value={form.recurring_day || null}
-                onChange={(v) => setField('recurring_day', v)}
-                options={WEEKDAYS.map((d) => ({ value: d, label: d }))}
-                placeholder="Select day..."
-              />
-            </div>
+            <Field label="Recurring Day">
+              {({ id }) => (
+                <Select<string>
+                  id={id}
+                  variant="manager"
+                  value={form.recurring_day || null}
+                  onChange={(v) => setField('recurring_day', v)}
+                  options={WEEKDAYS.map((d) => ({ value: d, label: d }))}
+                  placeholder="Select day..."
+                />
+              )}
+            </Field>
           )}
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setField('active', !form.active)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                form.active ? 'bg-primary' : 'bg-surface-active'
-              }`}
-            >
-              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${
-                form.active ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </button>
-            <span className="text-sm text-text-secondary">Active (visible on website)</span>
-          </div>
+          <Toggle
+            checked={form.active}
+            onChange={(checked) => setField('active', checked)}
+            label="Active (visible on website)"
+          />
         </div>
 
         <div className="flex gap-3">

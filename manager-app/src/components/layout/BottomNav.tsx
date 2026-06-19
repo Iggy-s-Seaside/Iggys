@@ -1,11 +1,10 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus } from 'lucide-react';
+import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus, Hourglass, ClipboardCheck, HelpCircle } from 'lucide-react';
 import { useUnreadCount } from '../../hooks/useMessages';
 import { useNewInsightCount } from '../../hooks/useLuna';
-
-interface BottomNavProps {
-  onQuickAdd: () => void;
-}
+import { useRole } from '../../hooks/useRole';
+import { QuickCreateSheet } from '../QuickCreateSheet';
 
 function Tab({ to, icon: Icon, label, end, badge }: {
   to: string; icon: React.ElementType; label: string; end?: boolean; badge?: number;
@@ -31,29 +30,49 @@ function Tab({ to, icon: Icon, label, end, badge }: {
   );
 }
 
-/** Thumb-reachable bottom navigation for mobile, with a center Quick-Add button. */
-export function BottomNav({ onQuickAdd }: BottomNavProps) {
+/** Thumb-reachable bottom navigation for mobile. The center FAB opens a
+ * context-aware quick-create sheet (parties, reservations, walk-ins, to-dos,
+ * posts, events, specials — plus shift actions when a shift is open). */
+export function BottomNav() {
   const unread = useUnreadCount();
   const newInsights = useNewInsightCount();
+  const { can } = useRole();
+  const ops = can(['owner', 'manager']);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
-      <div className="grid grid-cols-6 items-center">
-        <Tab to="/" icon={LayoutDashboard} label="Home" end />
-        <Tab to="/parties" icon={PartyPopper} label="Parties" />
-        <div className="flex justify-center">
-          <button
-            onClick={onQuickAdd}
-            aria-label="Quick add a party"
-            className="-mt-6 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-          >
-            <Plus size={26} />
-          </button>
-        </div>
-        <Tab to="/luna" icon={Moon} label="Luna" badge={newInsights} />
-        <Tab to="/calendar" icon={CalendarDays} label="Calendar" />
-        <Tab to="/messages" icon={MessageSquare} label="Inbox" badge={unread} />
-      </div>
-    </nav>
+    <>
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
+        {ops ? (
+          <div className="grid grid-cols-6 items-center">
+            <Tab to="/" icon={LayoutDashboard} label="Home" end />
+            <Tab to="/parties" icon={PartyPopper} label="Parties" />
+            <div className="flex justify-center">
+              <button
+                onClick={() => setQuickCreateOpen(true)}
+                aria-label="Quick create"
+                aria-haspopup="dialog"
+                aria-expanded={quickCreateOpen}
+                className="-mt-6 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              >
+                <Plus size={26} />
+              </button>
+            </div>
+            <Tab to="/luna" icon={Moon} label="Luna" badge={newInsights} />
+            <Tab to="/calendar" icon={CalendarDays} label="Calendar" />
+            <Tab to="/messages" icon={MessageSquare} label="Inbox" badge={unread} />
+          </div>
+        ) : (
+          // Employee view: the surfaces they're allowed to run + Help.
+          <div className="grid grid-cols-3 items-center">
+            <Tab to="/waitlist" icon={Hourglass} label="Waitlist" />
+            <Tab to="/shift" icon={ClipboardCheck} label="Service" />
+            <Tab to="/help" icon={HelpCircle} label="Help" />
+          </div>
+        )}
+      </nav>
+
+      {ops && <QuickCreateSheet open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} />}
+    </>
   );
 }

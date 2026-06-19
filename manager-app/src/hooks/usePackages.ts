@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Package, PartyPackage } from '../types';
 import toast from 'react-hot-toast';
+import { undoableDelete } from './useUndoableDelete';
 
 /** The editable package catalog. */
 export function usePackages() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('packages')
       .select('*')
@@ -21,6 +23,7 @@ export function usePackages() {
     } else {
       setPackages((data as Package[]) || []);
     }
+    loadedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -50,13 +53,18 @@ export function usePackages() {
   };
 
   const remove = async (id: number) => {
-    const { error } = await supabase.from('packages').delete().eq('id', id);
-    if (error) {
-      toast.error('Failed to delete package');
-      return false;
+    const item = packages.find((r) => r.id === id);
+    if (!item) {
+      // Fallback: row not in local cache — delete directly.
+      const { error } = await supabase.from('packages').delete().eq('id', id);
+      if (error) {
+        toast.error('Failed to delete package');
+        return false;
+      }
+      await refresh();
+      return true;
     }
-    toast.success('Package deleted');
-    await refresh();
+    undoableDelete('packages', id, item, setPackages, 'Package removed');
     return true;
   };
 
@@ -67,20 +75,28 @@ export function usePackages() {
 export function usePartyPackages(partyId: number | null) {
   const [items, setItems] = useState<PartyPackage[]>([]);
   const [loading, setLoading] = useState(false);
+  const loadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (partyId == null) {
       setItems([]);
       return;
     }
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const { data, error } = await supabase
       .from('party_packages')
       .select('*')
       .eq('party_id', partyId)
       .order('id', { ascending: true });
     if (!error) setItems((data as PartyPackage[]) || []);
+    loadedRef.current = true;
     setLoading(false);
+  }, [partyId]);
+
+  // Reset the first-load guard on a genuine party switch so the spinner shows
+  // for the new party (same-party realtime refetches stay strobe-free).
+  useEffect(() => {
+    loadedRef.current = false;
   }, [partyId]);
 
   useEffect(() => {
@@ -107,6 +123,34 @@ export function usePartyPackages(partyId: number | null) {
     return true;
   };
 
+  /**
+   * Insert a one-off custom line (not from the catalog): package_id stays null
+   * and the manager types the name/category/unit/price/quantity/notes directly.
+   * computeInvoice buckets it by category exactly like a catalog line, so a
+   * 'food'/'drink' line feeds gratuity while 'room'/'addon'/'other' don't.
+   * A discount/comp is just a line with a negative unit_price (or a non-gratuity
+   * category to keep gratuity off it).
+   */
+  const addCustomLine = async (fields: Partial<PartyPackage> = {}) => {
+    if (partyId == null) return false;
+    const { error } = await supabase.from('party_packages').insert({
+      party_id: partyId,
+      package_id: null,
+      name: fields.name ?? 'Custom line',
+      category: fields.category ?? 'other',
+      unit: fields.unit ?? 'flat',
+      quantity: fields.quantity ?? 1,
+      unit_price: fields.unit_price ?? 0,
+      notes: fields.notes ?? null,
+    });
+    if (error) {
+      toast.error('Failed to add line');
+      return false;
+    }
+    await refresh();
+    return true;
+  };
+
   const updateLine = async (id: number, fields: Partial<PartyPackage>) => {
     const { error } = await supabase.from('party_packages').update(fields).eq('id', id);
     if (!error) await refresh();
@@ -114,10 +158,16 @@ export function usePartyPackages(partyId: number | null) {
   };
 
   const removeLine = async (id: number) => {
-    const { error } = await supabase.from('party_packages').delete().eq('id', id);
-    if (!error) await refresh();
-    return !error;
+    const item = items.find((r) => r.id === id);
+    if (!item) {
+      // Fallback: row not in local cache — delete directly.
+      const { error } = await supabase.from('party_packages').delete().eq('id', id);
+      if (!error) await refresh();
+      return !error;
+    }
+    undoableDelete('party_packages', id, item, setItems, 'Line removed');
+    return true;
   };
 
-  return { items, loading, refresh, addPackage, updateLine, removeLine };
+  return { items, loading, refresh, addPackage, addCustomLine, updateLine, removeLine };
 }

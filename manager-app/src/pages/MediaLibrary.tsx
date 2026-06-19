@@ -3,6 +3,8 @@ import { Upload, Trash2, Search, Loader2, RefreshCw, ExternalLink, Copy } from '
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Skeleton } from '../components/ui/Skeleton';
 import toast from 'react-hot-toast';
 import type { MediaItem } from '../types';
 
@@ -69,22 +71,16 @@ export function MediaLibraryPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Media Library</h1>
-          <p className="text-sm text-text-muted mt-1">{items.length} images</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => refresh()} className="btn-secondary" disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} className="btn-primary" disabled={uploading}>
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            Upload
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
-        </div>
-      </div>
+      <PageHeader title="Media Library" subtitle={`${items.length} images`}>
+        <button onClick={() => refresh()} className="btn-secondary" disabled={loading}>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} className="btn-primary" disabled={uploading}>
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+          Upload
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
+      </PageHeader>
 
       {/* Search + Tabs */}
       <div className="card p-4 mb-6 space-y-3">
@@ -119,11 +115,11 @@ export function MediaLibraryPage() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="card overflow-hidden animate-pulse">
-              <div className="aspect-square bg-surface-hover" />
+            <div key={i} className="card overflow-hidden">
+              <Skeleton className="aspect-square rounded-none" />
               <div className="px-3 py-2">
-                <div className="h-3 bg-surface-hover rounded w-2/3 mb-1.5" />
-                <div className="h-2.5 bg-surface-hover rounded w-1/3" />
+                <Skeleton className="h-3 w-2/3 mb-1.5" />
+                <Skeleton className="h-2.5 w-1/3" />
               </div>
             </div>
           ))}
@@ -144,30 +140,30 @@ export function MediaLibraryPage() {
                 onClick={() => setActiveCard(isActive ? null : cardKey)}
               >
                 <img src={item.url} alt={formatFilename(item.name)} className="w-full h-full object-cover" loading="lazy" />
-                <div className={`absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 ${isActive ? '!bg-black/40 !opacity-100' : ''}`}>
+                <div className={`absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 ${isActive ? '!bg-black/40 !opacity-100' : ''}`}>
                   <button
                     onClick={(e) => { e.stopPropagation(); copyUrl(item.url); }}
-                    className="p-2 rounded-lg bg-black/60 text-white hover:bg-primary transition-colors"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-black/60 text-white hover:bg-primary active:scale-95 transition-colors"
                     aria-label="Copy URL"
                   >
-                    <Copy size={14} />
+                    <Copy size={18} />
                   </button>
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="p-2 rounded-lg bg-black/60 text-white hover:bg-primary transition-colors"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-black/60 text-white hover:bg-primary active:scale-95 transition-colors"
                     aria-label="Open in new tab"
                   >
-                    <ExternalLink size={14} />
+                    <ExternalLink size={18} />
                   </a>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                    className="p-2 rounded-lg bg-black/60 text-white hover:bg-danger transition-colors"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-black/60 text-white hover:bg-danger active:scale-95 transition-colors"
                     aria-label="Delete"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>

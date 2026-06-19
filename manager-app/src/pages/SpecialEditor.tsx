@@ -21,6 +21,7 @@ import { Modal, ConfirmDialog } from '../components/ui/Modal';
 import Select from '../components/ui/Select';
 import { useEditorState } from '../hooks/useEditorState';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useDraftPersistence } from '../hooks/useDraftPersistence';
 import { TEMPLATES } from '../data/templates';
@@ -42,6 +43,7 @@ export function SpecialEditor() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const handoff = useLunaHandoff();
   const canvasRef = useRef<DomCanvasHandle>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const imageLayerInputRef = useRef<HTMLInputElement>(null);
@@ -133,6 +135,8 @@ export function SpecialEditor() {
     description: '',
     type: 'drink' as 'drink' | 'food' | 'seasonal',
     price: '',
+    starts_at: '',
+    expires_at: '',
   });
   const [publishOptions, setPublishOptions] = useState({
     postToWebsite: true,
@@ -244,6 +248,9 @@ export function SpecialEditor() {
           description: special.description,
           type: special.type,
           price: special.price ?? '',
+          // timestamptz ISO → datetime-local value (YYYY-MM-DDTHH:mm)
+          starts_at: special.starts_at ? special.starts_at.slice(0, 16) : '',
+          expires_at: special.expires_at ? special.expires_at.slice(0, 16) : '',
         });
         if (special.image_url) {
           dispatch({ type: 'SET_BACKGROUND', url: special.image_url });
@@ -251,6 +258,36 @@ export function SpecialEditor() {
       }
     }
   }, [isEdit, id, specials, dispatch]);
+
+  // Luna handoff: a draft_special insight deep-links here with drafted copy in
+  // `draft` (the caption/description) plus optional structured fields in
+  // `payload`. Seed the Save form and open it so the manager reviews and
+  // publishes themselves — nothing is saved or posted automatically.
+  const handoffApplied = useRef(false);
+  useEffect(() => {
+    if (handoffApplied.current) return;
+    if (isEdit) return; // editing an existing special — never overwrite its form
+    if (!handoff.draft && !handoff.payload) return;
+    handoffApplied.current = true;
+
+    const p = handoff.payload ?? {};
+    const title = typeof p.title === 'string' ? p.title : undefined;
+    const description =
+      typeof p.description === 'string' ? p.description : handoff.draft;
+    const type =
+      p.type === 'drink' || p.type === 'food' || p.type === 'seasonal' ? p.type : undefined;
+    const price = typeof p.price === 'string' ? p.price : undefined;
+
+    setSaveForm((f) => ({
+      ...f,
+      ...(title !== undefined ? { title } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(type !== undefined ? { type } : {}),
+      ...(price !== undefined ? { price } : {}),
+    }));
+    setSaveModalOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handoff]);
 
   const handleBgUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -522,6 +559,8 @@ export function SpecialEditor() {
         price: saveForm.price || null,
         image_url: imageUrl,
         active: publishOptions.postToWebsite,
+        starts_at: saveForm.starts_at ? new Date(saveForm.starts_at).toISOString() : null,
+        expires_at: saveForm.expires_at ? new Date(saveForm.expires_at).toISOString() : null,
       };
 
       const ok = isEdit
@@ -910,7 +949,7 @@ export function SpecialEditor() {
 
   return (
     <VideoRefProvider>
-    <div className="md:h-[calc(100vh-3rem)] md:-m-6 lg:-m-8 md:relative md:flex md:flex-col fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="md:h-[calc(100dvh-3rem)] md:-m-6 lg:-m-8 md:relative md:flex md:flex-col fixed inset-0 z-50 flex flex-col bg-background">
       {/* Desktop Toolbar — hidden on mobile (MobileToolbar handles it) */}
       <div className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-surface border-b border-border shrink-0 overflow-x-auto">
         <button onClick={handleBack} className="btn-ghost text-xs py-1.5 px-2" aria-label="Back to specials">
@@ -1694,6 +1733,28 @@ export function SpecialEditor() {
               />
             </div>
           </div>
+          {/* Visibility window */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Starts</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={saveForm.starts_at}
+                onChange={(e) => setSaveForm((f) => ({ ...f, starts_at: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">Expires</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={saveForm.expires_at}
+                onChange={(e) => setSaveForm((f) => ({ ...f, expires_at: e.target.value }))}
+              />
+            </div>
+          </div>
+          <p className="text-[13px] text-text-muted -mt-1">Leave blank for no time limit.</p>
           {/* Publish Options */}
           <div className="border-t border-border pt-4 mt-1 space-y-3">
             <p className="text-xs font-medium text-text-muted uppercase tracking-wide">Publish To</p>

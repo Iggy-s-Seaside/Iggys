@@ -11,6 +11,12 @@ import Events from './pages/Events';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import BookEvent from './pages/BookEvent';
+import ProposalView from './pages/ProposalView';
+import Feedback from './pages/Feedback';
+import CheckoutSuccess from './pages/CheckoutSuccess';
+import CheckoutCancel from './pages/CheckoutCancel';
+import Privacy from './pages/Privacy';
+import SmsTerms from './pages/SmsTerms';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -28,6 +34,12 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/book" element={<BookEvent />} />
+        <Route path="/p/:token" element={<ProposalView />} />
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/checkout/success" element={<CheckoutSuccess />} />
+        <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/sms-terms" element={<SmsTerms />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

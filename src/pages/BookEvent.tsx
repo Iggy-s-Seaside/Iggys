@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CheckCircle2, PartyPopper, Loader2, Lock, Users } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { CheckCircle2, PartyPopper, Loader2, Lock, Users, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/track';
 import AvailabilityCalendar from '../components/booking/AvailabilityCalendar';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
 import { formatRange, minToLabel, windowsOverlap, spaceLabel, spacesConflict, SPACES, type Space } from '../lib/calendarDates';
 import TimeSelect from '../components/ui/TimeSelect';
+import PackageEstimator from '../components/booking/PackageEstimator';
 
 interface PackageRow {
   id: number;
@@ -29,9 +31,15 @@ export default function BookEvent() {
 
   const [form, setForm] = useState({
     name: '', email: '', phone: '', company: '',
-    guest_count: '', party_type: '', start_time: '', notes: '',
+    party_type: '', start_time: '', notes: '',
     company_website: '', // honeypot
   });
+  // Shared with the estimator (single source of truth — no re-entry).
+  const [guests, setGuests] = useState(30);
+  const [hours, setHours] = useState(3);
+  const [showDetails, setShowDetails] = useState(false);
+  const engagedRef = useRef(false);
+  const formStartedRef = useRef(false);
   const [date, setDate] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(true);
   const [space, setSpace] = useState<Space>('upstairs');
@@ -42,6 +50,10 @@ export default function BookEvent() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+  const [carried, setCarried] = useState<
+    { packages: number; guests: number; hours: number; names: string[]; total: number; unpriced: number } | null
+  >(null);
+  const [pendingHours, setPendingHours] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -51,8 +63,62 @@ export default function BookEvent() {
   }, []);
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const togglePkg = (id: number) =>
+
+  // Funnel: fire each step at most once per visit.
+  const fireEngaged = () => {
+    if (!engagedRef.current) { engagedRef.current = true; track('estimator_engaged'); }
+  };
+  const onGuestsChange = (n: number) => { fireEngaged(); setGuests(n); };
+  const onHoursChange = (n: number) => { fireEngaged(); setHours(n); };
+  const onFormFocus = () => {
+    if (!formStartedRef.current) { formStartedRef.current = true; track('form_started'); }
+  };
+  const togglePkg = (id: number) => {
+    fireEngaged();
     setSelectedPkgs((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
+  // When the estimator hands a duration over, fill the END time once a START is
+  // picked — suggested + fully editable, never forced into a conflicting window.
+  useEffect(() => {
+    if (pendingHours != null && startMin != null && endMin == null) {
+      setEndMin(startMin + pendingHours * 60);
+      setPendingHours(null);
+    }
+  }, [pendingHours, startMin, endMin]);
+
+  // "Love it? Let's set a date" — carry the estimator's selections into the form
+  // so nothing is re-entered, then smooth-scroll down to it.
+  const handleEstimatorContinue = (sel: {
+    guests: number; hours: number; packageIds: number[]; packageNames: string[]; estimateTotal: number; unpriced: number;
+  }) => {
+    // guests / hours / packages are already shared state — nothing to copy.
+    setIsPrivate(true);
+    setPendingHours(sel.hours > 0 ? sel.hours : null);
+    if (sel.guests > 0 || sel.packageIds.length > 0) {
+      setCarried({ packages: sel.packageIds.length, guests: sel.guests, hours: sel.hours, names: sel.packageNames, total: sel.estimateTotal, unpriced: sel.unpriced });
+    }
+    track('estimator_cta_clicked', { guests: sel.guests, packages: sel.packageIds.length, total: Math.round(sel.estimateTotal) });
+    requestAnimationFrame(() => {
+      document.getElementById('book-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const scrollToEstimator = () =>
+    document.getElementById('estimator')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // One-line recap of what the estimator carried over — reused in the banner,
+  // the submit button context, the confirmation, and the lead the staff receive.
+  const carriedSummary = carried
+    ? [
+        carried.guests > 0 ? `${carried.guests} guests` : '',
+        carried.hours > 0 ? `${carried.hours} hr${carried.hours === 1 ? '' : 's'}` : '',
+        carried.names.length ? carried.names.slice(0, 3).join(', ') + (carried.names.length > 3 ? ` +${carried.names.length - 3}` : '') : '',
+        carried.total > 0
+          ? `~$${Math.round(carried.total).toLocaleString('en-US')}${carried.unpriced > 0 ? '+' : ''}`
+          : (carried.packages > 0 ? 'custom quote' : ''),
+      ].filter(Boolean).join(' · ')
+    : '';
 
   // Fully blocked + busy days for the chosen space (PRIVATE mode).
   const taken = useMemo(
@@ -127,9 +193,9 @@ export default function BookEvent() {
           event_date: date,
           start_time: legacyStartTime,
           end_time: legacyEndTime,
-          guest_count: form.guest_count || null,
+          guest_count: guests > 0 ? String(guests) : null,
           party_type: form.party_type || null,
-          notes: form.notes || null,
+          notes: [form.notes.trim(), carriedSummary ? `Estimate shown to guest: ${carriedSummary}` : ''].filter(Boolean).join('\n\n') || null,
           package_ids: Array.from(selectedPkgs),
           is_private: isPrivate,
           space: isPrivate ? space : null,
@@ -141,6 +207,7 @@ export default function BookEvent() {
       });
       if (invokeErr) throw invokeErr;
       if (data?.error) throw new Error(data.error);
+      track('booking_submitted', { guests, packages: selectedPkgs.size, private: isPrivate });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again or call us at (503) 738-0672.');
@@ -160,6 +227,7 @@ export default function BookEvent() {
               {date ? ` for ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}.
               We'll reach out shortly to lock in the details.
             </p>
+            {carriedSummary && <p className="text-text-dim text-sm mt-3">{carriedSummary}</p>}
             <p className="text-text-muted text-sm mt-4">Need us sooner? Call (503) 738-0672.</p>
           </div>
         </div>
@@ -183,28 +251,51 @@ export default function BookEvent() {
         </div>
       </section>
 
-      <section className="section-padding">
+      <section id="estimator" className="section-padding scroll-mt-24">
         <div className="section-container max-w-3xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <PackageEstimator
+            guests={guests}
+            hours={hours}
+            selectedIds={selectedPkgs}
+            onGuestsChange={onGuestsChange}
+            onHoursChange={onHoursChange}
+            onToggle={togglePkg}
+            onContinue={handleEstimatorContinue}
+          />
+        </div>
+      </section>
+
+      <section id="book-form" className="section-padding scroll-mt-24">
+        <div className="section-container max-w-3xl mx-auto">
+          <form onSubmit={handleSubmit} onFocus={onFormFocus} className="space-y-6">
+            {carried && (
+              <div className="glass-card p-4 border-primary/30 bg-primary/[0.06] flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-white font-medium text-sm">We kept your selections — just add a date &amp; your details.</p>
+                  <p className="text-text-muted text-xs mt-0.5">{carriedSummary} — carried over from your estimate.</p>
+                </div>
+              </div>
+            )}
             {/* About you */}
             <div className="glass-card p-6 space-y-4">
               <h2 className="font-heading text-xl font-bold text-white">About you</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Name *</label>
-                  <input className={inputClasses} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your name" required />
+                  <input className={inputClasses} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your name" required autoComplete="name" autoCapitalize="words" />
                 </div>
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Company / group <span className="opacity-60">(optional)</span></label>
-                  <input className={inputClasses} value={form.company} onChange={(e) => set('company', e.target.value)} placeholder="e.g., Seaside School District" />
+                  <input className={inputClasses} value={form.company} onChange={(e) => set('company', e.target.value)} placeholder="e.g., Seaside School District" autoComplete="organization" />
                 </div>
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Email</label>
-                  <input type="email" className={inputClasses} value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
+                  <input type="email" inputMode="email" autoComplete="email" autoCapitalize="off" autoCorrect="off" className={inputClasses} value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
                 </div>
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Phone</label>
-                  <input type="tel" className={inputClasses} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(503) 555-0123" />
+                  <input type="tel" inputMode="tel" autoComplete="tel" className={inputClasses} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(503) 555-0123" />
                 </div>
               </div>
               <p className="text-xs text-text-muted">Leave an email or a phone number so we can reach you.</p>
@@ -357,7 +448,7 @@ export default function BookEvent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-text-muted mb-1 block">Guests <span className="opacity-60">(approx.)</span></label>
-                  <input type="number" min="1" className={inputClasses} value={form.guest_count} onChange={(e) => set('guest_count', e.target.value)} placeholder="e.g., 30" />
+                  <input type="number" min="1" inputMode="numeric" className={inputClasses} value={guests > 0 ? guests : ''} onChange={(e) => setGuests(parseInt(e.target.value, 10) || 0)} placeholder="e.g., 30" />
                 </div>
                 {!isPrivate && (
                   <div>
@@ -367,61 +458,66 @@ export default function BookEvent() {
                 )}
               </div>
 
-              <div>
-                <label className="text-sm text-text-muted mb-2 block">What's the occasion?</label>
+              <button
+                type="button"
+                onClick={() => setShowDetails((v) => !v)}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                {showDetails ? 'Hide extra details' : '+ Add details (occasion, notes) — optional'}
+              </button>
+
+              {showDetails && (
+                <div>
+                  <label className="text-sm text-text-muted mb-2 block">What's the occasion?</label>
+                  <div className="flex flex-wrap gap-2">
+                    {PARTY_TYPES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => set('party_type', form.party_type === t ? '' : t)}
+                        className={`px-4 py-2.5 rounded-full text-sm border min-h-[44px] transition ${
+                          form.party_type === t ? 'bg-primary text-background border-primary font-semibold' : 'border-white/15 text-white/80 hover:border-primary/40'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Your packages — picked in the estimator above (single source of truth) */}
+            {selectedPkgs.size > 0 && (
+              <div className="glass-card p-6 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-heading text-xl font-bold text-white">Your packages</h2>
+                  <button type="button" onClick={scrollToEstimator} className="text-sm text-primary hover:underline shrink-0">Edit ↑</button>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {PARTY_TYPES.map((t) => (
+                  {packages.filter((p) => selectedPkgs.has(p.id)).map((p) => (
                     <button
-                      key={t}
+                      key={p.id}
                       type="button"
-                      onClick={() => set('party_type', form.party_type === t ? '' : t)}
-                      className={`px-4 py-2.5 rounded-full text-sm border min-h-[44px] transition ${
-                        form.party_type === t ? 'bg-primary text-background border-primary font-semibold' : 'border-white/15 text-white/80 hover:border-primary/40'
-                      }`}
+                      onClick={() => togglePkg(p.id)}
+                      aria-label={`Remove ${p.name}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm text-white hover:border-primary transition min-h-[40px]"
                     >
-                      {t}
+                      {p.name} <X className="w-3.5 h-3.5 text-text-muted" />
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-
-            {/* Packages */}
-            {packages.length > 0 && (
-              <div className="glass-card p-6 space-y-3">
-                <h2 className="font-heading text-xl font-bold text-white">Add packages <span className="text-sm text-text-muted font-normal">(optional)</span></h2>
-                <p className="text-sm text-text-muted">Pick anything you're interested in — we'll confirm details with you.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {packages.map((p) => {
-                    const on = selectedPkgs.has(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => togglePkg(p.id)}
-                        className={`text-left p-4 rounded-xl border transition min-h-[44px] ${
-                          on ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.03] hover:border-white/25'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-medium text-white">{p.name}</span>
-                          <span className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center ${on ? 'bg-primary border-primary' : 'border-white/30'}`}>
-                            {on && <CheckCircle2 className="w-4 h-4 text-background" />}
-                          </span>
-                        </div>
-                        {p.description && <p className="text-xs text-text-muted mt-1">{p.description}</p>}
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="text-xs text-text-muted">Tap a package to remove it — or edit up top to add more.</p>
               </div>
             )}
 
-            {/* Notes */}
-            <div className="glass-card p-6">
-              <label className="text-sm text-text-muted mb-1 block">Anything else we should know?</label>
-              <textarea className={inputClasses} rows={4} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Vibe, food/drink ideas, special requests…" />
-            </div>
+            {/* Notes (inside the optional-details toggle) */}
+            {showDetails && (
+              <div className="glass-card p-6">
+                <label className="text-sm text-text-muted mb-1 block">Anything else we should know?</label>
+                <textarea className={inputClasses} rows={4} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Vibe, food/drink ideas, special requests…" />
+              </div>
+            )}
 
             {/* Honeypot (hidden from humans) */}
             <input
@@ -433,12 +529,32 @@ export default function BookEvent() {
             {error && <p className="text-amber-400 text-sm">{error}</p>}
 
             <button type="submit" disabled={!canSubmit} className="btn-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed">
-              {submitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Sending…</> : 'Request this date'}
+              {submitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Sending…</> : (carried && carried.guests > 0 ? `Request this date — ${carried.guests} guests` : 'Request this date')}
             </button>
             <p className="text-center text-xs text-text-muted">No deposit needed to ask — this just starts the conversation.</p>
+            {carried && <div className="h-16 sm:hidden" aria-hidden />}
           </form>
         </div>
       </section>
+
+      {/* Sticky mobile CTA — keeps the price + action one tap away on the scroll */}
+      {carried && !done && (
+        <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-background/95 backdrop-blur px-4 py-2.5 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-2xs uppercase tracking-wider text-text-dim">Your event</p>
+            <p className="text-white font-semibold text-sm truncate">
+              {carried.total > 0 ? `From ~$${Math.round(carried.total).toLocaleString('en-US')}${carried.unpriced > 0 ? '+' : ''}` : 'Custom quote'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => document.getElementById('book-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="btn-primary shrink-0 px-4 py-2.5 text-sm"
+          >
+            Request this date
+          </button>
+        </div>
+      )}
     </>
   );
 }

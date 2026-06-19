@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   Moon, Send, RefreshCw, Eye, X, Loader2, MessageCircle, Lightbulb, WifiOff,
+  ArrowRight, Copy, FileText, BookHeart,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLunaMessages, useLunaInsights } from '../hooks/useLuna';
 import { useCoarsePointer } from '../hooks/useCoarsePointer';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import type { LunaInsight, LunaInsightKind, LunaMessage } from '../types';
-import { LUNA_INSIGHT_KIND_LABELS } from '../types';
+import type { LunaInsight, LunaInsightKind, LunaMessage, LunaActionState } from '../types';
+import { LUNA_INSIGHT_KIND_LABELS, INSIGHT_ACTION_DEFAULT_LABELS, parseInsightData } from '../types';
 
 type LunaTab = 'chat' | 'insights';
 
@@ -16,6 +20,8 @@ const KIND_CHIP_CLASSES: Record<LunaInsightKind, string> = {
   alert: 'badge-danger',
   suggestion: 'badge-accent',
   note: 'badge bg-surface-hover text-text-muted',
+  pulse: 'badge-primary', // pulse renders as the dashboard card, not in this feed
+  special: 'badge-accent', // special-of-the-day renders as its own dashboard card
 };
 
 const EXAMPLE_PROMPTS = [
@@ -127,8 +133,44 @@ function InsightCard({
   onSeen: (id: number) => void;
   onDismiss: (id: number) => void;
 }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
+  const [showDraft, setShowDraft] = useState(false);
   const isLong = insight.body.length > 160 || insight.body.split('\n').length > 3;
+
+  // Luna writes an optional one-tap action + drafted text + sources into `data`.
+  const d = parseInsightData(insight.data);
+  const action = d.action;
+  const deepLink = action?.deep_link ?? d.deep_link;
+  const draft = action?.draft;
+  const sources = Array.isArray(d.sources)
+    ? d.sources.filter((s): s is string => typeof s === 'string')
+    : [];
+  const actionLabel = action ? action.label || INSIGHT_ACTION_DEFAULT_LABELS[action.type] : null;
+
+  // The human always triggers. Tapping marks the insight seen and routes to the
+  // relevant record, carrying Luna's draft so the target page can pre-fill it.
+  const runAction = () => {
+    onSeen(insight.id);
+    if (deepLink) {
+      const state: LunaActionState = {
+        lunaDraft: draft,
+        lunaPayload: action?.payload,
+        fromInsight: insight.id,
+      };
+      navigate(deepLink, { state });
+    }
+  };
+
+  const copyDraft = async () => {
+    if (!draft) return;
+    try {
+      await navigator.clipboard.writeText(draft);
+      toast.success('Draft copied');
+    } catch {
+      toast.error('Could not copy');
+    }
+  };
 
   return (
     <div className={`card p-4 ${insight.status === 'new' ? 'border-primary/40' : ''}`}>
@@ -177,6 +219,54 @@ function InsightCard({
           {expanded ? 'Show less' : 'Show more'}
         </button>
       )}
+
+      {/* Luna's drafted text — ready to use, never auto-sent */}
+      {draft && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowDraft((s) => !s)}
+            className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <FileText size={13} /> {showDraft ? "Hide Luna's draft" : "View Luna's draft"}
+          </button>
+          {showDraft && (
+            <div className="mt-2 rounded-lg border border-border bg-surface-hover/60 p-3">
+              <p className="text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">{draft}</p>
+              <button
+                onClick={copyDraft}
+                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
+              >
+                <Copy size={12} /> Copy
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sources — Luna grounds every data answer in real rows */}
+      {sources.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-medium text-text-muted">Sources:</span>
+          {sources.map((s, i) => (
+            <span key={i} className="text-[11px] text-text-muted bg-surface-hover rounded px-1.5 py-0.5">{s}</span>
+          ))}
+        </div>
+      )}
+
+      {/* One-tap action — the human always triggers; Luna only drafts */}
+      {(action || deepLink) && (
+        <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 flex-wrap">
+          <button
+            onClick={runAction}
+            className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5"
+          >
+            {actionLabel || 'Open'} <ArrowRight size={13} />
+          </button>
+          {action && action.type !== 'navigate' && (
+            <span className="text-[11px] text-text-muted">You review before it sends</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -215,13 +305,18 @@ export function Luna() {
   const thinking = waiting && waitedMs < STUCK_AFTER_MS;
   const stuck = waiting && waitedMs >= STUCK_AFTER_MS;
 
-  const newInsightCount = useMemo(
-    () => insights.filter((i) => i.status === 'new').length,
+  // The daily pulse + creative special are their own dashboard cards — keep them out of the feed.
+  const feedInsights = useMemo(
+    () => insights.filter((i) => i.kind !== 'pulse' && i.kind !== 'special'),
     [insights]
   );
+  const newInsightCount = useMemo(
+    () => feedInsights.filter((i) => i.status === 'new').length,
+    [feedInsights]
+  );
   const visibleInsights = useMemo(
-    () => (showDismissed ? insights : insights.filter((i) => i.status !== 'dismissed')),
-    [insights, showDismissed]
+    () => (showDismissed ? feedInsights : feedInsights.filter((i) => i.status !== 'dismissed')),
+    [feedInsights, showDismissed]
   );
 
   // Keep the thread pinned to the newest message — but never yank the user
@@ -278,42 +373,30 @@ export function Luna() {
           <h1 className="text-2xl font-bold text-text-primary">Luna</h1>
           <p className="text-sm text-text-muted">Your AI assistant for the bar</p>
         </div>
+        <Link
+          to="/luna/room"
+          className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-purple-600 dark:text-purple-300 hover:underline shrink-0"
+        >
+          <BookHeart size={16} /> Luna's Room
+        </Link>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 mb-5" role="tablist" aria-label="Luna sections">
-        <button
-          onClick={() => setTab('chat')}
-          role="tab"
-          aria-selected={tab === 'chat'}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            tab === 'chat'
-              ? 'bg-primary text-white'
-              : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-          }`}
-        >
-          <MessageCircle size={14} /> Chat
-        </button>
-        <button
-          onClick={() => setTab('insights')}
-          role="tab"
-          aria-selected={tab === 'insights'}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            tab === 'insights'
-              ? 'bg-primary text-white'
-              : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-          }`}
-        >
-          <Lightbulb size={14} /> Insights
-          {newInsightCount > 0 && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
-              tab === 'insights' ? 'bg-white/25 text-white' : 'bg-primary text-white'
-            }`}>
-              {newInsightCount > 9 ? '9+' : newInsightCount}
-            </span>
-          )}
-        </button>
-      </div>
+      <SegmentedControl<LunaTab>
+        className="mb-5"
+        ariaLabel="Luna sections"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'chat', label: 'Chat', icon: MessageCircle },
+          {
+            value: 'insights',
+            label: 'Insights',
+            icon: Lightbulb,
+            badge: newInsightCount > 0 ? (newInsightCount > 9 ? '9+' : newInsightCount) : undefined,
+          },
+        ]}
+      />
 
       {tab === 'insights' ? (
         <div className="pb-8">

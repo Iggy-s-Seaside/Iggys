@@ -155,6 +155,12 @@ export function useOrderScanner(inventoryItems: InventoryItem[]) {
           if (existing) {
             const newQty = existing.current_quantity + item.quantity;
             await adjustQuantity(existing.id, existing.current_quantity, newQty, 'order_scan', userEmail);
+            // A delivery is fresh ground truth: clear any low/out flag and stamp
+            // the count so the item drops off the "needs attention" / stale board.
+            await supabase
+              .from('inventory_items')
+              .update({ stock_state: 'ok', last_counted_at: new Date().toISOString() })
+              .eq('id', existing.id);
             restocked++;
           }
         } else if (item.status === 'new') {

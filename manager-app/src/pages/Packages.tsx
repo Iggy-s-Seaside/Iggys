@@ -3,11 +3,15 @@ import { Plus, Pencil, Trash2, Package as PackageIcon, Loader2, Tag } from 'luci
 import { usePackages } from '../hooks/usePackages';
 import { Modal, ConfirmDialog } from '../components/ui/Modal';
 import Select from '../components/ui/Select';
+import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { Field } from '../components/ui/Field';
+import { Toggle } from '../components/ui/Toggle';
+import { money } from '../utils/format';
 import {
   PACKAGE_CATEGORIES, PACKAGE_UNITS, PACKAGE_UNIT_LABELS, type Package, type PackageCategory, type PackageUnit,
 } from '../types';
-
-const money = (n: number) => `$${(n || 0).toFixed(2)}`;
 
 const emptyForm = {
   name: '',
@@ -16,6 +20,7 @@ const emptyForm = {
   price: '0',
   unit: 'flat' as PackageUnit,
   active: true,
+  public_visible: true,
   sort_order: '0',
 };
 
@@ -36,6 +41,7 @@ export function Packages() {
         price: String(editing.price),
         unit: editing.unit,
         active: editing.active,
+        public_visible: editing.public_visible !== false,
         sort_order: String(editing.sort_order),
       });
     } else {
@@ -60,6 +66,7 @@ export function Packages() {
       price: parseFloat(form.price) || 0,
       unit: form.unit,
       active: form.active,
+      public_visible: form.public_visible,
       sort_order: parseInt(form.sort_order, 10) || 0,
     };
     const ok = editing
@@ -71,24 +78,20 @@ export function Packages() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Packages</h1>
-          <p className="text-sm text-text-muted mt-1">The catalog of offerings you can add to any party</p>
-        </div>
+      <PageHeader title="Packages" subtitle="The catalog of offerings you can add to any party">
         <button onClick={openNew} className="btn-primary"><Plus size={18} /> New Package</button>
-      </div>
+      </PageHeader>
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="card p-4 animate-pulse h-16" />)}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}
         </div>
       ) : packages.length === 0 ? (
-        <div className="card p-12 text-center">
-          <PackageIcon size={40} className="mx-auto text-text-muted mb-3" />
-          <p className="text-text-secondary font-medium">No packages yet</p>
-          <button onClick={openNew} className="btn-primary mt-4 inline-flex"><Plus size={18} /> New Package</button>
-        </div>
+        <EmptyState
+          icon={PackageIcon}
+          title="No packages yet"
+          action={<button onClick={openNew} className="btn-primary inline-flex"><Plus size={18} /> New Package</button>}
+        />
       ) : (
         <div className="card divide-y divide-border overflow-hidden">
           {packages.map((p) => (
@@ -97,20 +100,22 @@ export function Packages() {
                 <div className="flex items-center gap-2">
                   <p className={`text-sm font-medium ${p.active ? 'text-text-primary' : 'text-text-muted line-through'}`}>{p.name}</p>
                   <span className="badge-primary capitalize">{p.category}</span>
+                  {p.public_visible === false && (
+                    <span className="badge bg-surface-hover text-text-muted">Manager only</span>
+                  )}
                 </div>
                 {p.description && <p className="text-xs text-text-muted truncate mt-0.5">{p.description}</p>}
               </div>
               <div className="text-right shrink-0">
-                <p className="text-sm font-medium text-text-primary">{money(p.price)}</p>
+                <p className="text-sm font-medium text-text-primary">{money(p.price, { cents: true })}</p>
                 <p className="text-xs text-text-muted">{PACKAGE_UNIT_LABELS[p.unit]}</p>
               </div>
-              <button
-                onClick={() => update(p.id, { active: !p.active })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${p.active ? 'bg-primary' : 'bg-surface-active'}`}
-                title={p.active ? 'Active' : 'Inactive'}
-              >
-                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${p.active ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
+              <Toggle
+                checked={p.active}
+                onChange={(next) => update(p.id, { active: next })}
+                ariaLabel={p.active ? 'Active' : 'Inactive'}
+                className="shrink-0"
+              />
               <button onClick={() => openEdit(p)} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors shrink-0">
                 <Pencil size={15} />
               </button>
@@ -124,19 +129,16 @@ export function Packages() {
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Package' : 'New Package'}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="label">Name *</label>
+          <Field label="Name *">
             <input className="input-field" value={form.name} onChange={(e) => setField('name', e.target.value)}
               placeholder="Upstairs Room Rental" required />
-          </div>
-          <div>
-            <label className="label">Description</label>
+          </Field>
+          <Field label="Description">
             <textarea className="input-field min-h-[60px] resize-y" value={form.description}
               onChange={(e) => setField('description', e.target.value)} />
-          </div>
+          </Field>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Category</label>
+            <Field label="Category">
               <Select<PackageCategory>
                 variant="manager"
                 leadingIcon={Tag}
@@ -144,34 +146,34 @@ export function Packages() {
                 onChange={(v) => setField('category', v)}
                 options={PACKAGE_CATEGORIES.map((c) => ({ value: c, label: c }))}
               />
-            </div>
-            <div>
-              <label className="label">Unit</label>
+            </Field>
+            <Field label="Unit">
               <Select<PackageUnit>
                 variant="manager"
                 value={form.unit}
                 onChange={(v) => setField('unit', v)}
                 options={PACKAGE_UNITS.map((u) => ({ value: u, label: PACKAGE_UNIT_LABELS[u] }))}
               />
-            </div>
-            <div>
-              <label className="label">Price ($)</label>
+            </Field>
+            <Field label="Price ($)">
               <input type="number" min="0" step="any" className="input-field" value={form.price}
                 onChange={(e) => setField('price', e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Sort order</label>
+            </Field>
+            <Field label="Sort order">
               <input type="number" className="input-field" value={form.sort_order}
                 onChange={(e) => setField('sort_order', e.target.value)} />
-            </div>
+            </Field>
           </div>
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setField('active', !form.active)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.active ? 'bg-primary' : 'bg-surface-active'}`}>
-              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${form.active ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-            <span className="text-sm text-text-secondary">Active (available to add to parties)</span>
-          </div>
+          <Toggle
+            checked={form.active}
+            onChange={(next) => setField('active', next)}
+            label="Active (available to add to parties)"
+          />
+          <Toggle
+            checked={form.public_visible}
+            onChange={(next) => setField('public_visible', next)}
+            label="Show on public booking (customers see this in the estimator)"
+          />
           <div className="flex gap-3 justify-end pt-1">
             <button type="button" onClick={() => setFormOpen(false)} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving || !form.name.trim()} className="btn-primary">
