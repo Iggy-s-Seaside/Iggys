@@ -15,7 +15,7 @@
 //
 // On-brand: `card` token, semantic tokens, lucide icons, ≥44px targets, dark-safe.
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Printer, QrCode, ScanLine } from 'lucide-react';
 import { useRole } from '../hooks/useRole';
 
@@ -36,6 +36,10 @@ export function InstallQR({ className = '' }: InstallQRProps) {
   // Unique, valid CSS id so the print stylesheet can isolate exactly this poster.
   const rawId = useId();
   const printId = `install-qr-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  // The QR image comes from a third-party API; if it ever fails to load, degrade
+  // gracefully to a clean placeholder (the URL is always printed below as the real
+  // fallback) instead of a broken-image box.
+  const [qrFailed, setQrFailed] = useState(false);
 
   // Owner / manager only — line staff don't need the print tool.
   if (!isManager) return null;
@@ -127,14 +131,22 @@ export function InstallQR({ className = '' }: InstallQRProps) {
         </p>
 
         <div className="rounded-xl border border-border bg-white p-3 sm:p-4">
-          <img
-            src={QR_SRC}
-            width={QR_SIZE}
-            height={QR_SIZE}
-            alt={`QR code to open ${APP_URL}`}
-            className="block w-44 h-44 sm:w-56 sm:h-56"
-            loading="lazy"
-          />
+          {qrFailed ? (
+            <div className="flex w-44 h-44 sm:w-56 sm:h-56 flex-col items-center justify-center gap-2 text-center text-slate-500">
+              <QrCode size={40} aria-hidden="true" />
+              <span className="px-3 text-xs font-medium">QR unavailable — open the link below</span>
+            </div>
+          ) : (
+            <img
+              src={QR_SRC}
+              width={QR_SIZE}
+              height={QR_SIZE}
+              alt={`QR code to open ${APP_URL}`}
+              className="block w-44 h-44 sm:w-56 sm:h-56"
+              loading="lazy"
+              onError={() => setQrFailed(true)}
+            />
+          )}
         </div>
 
         <p className="mt-3 text-sm font-mono text-text-muted break-all" style={{ wordBreak: 'break-all' }}>
