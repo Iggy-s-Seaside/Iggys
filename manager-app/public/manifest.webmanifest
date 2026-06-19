@@ -52,17 +52,20 @@
     {
       "name": "Run Sheet",
       "short_name": "Run Sheet",
-      "url": "/run-sheet"
+      "url": "/run-sheet",
+      "icons": [{ "src": "/shortcut-runsheet.png", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "Messages",
       "short_name": "Messages",
-      "url": "/messages"
+      "url": "/messages",
+      "icons": [{ "src": "/shortcut-messages.png", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "Today's Shift",
       "short_name": "Shift",
-      "url": "/shift"
+      "url": "/shift",
+      "icons": [{ "src": "/shortcut-shift.png", "sizes": "96x96", "type": "image/png" }]
     }
   ]
 }
