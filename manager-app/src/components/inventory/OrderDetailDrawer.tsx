@@ -1,5 +1,7 @@
 import { X, Check, Plus, AlertTriangle, Package } from 'lucide-react';
+import { useId, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { Order } from '../../types';
 
 interface OrderDetailDrawerProps {
@@ -9,6 +11,10 @@ interface OrderDetailDrawerProps {
 }
 
 export function OrderDetailDrawer({ open, onClose, order }: OrderDetailDrawerProps) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
+
   return (
     <>
       {/* Overlay */}
@@ -18,13 +24,19 @@ export function OrderDetailDrawer({ open, onClose, order }: OrderDetailDrawerPro
 
       {/* Drawer panel */}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-surface border-l border-border shadow-lg transform transition-transform duration-300 ${
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        inert={!open}
+        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-surface border-l border-border shadow-lg transform transition-transform duration-300 focus:outline-none ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <h2 className="font-semibold text-text-primary">Order Details</h2>
+            <h2 id={titleId} className="font-semibold text-text-primary">Order Details</h2>
             {order && (
               <p className="text-xs text-text-muted mt-0.5">
                 {format(parseISO(order.created_at), 'MMM d, yyyy h:mm a')}
@@ -33,7 +45,8 @@ export function OrderDetailDrawer({ open, onClose, order }: OrderDetailDrawerPro
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-surface-hover transition-colors"
+            aria-label="Close"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-surface-hover transition-colors"
           >
             <X size={18} />
           </button>
