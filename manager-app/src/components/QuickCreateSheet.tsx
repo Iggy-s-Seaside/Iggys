@@ -52,7 +52,7 @@ function ActionButton({ action, onSelect }: { action: QuickAction; onSelect: (to
         <Icon size={22} />
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-text-primary truncate">{action.label}</span>
+        <span className="block text-sm font-semibold text-text-primary leading-tight">{action.label}</span>
         <span className="block text-xs text-text-muted truncate">{action.hint}</span>
       </span>
     </button>

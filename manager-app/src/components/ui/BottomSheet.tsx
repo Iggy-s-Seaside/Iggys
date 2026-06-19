@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
 import { X, ChevronLeft, Check } from 'lucide-react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface BottomSheetProps {
   open: boolean;
@@ -47,6 +48,11 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open, animatedClose, sliderActive]);
+
+  // Trap focus inside the sheet (Tab cycle + focus restore on close). Escape is
+  // handled by the slider-aware effect above, so disable it here. Paused in slider
+  // peek mode, where the active control lives in the floating bar outside the sheet.
+  useFocusTrap(open && !sliderActive, sheetRef, { closeOnEscape: false });
 
   // Prevent body scroll when open
   useEffect(() => {
@@ -236,7 +242,11 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       {/* ─── Full-screen sheet ─── */}
       <div
         ref={sheetRef}
-        className="absolute inset-x-0 bottom-0 top-0 bg-surface flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className="absolute inset-x-0 bottom-0 top-0 bg-surface flex flex-col focus:outline-none"
         style={{
           height: keyboardVisible ? `${window.visualViewport?.height ?? window.innerHeight}px` : '100%',
           transition: sliderActive
