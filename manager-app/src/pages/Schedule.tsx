@@ -413,11 +413,11 @@ function TimeOffList({ staff, requests, onStatus }: {
         {r.status === 'pending' ? (
           <div className="flex items-center gap-1.5 shrink-0">
             <button onClick={() => onStatus(r.id, 'approved')}
-              className="p-2 rounded-lg hover:bg-green-500/10 text-text-muted hover:text-green-500" title="Approve">
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-green-500/10 text-text-muted hover:text-green-500" title="Approve" aria-label="Approve">
               <Check size={15} />
             </button>
             <button onClick={() => onStatus(r.id, 'denied')}
-              className="p-2 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger" title="Deny">
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger" title="Deny" aria-label="Deny">
               <Ban size={15} />
             </button>
           </div>
@@ -511,14 +511,14 @@ export function Schedule() {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-surface-hover rounded-lg p-1">
             <button onClick={() => setWeekAnchor((d) => addDays(d, -7))}
-              className="p-1.5 rounded-md hover:bg-surface-active text-text-secondary" title="Previous week">
+              className="p-2.5 rounded-md hover:bg-surface-active text-text-secondary" title="Previous week">
               <ChevronLeft size={16} />
             </button>
             <span className="text-sm font-medium text-text-primary px-2 tabular-nums whitespace-nowrap">
               {fmtDate(weekStart, 'MMM d')} – {format(addDays(new Date(weekStart), 6), 'MMM d')}
             </span>
             <button onClick={() => setWeekAnchor((d) => addDays(d, 7))}
-              className="p-1.5 rounded-md hover:bg-surface-active text-text-secondary" title="Next week">
+              className="p-2.5 rounded-md hover:bg-surface-active text-text-secondary" title="Next week">
               <ChevronRight size={16} />
             </button>
           </div>

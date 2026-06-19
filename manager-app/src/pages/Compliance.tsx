@@ -358,8 +358,9 @@ function TempCard({
           </button>
           <button
             onClick={() => onRemove(unit.id)}
-            className="p-2 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger shrink-0"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger shrink-0"
             title="Remove unit"
+            aria-label="Remove unit"
           >
             <Trash2 size={16} />
           </button>

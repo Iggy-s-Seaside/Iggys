@@ -128,7 +128,7 @@ function ProductRow({
             <button
               type="button"
               onClick={() => onDelete(product)}
-              className="text-xs text-text-muted hover:text-danger flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors"
+              className="text-xs text-text-muted hover:text-danger inline-flex items-center gap-1 px-2.5 py-2 min-h-[44px] rounded-lg hover:bg-red-500/10 transition-colors"
             >
               <Trash2 size={13} /> Delete
             </button>
