@@ -5,7 +5,7 @@ import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useInventoryItems, getLowStockItems } from '../hooks/useInventory';
 import { useMessages } from '../hooks/useMessages';
 import { useTodos } from '../hooks/useTodos';
-import { useLunaInsights } from '../hooks/useLuna';
+import { useLunaInsights, useLunaReach } from '../hooks/useLuna';
 import { useShift } from '../hooks/useShift';
 import { useAutoOpenShift } from '../hooks/useAutoOpenShift';
 import { QuickPostModal } from '../components/editor/QuickPostModal';
@@ -22,7 +22,9 @@ import { useDemandLog } from '../hooks/useDemandLog';
 import { useAuth } from '../context/AuthContext';
 import { useWeather } from '../hooks/useWeather';
 import { useParties } from '../hooks/useParties';
+import { useWeatherReach } from '../hooks/useWeatherReach';
 import { composeDailyRead } from '../lib/dailyRead';
+import { reachConcernKey } from '../lib/weatherWatch';
 import { needsReplyNow } from '../utils/triage';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -44,6 +46,12 @@ export function Dashboard() {
   const { firstName, role } = useAuth();
   const { weather } = useWeather();
   const { parties } = useParties();
+  // The reach banner (in the layout) escalates one weather flag; suppress that exact
+  // one from the panel below so it isn't shown twice — but only when the banner is
+  // actually showing the WEATHER reach (a luna_insights reach takes priority over it).
+  const { reach: lunaReach } = useLunaReach();
+  const { weatherReach } = useWeatherReach();
+  const excludeReachKey = !lunaReach && weatherReach ? reachConcernKey(weatherReach) : null;
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
   const needsReplyMessages = messages.filter(needsReplyNow);
@@ -113,8 +121,9 @@ export function Dashboard() {
       />
 
       {/* Weather × reservation cross-signal — only the next-48h flags that point
-          to an action (move a booking indoors, call in a hand). Silent otherwise. */}
-      <WeatherWatch />
+          to an action (move a booking indoors, call in a hand). Silent otherwise.
+          The one flag the reach banner is escalating is suppressed here to avoid an echo. */}
+      <WeatherWatch excludeReachKey={excludeReachKey} />
 
       {/* Luna's creative special-of-the-day */}
       <SpecialIdeaCard special={latestSpecial} />

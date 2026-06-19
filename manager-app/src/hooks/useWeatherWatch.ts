@@ -43,12 +43,21 @@ export function useWeatherWatch(): { flags: WeatherFlag[]; loading: boolean } {
   const [loading, setLoading] = useState(true);
   const [refetchKey, setRefetchKey] = useState(0);
 
-  // `now` is captured once per mount: the 48h window is stable across a session,
-  // and a fixed reference keeps the memo below from thrashing.
-  const now = useMemo(() => new Date(), []);
+  // `now` advances on a coarse interval. The reach banner mounts this hook in the
+  // layout and never remounts, so a frozen clock would go stale on an always-on
+  // dashboard — the 48h window and the same-day 17:00/19:00 cutoffs would drift. The
+  // day-key drives the data window (so we don't refetch every tick); the live `now`
+  // drives the time-of-day cutoffs in computeWeatherFlags.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const today = ymd(now);
   const windowDates = useMemo(
-    () => [0, 1, 2].map((n) => ymd(new Date(now.getTime() + n * 86_400_000))),
-    [now]
+    () => [0, 1, 2].map((n) => ymd(new Date(new Date(`${today}T00:00:00`).getTime() + n * 86_400_000))),
+    [today]
   );
 
   // Recompute when the schedule or Luna's demand bands change under us. Parties
@@ -65,7 +74,7 @@ export function useWeatherWatch(): { flags: WeatherFlag[]; loading: boolean } {
 
   useEffect(() => {
     let cancelled = false;
-    const histStart = ymd(new Date(now.getTime() - 35 * 86_400_000));
+    const histStart = ymd(new Date(new Date(`${today}T00:00:00`).getTime() - 35 * 86_400_000));
     const windowEnd = windowDates[windowDates.length - 1];
 
     (async () => {
@@ -131,7 +140,7 @@ export function useWeatherWatch(): { flags: WeatherFlag[]; loading: boolean } {
     })().catch(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [now, windowDates, refetchKey]);
+  }, [today, windowDates, refetchKey]);
 
   const flags = useMemo(
     () => computeWeatherFlags({ now, daily, parties, staffingByDate, demandByDate }),

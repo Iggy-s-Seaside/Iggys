@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { CloudRain, ThermometerSun, Umbrella, ChevronRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useWeatherWatch } from '../../hooks/useWeatherWatch';
-import type { WeatherFlag, WeatherFlagKind, WeatherFlagSeverity } from '../../lib/weatherWatch';
+import { reachConcernKey, type WeatherFlag, type WeatherFlagKind, type WeatherFlagSeverity } from '../../lib/weatherWatch';
 
 // Weather Watch — Luna's weather × reservation cross-signal on the dashboard.
 // Her contract: no header, no "I noticed," no preamble. Each flag is one sentence
@@ -29,9 +29,13 @@ const ACCENT: Record<WeatherFlagSeverity, { card: string; iconWrap: string; icon
   },
 };
 
-export function WeatherWatch() {
+export function WeatherWatch({ excludeReachKey }: { excludeReachKey?: string | null }) {
   const { flags } = useWeatherWatch();
-  return <WeatherWatchView flags={flags} />;
+  // The reach banner already escalates one flag at the top of the screen; don't echo
+  // that exact one in the panel below. (Dashboard passes its key only when the banner
+  // is actually showing the weather reach — a luna_insights reach pre-empts it.)
+  const shown = excludeReachKey ? flags.filter((f) => reachConcernKey(f) !== excludeReachKey) : flags;
+  return <WeatherWatchView flags={shown} />;
 }
 
 // Presentational half — pure render over flags, so it can be previewed/tested in
