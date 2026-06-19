@@ -36,14 +36,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // role guards wait on roleResolved so an owner isn't briefly seen as 'employee'.
     const applyRole = async (s: Session | null) => {
       if (!s?.user) { if (mounted) { setRole('employee'); setRoleResolved(true); setFirstName(null); } return; }
-      if (mounted) setRoleResolved(false);
+      // Note: we do NOT reset roleResolved to false here on re-resolution — auth
+      // events (token refresh, focus) fire repeatedly, and flapping it would bounce
+      // an owner through the employee UI each time.
       const [{ data, error }, { data: name }] = await Promise.all([
         supabase.rpc('get_my_role'),
         supabase.rpc('get_my_name'),
       ]);
       if (!mounted) return;
-      setRole(!error && (data === 'owner' || data === 'manager' || data === 'employee') ? data : 'employee');
-      setFirstName(typeof name === 'string' && name.trim() ? name.trim().split(/\s+/)[0] : null);
+      // A transient RPC failure (auth churn / network) must NOT downgrade an already-
+      // resolved role — keep what we have and just mark resolved. Likewise only apply
+      // a role/name when the response is well-formed, so a hiccup can't clobber owner
+      // with the fail-closed default.
+      if (error) { setRoleResolved(true); return; }
+      if (data === 'owner' || data === 'manager' || data === 'employee') setRole(data);
+      if (typeof name === 'string' && name.trim()) setFirstName(name.trim().split(/\s+/)[0]);
       setRoleResolved(true);
     };
 
