@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type { Role } from '../hooks/useRole';
+import { devAuthEnabled, DEV_USER, DEV_ROLE } from '../lib/devAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -29,6 +30,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // DEV-only visual-QA bypass (see lib/devAuth). import.meta.env.DEV is statically
+    // false in production builds, so this entire branch is dead-code-eliminated there.
+    if (import.meta.env.DEV && devAuthEnabled()) {
+      setUser(DEV_USER as unknown as User);
+      setSession({ user: DEV_USER } as unknown as Session);
+      setRole(DEV_ROLE);
+      setRoleResolved(true);
+      setFirstName('Claude');
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     // Resolve the caller's role + name from the DB (SECURITY DEFINER RPCs read
