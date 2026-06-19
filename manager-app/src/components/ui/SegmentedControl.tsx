@@ -81,7 +81,7 @@ export function SegmentedControl<T extends string>({
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               active
-                ? 'bg-primary text-white'
+                ? 'bg-primary text-[#03201c]'
                 : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
             }`}
           >
@@ -90,7 +90,7 @@ export function SegmentedControl<T extends string>({
             {opt.badge != null && opt.badge !== '' && (
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
-                  active ? 'bg-white/25 text-white' : 'bg-primary text-white'
+                  active ? 'bg-black/15 text-[#03201c]' : 'bg-primary text-[#03201c]'
                 }`}
               >
                 {opt.badge}
