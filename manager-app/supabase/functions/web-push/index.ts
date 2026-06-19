@@ -1,5 +1,5 @@
 // supabase/functions/web-push/index.ts
-// WEB PUSH (VAPID) SENDER — *clearly stubbed / SAFE BY DEFAULT*. This function does
+// WEB PUSH (VAPID) SENDER — fully implemented, *SAFE BY DEFAULT*. This function does
 // NOT send any push notifications until VAPID keys are configured. With the keys
 // absent (the default), every call is a no-op that reports "disabled" — nothing ever
 // leaves the server. This is the trust-layer push channel for the manager PWA.
@@ -38,15 +38,14 @@
 //      A 201 = delivered to the push service. A 404/410 = the subscription is dead →
 //      delete that row from push_subscriptions.
 //
-// The aes128gcm content encryption is intentionally NOT implemented inline here: it is
-// substantial crypto best delegated to a vetted library at wire-up time, e.g.
-//   import webpush from "https://esm.sh/web-push@3";   // (Node-compat) or
-//   import * as wp from "https://deno.land/x/webpush/mod.ts";
-// The VAPID JWT below IS implemented so the auth half is ready and testable; the
-// function refuses to send (and says so) until the keys exist.
+// The aes128gcm content encryption (RFC 8291) is implemented in ./encrypt.ts and
+// verified against the RFC's Appendix A test vector — CEK/NONCE/body match byte-for-
+// byte (see ./verify-encrypt.ts). Both halves — VAPID auth (below) and payload
+// encryption — are live; the function still refuses to send until the VAPID keys exist.
 
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encryptWebPush } from "./encrypt.ts";
 
 const ALLOWED_ORIGINS = [
   "https://iggysseaside.com",
@@ -100,7 +99,12 @@ function base64urlToBytes(b64url: string): Uint8Array {
  * of Web Push (RFC 8292) and is fully implemented so it's ready the moment the keys
  * land. Returns null if the private key can't be imported.
  */
-async function buildVapidJwt(endpoint: string, vapidPrivateKey: string, subject: string): Promise<string | null> {
+async function buildVapidJwt(
+  endpoint: string,
+  vapidPrivateKey: string,
+  vapidPublicKey: string,
+  subject: string,
+): Promise<string | null> {
   try {
     const aud = new URL(endpoint).origin;
     const header = { typ: "JWT", alg: "ES256" };
@@ -112,10 +116,22 @@ async function buildVapidJwt(endpoint: string, vapidPrivateKey: string, subject:
     const enc = (obj: unknown) => base64urlEncode(new TextEncoder().encode(JSON.stringify(obj)));
     const signingInput = `${enc(header)}.${enc(payload)}`;
 
-    // Import the raw P-256 private key (PKCS#8 base64url) for ES256 signing.
+    // `web-push generate-vapid-keys` emits the private key as a RAW 32-byte P-256
+    // scalar (not PKCS#8), so import it as a JWK assembled from that scalar plus the
+    // public point's x/y (the uncompressed 65-byte public key, 0x04||x||y).
+    const pub = base64urlToBytes(vapidPublicKey);
+    const jwk: JsonWebKey = {
+      kty: "EC",
+      crv: "P-256",
+      d: vapidPrivateKey.replace(/=+$/, ""),
+      x: base64urlEncode(pub.slice(1, 33)),
+      y: base64urlEncode(pub.slice(33, 65)),
+      ext: true,
+      key_ops: ["sign"],
+    };
     const key = await crypto.subtle.importKey(
-      "pkcs8",
-      base64urlToBytes(vapidPrivateKey),
+      "jwk",
+      jwk,
       { name: "ECDSA", namedCurve: "P-256" },
       false,
       ["sign"],
@@ -183,27 +199,52 @@ serve(async (req: Request) => {
       });
     }
 
-    // ── LIVE PATH (unreachable until the gate above opens) ───────────────
-    // The VAPID auth header is built per-endpoint here. The aes128gcm payload
-    // encryption (RFC 8291) is delegated to a vetted library at wire-up time — see
-    // the header comment — so we do not attempt a real, unencrypted send. Dead
-    // subscriptions (404/410) are pruned.
+    // ── LIVE PATH ────────────────────────────────────────────────────────
+    // For each subscription: sign a per-endpoint VAPID JWT, encrypt the payload with
+    // aes128gcm (RFC 8291 — see ./encrypt.ts, verified against the RFC's test vector),
+    // and POST it. A 201/200 is delivered; a 404/410 means the subscription is dead, so
+    // we prune it.
+    const payloadBytes = new TextEncoder().encode(JSON.stringify(notification));
+    let sent = 0, pruned = 0, failed = 0;
     const results: { id: number; status: string }[] = [];
     for (const sub of subs) {
-      const jwt = await buildVapidJwt(sub.endpoint, vapidPrivate!, subject);
+      const jwt = await buildVapidJwt(sub.endpoint, vapidPrivate!, vapidPublic!, subject);
       if (!jwt) {
+        failed++;
         results.push({ id: sub.id, status: "skipped: bad VAPID key" });
         continue;
       }
-      // NOTE: a complete send POSTs the aes128gcm-encrypted body to sub.endpoint with
-      //   Authorization: `vapid t=${jwt}, k=${vapidPublic}`
-      //   Content-Encoding: aes128gcm, TTL: 60
-      // and on 404/410 deletes the row. That encryption step is added with the push
-      // library at wire-up; until then we report "ready" without sending.
-      results.push({ id: sub.id, status: "ready (encryption pending wire-up)" });
+      try {
+        const body = await encryptWebPush(payloadBytes, sub.p256dh, sub.auth);
+        const resp = await fetch(sub.endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `vapid t=${jwt}, k=${vapidPublic}`,
+            "Content-Encoding": "aes128gcm",
+            "Content-Type": "application/octet-stream",
+            TTL: "60",
+          },
+          body,
+        });
+        if (resp.status === 201 || resp.status === 200) {
+          sent++;
+          results.push({ id: sub.id, status: "sent" });
+        } else if (resp.status === 404 || resp.status === 410) {
+          await admin.from("push_subscriptions").delete().eq("id", sub.id);
+          pruned++;
+          results.push({ id: sub.id, status: "pruned (gone)" });
+        } else {
+          failed++;
+          results.push({ id: sub.id, status: `push ${resp.status}` });
+        }
+      } catch (e) {
+        failed++;
+        results.push({ id: sub.id, status: `error: ${e instanceof Error ? e.message : "send failed"}` });
+      }
     }
 
-    return json({ enabled: true, subscriptions: subs.length, notification, results });
+    console.log(`[web-push] sent=${sent} pruned=${pruned} failed=${failed} of ${subs.length}`);
+    return json({ enabled: true, subscriptions: subs.length, sent, pruned, failed, notification, results });
   } catch (error) {
     console.error("web-push error:", error);
     return json({ error: "Could not run web-push" }, 500);
