@@ -14,6 +14,7 @@ import {
   type WeatherReachState,
 } from '../src/lib/weatherWatch';
 import type { WeatherDay } from '../src/hooks/useWeather';
+import { composeDailyRead, type DailyReadSignals } from '../src/lib/dailyRead';
 
 // Anchor "now" at Fri 2026-06-19 14:00 local. Window = Fri, Sat, Sun.
 const now = new Date('2026-06-19T14:00:00');
@@ -173,6 +174,17 @@ check('R7 a new concern surfaces after the hour passes', pickWeatherReach([B], {
 const afterDismiss: WeatherReachState = { lastConcern: null, lastShownAt: null, dismissedUntil: { ['rain_party_indoor:' + SAT]: T + REACH_DISMISS_MS } };
 check('R8 a new concern reaches immediately after a dismiss', pickWeatherReach([B], afterDismiss, T)?.id === B.id);
 check('R9 the dismissed concern stays silent, the new one wins', pickWeatherReach([A, B], afterDismiss, T)?.id === B.id);
+
+// ── Daily Read: one grounded sentence, never empty, varies by the night ──
+console.log('\n— daily read —');
+const drBase: DailyReadSignals = { now: new Date('2026-06-20T17:00:00'), goodBeachDay: false, precipProb: 10, highF: 68, hasWeather: true, eventsTonight: 0, partiesTonight: 0, guestsTonight: 0, band: null };
+const dr = (over: Partial<DailyReadSignals>) => composeDailyRead({ ...drBase, ...over });
+const oneLine = (s: string) => s.length > 0 && !s.includes('\n');
+check('D1 always a non-empty one-liner (with and without weather)', oneLine(dr({})) && oneLine(dr({ hasWeather: false })));
+check('D2 a real load on the books names the count', dr({ partiesTonight: 2, guestsTonight: 45 }).includes('45'));
+check('D3 beach and washout read differently', dr({ goodBeachDay: true, highF: 74 }) !== dr({ precipProb: 80, highF: 60 }));
+check('D4 a packed night reads differently from a quiet one', dr({ band: 'PACKED', partiesTonight: 3, guestsTonight: 70 }) !== dr({}));
+check('D5 no-weather still speaks a real line', oneLine(dr({ hasWeather: false })) && dr({ hasWeather: false }).length > 12);
 
 console.log(`\n── ${pass} passed, ${fail} failed ──`);
 process.exit(fail ? 1 : 0);
