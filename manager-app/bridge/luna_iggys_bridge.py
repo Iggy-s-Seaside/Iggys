@@ -33,6 +33,8 @@ from datetime import date, datetime, timedelta
 
 import psycopg2
 
+import weather_reach  # weather × reservation cross-signal → reach (sibling module)
+
 # --------------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------------
@@ -101,6 +103,13 @@ try:
 except ValueError:
     SPECIAL_INTERVAL = 21600
 ON_THIS_DAY_API = "https://en.wikipedia.org/api/rest_v1/feed/onthisday/all"
+
+# Weather × reservation cross-signal → reach. Checked hourly; per-concern dedup in
+# weather_reach keeps it from re-pinging the same day's rain/heat.
+try:
+    WEATHER_REACH_INTERVAL = max(900, int(os.environ.get("LUNA_WEATHER_REACH_SECONDS", "3600")))  # 1h
+except ValueError:
+    WEATHER_REACH_INTERVAL = 3600
 
 
 def log(msg: str) -> None:
@@ -1080,6 +1089,7 @@ def run_daemon() -> None:
     last_triage = 0.0
     last_pulse = 0.0
     last_special = 0.0
+    last_weather_reach = 0.0
     while True:
         try:
             if conn is None or conn.closed:
@@ -1100,6 +1110,9 @@ def run_daemon() -> None:
                 elif now - last_special >= SPECIAL_INTERVAL:
                     last_special = now
                     run_special(conn)
+                elif now - last_weather_reach >= WEATHER_REACH_INTERVAL:
+                    last_weather_reach = now
+                    weather_reach.run_weather_reach(conn)
                 time.sleep(POLL_SECONDS)
         except DB_ERRORS as e:
             log(f"Postgres connection problem: {e}; reconnecting in {backoff}s")
@@ -2592,6 +2605,13 @@ def main() -> int:
         return run_pulse_once()
     if "--special" in sys.argv[1:]:
         return run_special_once()
+    if "--weather-reach" in sys.argv[1:]:
+        conn = connect_db()
+        try:
+            weather_reach.run_weather_reach(conn)
+            return 0
+        finally:
+            close_quietly(conn)
     run_daemon()
     return 0
 

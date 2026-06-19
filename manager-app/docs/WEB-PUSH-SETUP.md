@@ -47,29 +47,18 @@ This unlocks the "Enable notifications" toggle on the Team page.
 Open the manager app on the phone → **Team** → enable notifications → grant the browser
 prompt. That writes a row into `push_subscriptions`. ~30 seconds.
 
-### 4. Fire on reach — pick one owner
-Nothing pushes until something *calls* `web-push` when a reach lands. The function
-broadcasts `{ title, body, url }` to every subscription. Recommended: the **bridge**
-owns it (keeps the worth-bar decision with Luna on PC1), POSTing right after it inserts
-a reach insight:
-```python
-# in luna_iggys_bridge.py, after inserting a luna_insights row with data.reach = True:
-requests.post(
-    f"{SUPABASE_URL}/functions/v1/web-push",
-    headers={"Authorization": f"Bearer {SERVICE_ROLE_KEY}", "Content-Type": "application/json"},
-    json={"title": "Luna reached out", "body": insight_title, "url": deep_link or "/luna"},
-    timeout=10,
-)
-```
-Alternative (no bridge change): a Postgres trigger via `pg_net` on `luna_insights`
-INSERT, **gated tightly** to `(new.data->>'reach')::bool is true` so it never fires on
-ordinary insights — heed the "check triggers before inserting" lesson; an over-broad
-trigger here would push on every insight.
+### 4. Fire on reach — DONE (bridge-owned)
+The **bridge** owns the fire (keeps the worth-bar decision with Luna on PC1). It now
+computes the weather × reservation cross-signal itself (`bridge/weather_reach.py`, an
+hourly tick) and, for any ACTION flag that clears Luna's worth-bar, inserts a
+`luna_insights` reach row **and** POSTs `web-push` — so those reaches show in the banner
+*and* push to the phone. The existing demand-surprise reach (`maybe_reach`) is in-app
+only today; point it at `fire_web_push` the same way if you want it pushing too.
 
-> The in-app weather→reach (the cross-signal banner) is currently client-side and does
-> not write a `luna_insights` row, so it won't phone-push yet. To push those too, have
-> the bridge compute the weather cross-signal and raise a reach insight server-side —
-> then it rides this exact path. (Follow-up.)
+Bridge env (already set on PC1 `~/.local-agent/luna-iggys-bridge.env`): `SUPABASE_URL`
++ `SUPABASE_ANON_KEY` (the anon key is a valid JWT, so it passes the function's
+`verify_jwt`). Verified end-to-end: `python3 -c "import weather_reach;
+weather_reach.fire_web_push(...)"` → `web-push → HTTP 200`.
 
 ## Verification status
 - **Crypto: proven** — matches RFC 8291 Appendix A byte-for-byte; VAPID JWT signs+verifies.

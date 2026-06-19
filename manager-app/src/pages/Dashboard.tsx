@@ -22,9 +22,8 @@ import { useDemandLog } from '../hooks/useDemandLog';
 import { useAuth } from '../context/AuthContext';
 import { useWeather } from '../hooks/useWeather';
 import { useParties } from '../hooks/useParties';
-import { useWeatherReach } from '../hooks/useWeatherReach';
 import { composeDailyRead } from '../lib/dailyRead';
-import { reachConcernKey } from '../lib/weatherWatch';
+import { parseInsightData } from '../types';
 import { needsReplyNow } from '../utils/triage';
 import { OnboardingChecklist } from '../components/OnboardingChecklist';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -46,12 +45,12 @@ export function Dashboard() {
   const { firstName, role } = useAuth();
   const { weather } = useWeather();
   const { parties } = useParties();
-  // The reach banner (in the layout) escalates one weather flag; suppress that exact
-  // one from the panel below so it isn't shown twice — but only when the banner is
-  // actually showing the WEATHER reach (a luna_insights reach takes priority over it).
+  // The reach banner (in the layout) escalates one weather flag as a server insight;
+  // suppress that exact one from the panel below so it isn't shown twice on the dashboard.
+  // The bridge tags a weather reach with data.reach_kind = "weather:<kind>:<date>".
   const { reach: lunaReach } = useLunaReach();
-  const { weatherReach } = useWeatherReach();
-  const excludeReachKey = !lunaReach && weatherReach ? reachConcernKey(weatherReach) : null;
+  const reachKind = lunaReach ? ((parseInsightData(lunaReach.data) as Record<string, unknown>).reach_kind as string | undefined) : undefined;
+  const excludeReachKey = reachKind && reachKind.startsWith('weather:') ? reachKind.slice('weather:'.length) : null;
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const unreadMessages = messages.filter(m => m.status === 'unread');
   const needsReplyMessages = messages.filter(needsReplyNow);
