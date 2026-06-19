@@ -1,6 +1,7 @@
-import { createElement, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { enqueue, flush, subscribeOnline, isOffline } from '../lib/outbox';
+import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import toast from 'react-hot-toast';
 
 export function useSupabaseCRUD<T extends { id: number }>(table: string) {
@@ -19,7 +20,9 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
       console.error(`[${table}] load error:`, err.message);
       toast.error('Failed to load data. Please refresh.');
     } else {
-      setData((result as T[]) || []);
+      // filterPendingDeletes: a realtime tick during a 5s undo window must not
+      // resurrect a row the user just deleted (matches the dedicated hooks).
+      setData(filterPendingDeletes(table, (result as T[]) || []));
       setError(null);
     }
     loadedRef.current = true;
@@ -63,8 +66,20 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
   // Optimistic: patch the row locally now, fire in the background, roll back on
   // failure. Makes toggles/edits feel instant on bar wifi (no round-trip wait).
   const update = async (id: number, fields: Partial<T>) => {
-    const snapshot = data;
-    setData((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)));
+    // Field-scoped rollback: capture only the prior values of the fields we're
+    // about to patch on THIS row. A failed update then reverts just those fields
+    // and leaves any concurrent edit / fresh realtime data intact (snapshotting
+    // the whole array would stomp a second in-flight edit on flaky bar wifi).
+    let prevFields: Partial<T> | undefined;
+    setData((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        prevFields = Object.fromEntries(
+          Object.keys(fields).map((k) => [k, (r as Record<string, unknown>)[k]]),
+        ) as Partial<T>;
+        return { ...r, ...fields };
+      }),
+    );
     const { error: err } = await supabase.from(table).update(fields as Record<string, unknown>).eq('id', id);
     if (err) {
       console.error(`[${table}] update error:`, err.message);
@@ -74,7 +89,7 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
         toast('Edit saved offline — will sync');
         return true;
       }
-      setData(snapshot);
+      setData((prev) => prev.map((r) => (r.id === id ? { ...r, ...(prevFields ?? {}) } : r)));
       toast.error('Failed to update. Please try again.');
       return false;
     }
@@ -92,36 +107,10 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
       await refresh();
       return true;
     }
-    setData((prev) => prev.filter((r) => r.id !== id));
-    let undone = false;
-    const restore = () => setData((prev) => (prev.some((r) => r.id === id) ? prev : [...prev, item].sort((a, b) => a.id - b.id)));
-    const commit = setTimeout(async () => {
-      if (undone) return;
-      const { error: err } = await supabase.from(table).delete().eq('id', id);
-      if (err) {
-        console.error(`[${table}] delete error:`, err.message);
-        if (isOffline()) {
-          // Undo window already elapsed; keep the delete pending instead of restoring.
-          enqueue({ table, op: 'delete', rowId: id });
-          toast('Delete saved offline — will sync');
-          return;
-        }
-        restore();
-        toast.error("Couldn't delete — restored.");
-      }
-    }, 5000);
-    toast(
-      (t) => createElement(
-        'span',
-        { style: { display: 'flex', alignItems: 'center', gap: '14px' } },
-        'Deleted',
-        createElement('button', {
-          onClick: () => { undone = true; clearTimeout(commit); restore(); toast.dismiss(t.id); },
-          style: { fontWeight: 700, color: '#2dd4bf', cursor: 'pointer' },
-        }, 'Undo'),
-      ),
-      { duration: 5000 },
-    );
+    // Route through the shared undoableDelete: same 5s optimistic-undo UX, but it
+    // registers the row in pendingDeletes so a concurrent realtime refresh (via
+    // filterPendingDeletes above) can't resurrect it mid-window.
+    undoableDelete(table, id, item, setData);
     return true;
   };
 
