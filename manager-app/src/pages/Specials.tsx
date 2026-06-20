@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit, Share2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Sparkles, Image, Palette, FileEdit, Share2, Copy } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ConfirmDialog } from '../components/ui/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -15,9 +15,24 @@ import type { Special, DraftState } from '../types';
 type LifecycleFilter = 'all' | SpecialLifecycle;
 
 export function Specials() {
-  const { data: specials, loading, update, remove } = useSupabaseCRUD<Special>('specials');
+  const { data: specials, loading, create, update, remove } = useSupabaseCRUD<Special>('specials');
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [socialFor, setSocialFor] = useState<number | null>(null);
+
+  // "Run it again" — clone a past special as an INACTIVE draft (never auto-publishes)
+  // titled "… (copy)". Fields copied explicitly; price is carried verbatim, never
+  // altered, and the draft stays unpublished until the manager re-edits + posts it.
+  const duplicate = (special: Special) =>
+    create({
+      title: `${special.title} (copy)`,
+      description: special.description,
+      type: special.type,
+      price: special.price,
+      image_url: special.image_url,
+      active: false,
+      starts_at: special.starts_at,
+      expires_at: special.expires_at,
+    });
   const [showTemplates, setShowTemplates] = useState(false);
   const [drafts, setDrafts] = useState<DraftState[]>([]);
   const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>('all');
@@ -240,13 +255,16 @@ export function Specials() {
                     {special.active ? 'Active' : 'Inactive'}
                   </button>
                   <div className="flex gap-1">
-                    <button onClick={() => setSocialFor(special.id)} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                    <button onClick={() => setSocialFor(special.id)} aria-label="Share special to social" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
                       <Share2 size={14} />
                     </button>
-                    <Link to={`/specials/editor/${special.id}`} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                    <Link to={`/specials/editor/${special.id}`} aria-label="Edit special" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
                       <Edit2 size={14} />
                     </Link>
-                    <button onClick={() => setDeleteId(special.id)} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
+                    <button onClick={() => duplicate(special)} aria-label="Duplicate special" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                      <Copy size={14} />
+                    </button>
+                    <button onClick={() => setDeleteId(special.id)} aria-label="Delete special" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
                       <Trash2 size={14} />
                     </button>
                   </div>

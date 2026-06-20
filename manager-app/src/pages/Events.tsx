@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Calendar, RefreshCw, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, RefreshCw, Download, Copy } from 'lucide-react';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { ConfirmDialog } from '../components/ui/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -13,10 +13,30 @@ import { safeFmtDate } from '../utils/format';
 import type { IggyEvent } from '../types';
 
 export function Events() {
-  const { data: events, loading, update, remove } = useSupabaseCRUD<IggyEvent>('events');
+  const { data: events, loading, create, update, remove } = useSupabaseCRUD<IggyEvent>('events');
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const sorted = [...events].sort((a, b) => b.date.localeCompare(a.date));
+
+  // "Run it again" — most events are reruns. Clone the row as an INACTIVE draft
+  // (never auto-publishes) titled "… (copy)"; the manager edits the date + flips it
+  // live. Fields copied explicitly so it's clear nothing unexpected is carried.
+  const duplicate = (event: IggyEvent) =>
+    create({
+      title: `${event.title} (copy)`,
+      description: event.description,
+      date: event.date,
+      time: event.time,
+      image_url: event.image_url,
+      is_recurring: event.is_recurring,
+      recurring_day: event.recurring_day,
+      category: event.category,
+      active: false,
+      start_min: event.start_min,
+      end_min: event.end_min,
+      all_day: event.all_day,
+      space: event.space,
+    });
 
   return (
     <div>
@@ -115,6 +135,9 @@ export function Events() {
                       <Link to={`/events/${event.id}/edit`} aria-label="Edit event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
                         <Edit2 size={15} />
                       </Link>
+                      <button onClick={() => duplicate(event)} aria-label="Duplicate event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors">
+                        <Copy size={15} />
+                      </button>
                       <button onClick={() => setDeleteId(event.id)} aria-label="Delete event" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover text-text-muted hover:text-danger transition-colors">
                         <Trash2 size={15} />
                       </button>
