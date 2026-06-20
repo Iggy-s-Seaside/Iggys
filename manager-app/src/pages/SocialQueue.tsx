@@ -255,7 +255,7 @@ export function SocialQueue() {
         </div>
       )}
 
-      <CreateSocialPostModal open={showCreate} onClose={() => setShowCreate(false)} />
+      {showCreate && <CreateSocialPostModal open={showCreate} onClose={() => setShowCreate(false)} />}
 
       {/* Schedule picker */}
       {scheduleTarget && (

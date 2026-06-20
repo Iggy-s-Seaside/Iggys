@@ -70,7 +70,8 @@ export function useSocialPosts() {
     const { data, error } = await supabase
       .from('social_posts')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     if (error) {
       toast.error('Failed to load social posts');
       console.error('[social_posts] load error:', error.message);

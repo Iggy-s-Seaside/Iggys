@@ -662,8 +662,8 @@ export function Inventory() {
         open={scanModalOpen}
         onClose={() => {
           setScanModalOpen(false);
+          scanner.reset();
           if (scanner.state === 'done') {
-            scanner.reset();
             refresh();
           }
         }}

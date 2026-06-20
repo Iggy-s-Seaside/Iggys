@@ -22,6 +22,15 @@ describe('businessDay — 9am Pacific service-day cutoff', () => {
     expect(businessDay(new Date('2026-06-15T09:00:00-07:00'))).toBe('2026-06-15');
   });
 
+  it('midnight (00:00) Pacific files under the previous SERVICE night', () => {
+    // Cross-language day-key contract: the bridge footage sampler
+    // (bridge/bar_busyness.py _service_night_hours) samples the 00:00..08:59 hours
+    // of day+1 INTO `day`'s band. This pins the TS side — midnight of the next
+    // calendar date must still resolve to the prior service day, or the two
+    // would disagree and a packed last-call peak would be mis-attributed.
+    expect(businessDay(new Date('2026-06-16T00:00:00-07:00'))).toBe('2026-06-15');
+  });
+
   it('mid-afternoon Pacific is today', () => {
     expect(businessDay(new Date('2026-06-15T15:00:00-07:00'))).toBe('2026-06-15');
   });

@@ -87,7 +87,9 @@ describe('timeSelectOptions — time-picker slots + inline disabling', () => {
     const opts = timeSelectOptions();
     expect(opts.every((o) => !o.disabled)).toBe(true);
     expect(byVal(opts, 660).group).toBe('Morning'); // 11:00 AM (< 720 = Morning)
-    expect(byVal(opts, 780).group).toBe('Afternoon'); // 1:00 PM
+    expect(byVal(opts, 780).group).toBe('Afternoon'); // 1:00 PM (720..1019 = Afternoon)
+    expect(byVal(opts, 1080).group).toBe('Evening'); // 6:00 PM (1020..1439 = Evening)
+    expect(byVal(opts, 1440).group).toBe('Late night'); // 12:00 AM next day (>= 1440)
     expect(byVal(opts, 1440).hint).toBe('next day');
   });
 

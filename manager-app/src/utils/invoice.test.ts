@@ -52,6 +52,13 @@ describe('computeInvoice', () => {
     expect(b.grandTotal).toBe(293); // 118 + 100 + 75
   });
 
+  it('gratuity base includes drink_total even when food_total is zero', () => {
+    const b = computeInvoice(inputs({ drink_total: 200, food_total: 0, gratuity_rate: 0.18 }), []);
+    expect(b.drinkTotal).toBe(200);
+    expect(b.foodTotal).toBe(0);
+    expect(b.gratuity).toBe(36); // 0.18 × 200
+  });
+
   it('buckets package lines into food/drink/room/addon by category', () => {
     const b = computeInvoice(inputs({ guest_count: 5, gratuity_rate: 0 }), [
       pkg({ category: 'food', unit: 'per_person', unit_price: 20, quantity: 1 }), // 20×5 = 100

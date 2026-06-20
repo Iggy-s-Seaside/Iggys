@@ -14,16 +14,11 @@ import { useParties } from './useParties';
 import { useWeather } from './useWeather';
 import { computeWeatherFlags, type DayStaffing, type WeatherFlag } from '../lib/weatherWatch';
 import type { Staff, Shift } from '../types';
+import { uniqueTopic } from '../lib/realtimeTopic';
 
 // Floor staff — who covers a busy night (managers/kitchen don't count toward "a hand").
 const FOH_ROLES = new Set(['server', 'bartender', 'barback']);
 const MIN_BASELINE_SAMPLES = 3; // need this many same-weekday nights before we trust a "typical"
-
-// This hook is mounted twice on the dashboard (the WeatherWatch panel + the reach
-// banner via useWeatherReach), so each realtime channel needs a unique name — two
-// channels of the same name collide. Same pattern as useLuna/useLunaChronicle.
-let channelSeq = 0;
-const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

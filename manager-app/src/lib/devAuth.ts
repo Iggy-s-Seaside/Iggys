@@ -18,7 +18,7 @@ import type { Role } from '../hooks/useRole';
  * needed to verify layout, touch targets, the notch, loading skeletons, and modal
  * styling without touching production auth or data.
  */
-export const DEV_AUTH_FLAG = 'iggy-dev-auth';
+const DEV_AUTH_FLAG = 'iggy-dev-auth';
 
 export function devAuthEnabled(): boolean {
   if (!import.meta.env.DEV) return false;

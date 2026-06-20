@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import type { Review, Feedback, ReviewSource } from '../types';
 import toast from 'react-hot-toast';
 
@@ -62,13 +63,13 @@ export function useReviews() {
   // Realtime — keep the inbox fresh without a manual refresh.
   useEffect(() => {
     const channel = supabase
-      .channel('reputation-realtime')
+      .channel(uniqueTopic('reputation-realtime'))
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'reviews' },
         (payload) => {
           const row = payload.new as Review;
-          setReviews((prev) => (prev.some((r) => r.id === row.id) ? prev : [row, ...prev]));
+          setReviews((prev) => (prev.some((r) => r.id === row.id) ? prev : [row, ...prev].slice(0, 200)));
           const ageMs = Date.now() - new Date(row.created_at).getTime();
           if (ageMs < 5 * 60 * 1000) {
             toast(row.rating <= 3 ? 'New low review needs a reply' : 'New review received', {
@@ -98,7 +99,7 @@ export function useReviews() {
         { event: 'INSERT', schema: 'public', table: 'feedback' },
         (payload) => {
           const row = payload.new as Feedback;
-          setFeedback((prev) => (prev.some((f) => f.id === row.id) ? prev : [row, ...prev]));
+          setFeedback((prev) => (prev.some((f) => f.id === row.id) ? prev : [row, ...prev].slice(0, 200)));
           const ageMs = Date.now() - new Date(row.created_at).getTime();
           if (ageMs < 5 * 60 * 1000) {
             toast('New guest feedback', { icon: '💬' });

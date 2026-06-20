@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -43,6 +43,16 @@ export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   { onEscape, restoreFocus = true, closeOnEscape = true }: FocusTrapOptions = {}
 ) {
+  // Hold onEscape in a ref, synced after each render, so a caller passing an inline
+  // arrow (every one of the 11 callers does) doesn't churn the trap effect's deps and
+  // tear it down / re-arm it on each parent re-render — which would re-snap focus to
+  // the first child mid-session and restore focus to a node inside the dialog, not the
+  // opener. Synced in an effect (not during render) to keep the hook render-pure.
+  const onEscapeRef = useRef(onEscape);
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  });
+
   useEffect(() => {
     if (!active) return;
 
@@ -57,7 +67,7 @@ export function useFocusTrap(
     const handleKeyDown = (e: KeyboardEvent) => {
       if (closeOnEscape && e.key === 'Escape') {
         e.preventDefault();
-        onEscape?.();
+        onEscapeRef.current?.();
         return;
       }
       if (e.key !== 'Tab' || !containerRef.current) return;
@@ -88,5 +98,7 @@ export function useFocusTrap(
       document.removeEventListener('keydown', handleKeyDown, true);
       if (restoreFocus) previouslyFocused?.focus?.();
     };
-  }, [active, containerRef, onEscape, restoreFocus, closeOnEscape]);
+    // onEscape intentionally excluded — read via onEscapeRef so callback identity
+    // churn never re-runs the trap. The effect re-arms only on genuine state changes.
+  }, [active, containerRef, restoreFocus, closeOnEscape]);
 }

@@ -20,7 +20,7 @@ interface EmptyStateProps {
  */
 export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={`card p-12 text-center animate-fade-in ${className ?? ''}`}>
+    <div className={`card p-12 text-center animate-slide-in ${className ?? ''}`}>
       {Icon && <Icon size={40} className="mx-auto text-text-muted mb-3" />}
       <p className="text-text-secondary font-medium">{title}</p>
       {description && <p className="text-sm text-text-muted mt-1">{description}</p>}

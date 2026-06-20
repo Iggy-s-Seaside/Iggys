@@ -2,13 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { LunaChronicleEntry, LunaPhoto, RegularContact } from '../types';
 import toast from 'react-hot-toast';
+import { uniqueTopic } from '../lib/realtimeTopic';
+import { todaysBusinessDay } from '../utils/businessDay';
 
 /** Cap on chronicle entries fetched — the journal grows forever in the DB. */
 const CHRONICLE_LIMIT = 60;
-
-/** supabase-js reuses channels by topic socket-wide; every mount needs its own. */
-let channelSeq = 0;
-const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
 const sortByNight = (list: LunaChronicleEntry[]) =>
   [...list].sort((a, b) => (a.business_day < b.business_day ? 1 : -1));
@@ -204,7 +202,7 @@ export function useLunaPhotos() {
         caption: p.caption?.trim() || null,
         mood: p.mood?.trim() || null,
         storage_path: p.storage_path ?? null,
-        business_day: new Date().toISOString().slice(0, 10),
+        business_day: todaysBusinessDay(),
         taken_at: new Date().toISOString(),
         uploaded_by: p.uploaded_by ?? null,
       });

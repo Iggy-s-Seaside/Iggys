@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { ClipboardList, Loader2, ChevronRight, Package, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useOrders } from '../../hooks/useOrders';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { OrderDetailDrawer } from './OrderDetailDrawer';
 import type { Order } from '../../types';
 
@@ -13,24 +14,40 @@ interface OrderHistoryProps {
 export function OrderHistory({ open, onClose }: OrderHistoryProps) {
   const { orders, loading } = useOrders(open);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-
-  // Don't render anything when closed, but hooks are always called above
-  if (!open) return null;
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
+  // The panel is always mounted now (inert when closed), so the early-return unmount
+  // no longer resets state — clear the nested OrderDetailDrawer selection on close.
+  useEffect(() => { if (!open) setSelectedOrder(null); }, [open]);
 
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      {open && (
+        <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      )}
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 z-50 h-full w-full max-w-md bg-surface border-l border-border shadow-lg">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        inert={!open}
+        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-surface border-l border-border shadow-lg transform transition-transform duration-300 focus:outline-none ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <ClipboardList size={18} className="text-primary" />
-            <h2 className="font-semibold text-text-primary">Order History</h2>
+            <h2 id={titleId} className="font-semibold text-text-primary">Order History</h2>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-muted"
           >
             <X size={18} />

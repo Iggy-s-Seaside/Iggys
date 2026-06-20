@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import type { Staff, Shift, TimeOffRequest, TipPool } from '../types';
 import toast from 'react-hot-toast';
@@ -165,10 +166,23 @@ export function useSchedule(weekAnchor: Date) {
 
   const refresh = useCallback(async () => {
     if (!loadedRef.current) setLoading(true);
+    // Time-off OVERLAP window. Lower bound on date_TO (so a long/active request that
+    // STARTED >90 days ago but hasn't ended yet is still surfaced — filtering date_from
+    // dropped it); upper bound on date_from anchored to the later of +60 days or the
+    // currently-viewed week's end (so navigating far forward doesn't hide that week's
+    // conflicting time-off). 'yyyy-MM-dd' strings compare correctly lexicographically.
+    const offStart = format(addDays(new Date(), -90), 'yyyy-MM-dd');
+    const offPlus60 = format(addDays(new Date(), 60), 'yyyy-MM-dd');
+    const offEnd = weekEnd && weekEnd > offPlus60 ? weekEnd : offPlus60;
     const [staffRes, shiftRes, offRes, poolRes] = await Promise.all([
       supabase.from('staff').select('*').order('name'),
       supabase.from('shifts').select('*').gte('date', weekStart).lte('date', weekEnd),
-      supabase.from('time_off_requests').select('*').order('date_from', { ascending: true }),
+      supabase
+        .from('time_off_requests')
+        .select('*')
+        .gte('date_to', offStart)
+        .lte('date_from', offEnd)
+        .order('date_from', { ascending: true }),
       supabase.from('tip_pools').select('*').order('date', { ascending: false }).limit(20),
     ]);
     const firstErr = staffRes.error || shiftRes.error || offRes.error || poolRes.error;
@@ -192,7 +206,7 @@ export function useSchedule(weekAnchor: Date) {
   // Live board: refetch when any labor table changes elsewhere.
   useEffect(() => {
     const channel = supabase
-      .channel('schedule-board')
+      .channel(uniqueTopic('schedule-board'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => refresh())

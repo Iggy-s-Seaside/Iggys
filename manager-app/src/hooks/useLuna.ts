@@ -2,19 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { LunaMessage, LunaInsight } from '../types';
 import toast from 'react-hot-toast';
+import { uniqueTopic } from '../lib/realtimeTopic';
 
 /** Cap on rows fetched — the thread/feed grow forever in the DB. */
 const MESSAGE_LIMIT = 100;
 const INSIGHT_LIMIT = 20;
-
-/**
- * supabase-js reuses channel instances by topic name socket-wide, so two
- * components subscribing to the same fixed topic silently break each other
- * (binding-count mismatch → CHANNEL_ERROR, or a dying channel gets reused
- * across route transitions). Every mount needs its own topic.
- */
-let channelSeq = 0;
-const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
 /** Command rows (e.g. '__regen_special__') are control signals for the bridge,
  * not chat — keep them out of the visible thread. */
@@ -72,7 +64,9 @@ export function useLunaMessages() {
               );
               const withoutTemp =
                 idx === -1 ? prev : [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-              return [...withoutTemp, row];
+              // Cap the in-memory thread so realtime inserts don't grow it unbounded
+              // past the initial fetch (chronological, so keep the newest tail).
+              return [...withoutTemp, row].slice(-MESSAGE_LIMIT);
             });
           } else if (payload.eventType === 'UPDATE') {
             const row = payload.new as LunaMessage;

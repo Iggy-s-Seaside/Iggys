@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KanbanSquare, PartyPopper } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -72,6 +72,18 @@ export function Pipeline() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const columnRefs = useRef<Map<PipelineStage, HTMLElement>>(new Map());
   const dragMoved = useRef(false);
+  // Per-card celebrate timers, keyed by party id (see the win block for why a single
+  // shared timer was wrong: two wins within 700ms cancelled each other's clear).
+  const celebrateTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Clear every pending celebrate timer on unmount so none fire after the page is gone.
+  useEffect(() => {
+    const timers = celebrateTimersRef.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
 
   // Rebuild columns honoring optimistic overrides.
   const columns = useMemo<PipelineColumn[]>(() => {
@@ -137,14 +149,22 @@ export function Pipeline() {
       buzz(won ? [12, 24, 36] : 10);
 
       if (won) {
-        setCelebrating((prev) => new Set(prev).add(card.party.id));
-        window.setTimeout(() => {
+        const pid = card.party.id;
+        setCelebrating((prev) => new Set(prev).add(pid));
+        // Per-card timer keyed by party id: two wins within 700ms must not cancel each
+        // other's clear (a single shared timer left the first winner's sparkles stuck
+        // on forever). Re-winning the same card resets just its own timer.
+        const existing = celebrateTimersRef.current.get(pid);
+        if (existing) clearTimeout(existing);
+        const t = setTimeout(() => {
+          celebrateTimersRef.current.delete(pid);
           setCelebrating((prev) => {
             const next = new Set(prev);
-            next.delete(card.party.id);
+            next.delete(pid);
             return next;
           });
         }, 700);
+        celebrateTimersRef.current.set(pid, t);
       }
 
       const ok = await update(card.party.id, fields);

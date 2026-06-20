@@ -40,6 +40,7 @@ describe('generateGoogleCalendarUrl', () => {
     expect(url).toContain('action=TEMPLATE');
     expect(url).toContain('text=Trivia+Night');
     expect(url).toContain('dates=20260320T200000%2F20260320T220000'); // 8pm -> 10pm
+    expect(url).not.toContain('recur='); // non-recurring: no recurrence param
   });
   it('adds a weekly RRULE for a recurring event', () => {
     const url = generateGoogleCalendarUrl(ev({ is_recurring: true, recurring_day: 'Friday' }));
@@ -57,6 +58,7 @@ describe('generateIcsContent', () => {
     expect(ics).toContain('SUMMARY:Trivia Night');
     expect(ics).toContain('END:VCALENDAR');
     expect(ics).toContain('\r\n');
+    expect(ics).not.toContain('RRULE:'); // non-recurring: no recurrence rule
   });
   it('escapes description newlines to \\n and appends the category', () => {
     const ics = generateIcsContent(ev({ description: 'Fun night', category: 'Trivia' }));

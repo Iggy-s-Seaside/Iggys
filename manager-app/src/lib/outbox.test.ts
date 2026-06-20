@@ -72,3 +72,45 @@ describe('outbox flush — poison-entry quarantine', () => {
     expect(size()).toBe(2);
   });
 });
+
+describe('outbox flush — update / delete / malformed / single-flight', () => {
+  beforeEach(() => {
+    (globalThis as unknown as { window: unknown }).window = { localStorage: memStorage() };
+    clear();
+  });
+
+  it('replays update and delete entries on the happy path', async () => {
+    enqueue({ table: 't', op: 'update', rowId: 1, payload: { mode: 'ok', n: 1 } });
+    enqueue({ table: 't', op: 'delete', rowId: 2 });
+    const res = await flush(makeSupabase());
+    expect(res.flushed).toBe(2);
+    expect(size()).toBe(0);
+  });
+
+  it('drops a malformed entry (no rowId) WITHOUT counting it as flushed, and notifies', async () => {
+    const dropped: string[] = [];
+    enqueue({ table: 't', op: 'update', payload: { mode: 'ok' } }); // no rowId — undeliverable
+    const res = await flush(makeSupabase(), { onPoisonDrop: (e) => dropped.push(e.op) });
+    expect(res.flushed).toBe(0); // never reached the server, so not counted as flushed
+    expect(size()).toBe(0); // but it IS removed (not looped forever)
+    expect(dropped).toEqual(['update']);
+  });
+
+  it('quarantines a server-rejected UPDATE poison entry after the cap, notifying once', async () => {
+    const dropped: string[] = [];
+    enqueue({ table: 't', op: 'update', rowId: 9, payload: { mode: 'error' } });
+    enqueue({ table: 't', op: 'insert', payload: { mode: 'ok', n: 'after' } });
+    for (let i = 0; i < 3; i++) await flush(makeSupabase(), { onPoisonDrop: (e) => dropped.push(e.id) });
+    expect(size()).toBe(0); // poison update quarantined; the insert behind it drained
+    expect(dropped.length).toBe(1);
+  });
+
+  it('single-flight: concurrent flush() calls share one in-flight pass (no double-replay)', async () => {
+    enqueue({ table: 't', op: 'insert', payload: { mode: 'ok', n: 1 } });
+    enqueue({ table: 't', op: 'insert', payload: { mode: 'ok', n: 2 } });
+    const [a, b] = await Promise.all([flush(makeSupabase()), flush(makeSupabase())]);
+    expect(a).toBe(b); // same in-flight promise returned by reference
+    expect(a.flushed).toBe(2);
+    expect(size()).toBe(0);
+  });
+});

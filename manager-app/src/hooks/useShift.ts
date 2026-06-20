@@ -27,6 +27,7 @@ export function useShift() {
   const [recent, setRecent] = useState<ShiftSession[]>([]);
   const [loading, setLoading] = useState(true);
   const loadedRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
     if (!loadedRef.current) setLoading(true);
@@ -64,10 +65,12 @@ export function useShift() {
     const channel = supabase
       .channel(uniqueTopic('shift-sessions-realtime'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_sessions' }, () => {
-        refresh();
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => { refresh(); }, 50);
       })
       .subscribe();
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [refresh]);

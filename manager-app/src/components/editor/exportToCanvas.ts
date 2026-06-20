@@ -391,7 +391,7 @@ function preloadImage(src: string): Promise<HTMLImageElement | null> {
     img.src = src;
     // decode() guarantees the bitmap is ready before we draw (avoids the cache race)
     if (img.decode) {
-      img.decode().then(() => resolve(img)).catch(() => {
+      img.decode().then(() => resolve(img.naturalWidth > 0 ? img : null)).catch(() => {
         // Fall through to onload/onerror above.
       });
     }

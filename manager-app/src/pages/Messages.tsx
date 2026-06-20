@@ -132,6 +132,18 @@ export function Messages() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Cleanup: if the component unmounts while a Luna draft is in-flight, clear the
+  // timeout and remove the Supabase channel so we don't leak or setState on an
+  // unmounted tree.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     let result = messages;
@@ -334,7 +346,8 @@ export function Messages() {
     const finish = (text?: string) => {
       if (settled) return;
       settled = true;
-      supabase.removeChannel(channel);
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
       setDrafting(false);
       if (text) {
         if (selectedIdRef.current === targetId) {
@@ -345,7 +358,7 @@ export function Messages() {
         }
       }
     };
-    const channel = supabase
+    channelRef.current = supabase
       .channel(`luna-draft-${reqId}`)
       .on(
         'postgres_changes',
@@ -357,7 +370,7 @@ export function Messages() {
       )
       .subscribe();
     // Luna reasons before answering (30-90s typical). Give her up to 2.5 min.
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       if (!settled) {
         finish();
         toast('Luna is taking a while — her draft will land in the Luna tab.');

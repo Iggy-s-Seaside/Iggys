@@ -170,6 +170,15 @@
   animation: fade-in 200ms ease-out;
 }
 
+@keyframes slide-in {
+  from { transform: translateY(6px); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slide-in 200ms ease-out;
+}
+
 /* ── Prevent iOS Safari auto-zoom on input focus ── */
 @media screen and (max-width: 768px) {
   input[type="text"],

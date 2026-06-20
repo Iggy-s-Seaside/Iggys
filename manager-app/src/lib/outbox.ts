@@ -172,18 +172,26 @@ export function clear(): void {
  */
 let flushing: Promise<FlushResult> | null = null;
 
-export async function flush(supabase: SupabaseClient): Promise<FlushResult> {
+export interface FlushOptions {
+  /** Called once for each entry PERMANENTLY dropped without ever reaching the
+   *  server — a poison entry that exhausted its retries, or a malformed entry
+   *  with no target rowId. Lets the UI surface the otherwise-silent offline-write
+   *  loss (e.g. a toast) instead of only a console.error. */
+  onPoisonDrop?: (entry: OutboxEntry) => void;
+}
+
+export async function flush(supabase: SupabaseClient, opts: FlushOptions = {}): Promise<FlushResult> {
   // Single-flight guard: useSupabaseCRUD mounts on 10+ screens and each calls
   // flush() on mount + on the window 'online' event. Without this, two flushes
   // would read the same not-yet-removed entry (removeById only runs AFTER the
   // network insert resolves) and replay it twice — a duplicate INSERT. Concurrent
   // callers share the one in-flight pass.
   if (flushing) return flushing;
-  flushing = doFlush(supabase).finally(() => { flushing = null; });
+  flushing = doFlush(supabase, opts).finally(() => { flushing = null; });
   return flushing;
 }
 
-async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
+async function doFlush(supabase: SupabaseClient, opts: FlushOptions = {}): Promise<FlushResult> {
   const queue = getAll();
   if (queue.length === 0) return { flushed: 0, remaining: 0 };
 
@@ -192,6 +200,7 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
   for (const entry of queue) {
     let returnedError = false; // server rejected it (data-level — won't self-heal)
     let threw = false;         // network failure (request didn't reach the server)
+    let malformed = false;     // no rowId to target — undeliverable, drop + notify
     try {
       if (entry.op === 'insert') {
         const { error } = await supabase
@@ -203,6 +212,7 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
         if (entry.rowId == null) {
           // Malformed entry — can't target a row; drop it rather than loop forever.
           console.error('[outbox] update entry missing rowId, dropping:', entry.id);
+          malformed = true;
         } else {
           const { error } = await supabase
             .from(entry.table)
@@ -215,6 +225,7 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
         // delete
         if (entry.rowId == null) {
           console.error('[outbox] delete entry missing rowId, dropping:', entry.id);
+          malformed = true;
         } else {
           const { error } = await supabase.from(entry.table).delete().eq('id', entry.rowId);
           returnedError = !!error;
@@ -229,6 +240,14 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
 
     if (threw) break;
 
+    if (malformed) {
+      // Undeliverable (no target row): drop it and surface the loss. It never
+      // reached the server, so it must NOT be counted as a flushed write.
+      opts.onPoisonDrop?.(entry);
+      removeById(entry.id);
+      continue;
+    }
+
     if (returnedError) {
       // The server rejected this entry (RLS / FK / NOT NULL / unique). It won't
       // heal on plain retry, but give it a few passes (it may be transient, or
@@ -237,6 +256,7 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
       const attempts = (entry.attempts ?? 0) + 1;
       if (attempts >= MAX_REPLAY_ATTEMPTS) {
         console.error(`[outbox] dropping poison entry ${entry.id} (${entry.op} ${entry.table}) after ${attempts} failed attempts`);
+        opts.onPoisonDrop?.(entry);
         removeById(entry.id);
         continue;
       }
@@ -244,7 +264,8 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
       break;
     }
 
-    // Success (or dropped malformed entry): remove just this one and continue.
+    // Success: the entry was written to the server — remove just this one and continue.
+    // (Malformed entries are handled+dropped above and never reach here.)
     removeById(entry.id);
     flushed += 1;
   }

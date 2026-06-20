@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
+import { useRef, useEffect, useLayoutEffect, useCallback, useState, useId, type ReactNode } from 'react';
 import { X, ChevronLeft, Check } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 
@@ -7,7 +7,6 @@ interface BottomSheetProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
-  peekHeight?: number;
 }
 
 export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
@@ -16,22 +15,40 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
   const dragRef = useRef({ startY: 0, isDragging: false, startScrollTop: 0 });
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Slider peek-through state
   const [sliderActive, setSliderActive] = useState(false);
+  const [sliderEpoch, setSliderEpoch] = useState(0);
   const [activeSliderLabel, setActiveSliderLabel] = useState('');
   const [activeSliderValue, setActiveSliderValue] = useState('');
   const activeSliderRef = useRef<HTMLInputElement | null>(null);
   const floatingSliderRef = useRef<HTMLDivElement>(null);
 
+  // Pre-sheet focus — captured when sheet opens, restored on true close
+  const preFocusRef = useRef<Element | null>(null);
+  const titleId = useId();
+
   // Animated close — slide down then unmount
   const animatedClose = useCallback(() => {
+    if (closeTimerRef.current !== null) return; // already closing
     setClosing(true);
-    setTimeout(() => {
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
       setClosing(false);
-      onClose();
+      onClose(); // open -> false; the capture/restore effect below restores focus
     }, 250);
   }, [onClose]);
+
+  // Clear close timer on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Close on escape
   useEffect(() => {
@@ -49,10 +66,24 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     return () => window.removeEventListener('keydown', handler);
   }, [open, animatedClose, sliderActive]);
 
-  // Trap focus inside the sheet (Tab cycle + focus restore on close). Escape is
-  // handled by the slider-aware effect above, so disable it here. Paused in slider
-  // peek mode, where the active control lives in the floating bar outside the sheet.
-  useFocusTrap(open && !sliderActive, sheetRef, { closeOnEscape: false });
+  // Trap focus inside the sheet (Tab cycle). Escape is handled by the slider-aware
+  // effect above, so disable it here. Paused in slider peek mode, where the active
+  // control lives in the floating bar outside the sheet. restoreFocus is disabled
+  // because we manage pre-sheet focus restoration manually (preFocusRef).
+  useFocusTrap(open && !sliderActive, sheetRef, { closeOnEscape: false, restoreFocus: false });
+
+  // Capture the opener BEFORE the focus trap moves focus into the sheet, and restore
+  // it on ANY close path (animatedClose's onClose OR a direct open->false elsewhere,
+  // e.g. SpecialEditor's setMobileSheet(null)). useLayoutEffect runs before
+  // useFocusTrap's passive effect, so document.activeElement is still the opener here.
+  useLayoutEffect(() => {
+    if (open) {
+      preFocusRef.current = document.activeElement;
+    } else if (preFocusRef.current instanceof HTMLElement) {
+      preFocusRef.current.focus();
+      preFocusRef.current = null;
+    }
+  }, [open]);
 
   // Prevent body scroll when open
   useEffect(() => {
@@ -96,6 +127,9 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       setActiveSliderLabel(label);
       setActiveSliderValue(target.value);
       setSliderActive(true);
+      // Increment epoch on every touch so the clone effect always re-runs,
+      // even when a second slider is touched while peek mode is already active.
+      setSliderEpoch(n => n + 1);
     };
 
     content.addEventListener('pointerdown', handleSliderStart, { passive: true });
@@ -147,7 +181,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       clone.removeEventListener('input', syncToOriginal);
       container.innerHTML = '';
     };
-  }, [sliderActive]);
+  }, [sliderActive, sliderEpoch]);
 
   // "Done" — exit peek mode back to full sheet
   const handleSliderDone = useCallback(() => {
@@ -244,7 +278,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         tabIndex={-1}
         className="absolute inset-x-0 bottom-0 top-0 bg-surface flex flex-col focus:outline-none"
         style={{
@@ -270,7 +304,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
           >
             <ChevronLeft size={22} />
           </button>
-          <h3 className="text-base font-bold text-text-primary flex-1">{title}</h3>
+          <h3 id={titleId} className="text-base font-bold text-text-primary flex-1">{title}</h3>
           <button
             onClick={animatedClose}
             className="flex items-center justify-center rounded-xl hover:bg-surface-hover text-text-muted transition-colors active:scale-95"

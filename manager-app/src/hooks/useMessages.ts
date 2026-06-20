@@ -43,7 +43,7 @@ export function useMessages() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const row = payload.new as Message;
-          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [row, ...prev]));
+          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [row, ...prev].slice(0, 200)));
           // Only announce genuinely-fresh mail — a Gmail backfill inserts rows
           // with their original (often old) date, which shouldn't toast.
           const ageMs = Date.now() - new Date(row.created_at).getTime();

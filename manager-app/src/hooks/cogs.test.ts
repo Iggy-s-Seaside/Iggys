@@ -71,8 +71,14 @@ describe('buildReorderGroups — never produces a NaN total (regression)', () =>
     expect(groupsNull.every((g) => Number.isFinite(g.total))).toBe(true);
   });
 
-  it('excludes items at or above par', () => {
+  it('excludes items strictly above par', () => {
     const groups = buildReorderGroups([item({ id: 1, current_quantity: 9, par_level: 5 })], vendors, []);
     expect(groups).toEqual([]);
+  });
+
+  it('includes items at par (qty === par_level, <= boundary)', () => {
+    // The impl uses current_quantity <= par_level, so at-par items ARE included.
+    const groups = buildReorderGroups([item({ id: 1, current_quantity: 5, par_level: 5 })], vendors, []);
+    expect(groups.length).toBeGreaterThan(0);
   });
 });

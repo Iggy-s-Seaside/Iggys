@@ -33,7 +33,7 @@ export function ShortcutsSheet() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && !isTypingTarget(e.target)) {
         e.preventDefault();
-        setOpen((v) => !v);
+        setOpen(true);
       }
     };
     window.addEventListener('keydown', onKey);

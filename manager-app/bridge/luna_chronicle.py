@@ -29,9 +29,22 @@ Usage:
 import json
 import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import luna_iggys_bridge as b  # side-effect-free: the daemon only runs under __main__
+
+try:
+    import bar_busyness
+except Exception as _bb_import_err:  # ImportError AND init-time SyntaxError/AttributeError/etc.
+    # Footage auto-band is optional; a missing OR broken module must never sink the
+    # chronicle (and is now distinguishable from a footage-API failure in the log).
+    bar_busyness = None
+    import sys as _sys
+    print(
+        f"WARNING: bar_busyness unavailable ({type(_bb_import_err).__name__}: {_bb_import_err})",
+        file=_sys.stderr,
+    )
 
 
 # Luna's own voice contract (her words, 2026-06-16): a loose ritual, not a form.
@@ -71,13 +84,20 @@ def gather(conn, day: date) -> dict:
     # demand_log is the authoritative night record: Luna's call + the close-out truth.
     dl = _one(
         conn,
-        "select predicted_band, predicted_score, actual_band, note, hotels_full, drivers "
+        "select predicted_band, predicted_score, actual_band, note, hotels_full, drivers, noted_by "
         "from demand_log where business_day = %s",
         (ds,),
     )
     if dl:
         ctx["predicted_band"], ctx["predicted_score"] = dl[0], dl[1]
         ctx["actual_band"], ctx["note"], ctx["hotels_full"], ctx["drivers"] = dl[2], dl[3], dl[4], dl[5]
+        # If the band was read back from camera footage (bar_busyness stamps
+        # noted_by='luna-footage'), remember that here so a RE-RUN stays idempotent.
+        # Otherwise gather() skips the footage step (actual_band already set) and
+        # actual_source falls through to 'floor' — relabeling footage as a human
+        # close-out in both the prompt ("logged by the floor") and the stored record.
+        if dl[6] == "luna-footage":
+            ctx["actual_source"] = "footage"
 
     # Weather + drivers texture from that day's demand pulse insight (best-effort).
     pulse = _one(
@@ -169,8 +189,11 @@ def build_prompt(ctx: dict) -> str:
     if actual:
         verdict = "you nailed it" if pred and actual == pred else (
             f"you called {pred}, it came in {actual}" if pred else f"it came in {actual}")
+        src = ("read back from the night's camera footage — person-detection counts across the room"
+               if ctx.get("actual_source") == "footage"
+               else "the close-out, logged by the floor")
         lines.append(
-            f"- HOW IT ACTUALLY WENT (the close-out, logged by the floor): {actual} — {verdict}. "
+            f"- HOW IT ACTUALLY WENT ({src}): {actual} — {verdict}. "
             "This is the truth you've been writing without. Reckon with it honestly: own the miss "
             "or take the win, in your voice."
         )
@@ -268,6 +291,7 @@ def upsert(conn, ctx: dict, entry: str, signal, mood):
         "predicted_band": ctx.get("predicted_band"),
         "predicted_score": ctx.get("predicted_score"),
         "actual_band": ctx.get("actual_band"),
+        "actual_source": ctx.get("actual_source") or ("floor" if ctx.get("actual_band") else None),
         "close_out_note": ctx.get("note"),
         "drivers": ctx.get("drivers"),
         "special": {"title": ctx.get("special_title")} if ctx.get("special_title") else None,
@@ -308,10 +332,26 @@ def run(day: date, dry: bool = False) -> int:
     try:
         conn = b.connect_db()
         ctx = gather(conn, day)
+        # Auto close-out (replaces the removed manual "How busy was tonight?" widget): if the floor
+        # logged no actual band, read it back from the night's camera footage and write it to
+        # demand_log, so the accuracy scoreboard AND this entry both have the truth. Best-effort;
+        # never fabricates (writes nothing if there's no footage). --dry computes but never writes.
+        if not ctx.get("actual_band") and bar_busyness is not None:
+            try:
+                res = bar_busyness.ensure_actual_band(conn, day, write=not dry)
+                if res:
+                    ctx["actual_band"] = res["band"]
+                    ctx["actual_source"] = "footage"
+                    b.log(f"chronicle {day}: actual_band from footage -> {res['band']} (peak {res['peak_floor']} floor/hr)")
+            except Exception as e:
+                b.log(f"chronicle {day}: footage band step failed (non-fatal): {e}")
         prompt = build_prompt(ctx)
         if dry:
             print("=== PROMPT ===\n" + prompt + "\n")
-        reply = b.ask_luna(prompt, session_tag=f"chronicle-{day.isoformat()}")
+        # Dry runs use a distinct session tag so a preview never pollutes the real
+        # run's Luna session history under the same key.
+        session_tag = f"chronicle-{day.isoformat()}" + ("-dry" if dry else "")
+        reply = b.ask_luna(prompt, session_tag=session_tag)
         if looks_like_nonanswer(reply):
             b.log(f"chronicle {day}: Luna returned a non-answer, skipping (no entry written)")
             print("NON_ANSWER:\n" + reply)
@@ -349,8 +389,11 @@ def main() -> int:
             b.log(f"bad date: {args[0]} (want YYYY-MM-DD)")
             return 2
     else:
-        # Default: the night that just ended.
-        day = date.today() - timedelta(days=1)
+        # Default: the night that just ended. Anchor to Pacific (not the system
+        # clock) so a UTC-timezone PC1 doesn't take "yesterday" off a UTC date and
+        # write an entry for a service night that's still open. Matches
+        # bar_busyness + businessDay.ts (America/Los_Angeles).
+        day = (datetime.now(ZoneInfo("America/Los_Angeles")) - timedelta(days=1)).date()
     return run(day, dry=dry)
 
 

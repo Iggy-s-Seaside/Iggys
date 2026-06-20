@@ -25,9 +25,13 @@ PY="$(printf '%s\n' "$BREF" | sed -n 's#^ExecStart=\(/[^ ]*python[0-9.]*\).*#\1#
 : "${PY:=/usr/bin/python3}"
 echo "env=${ENVF:-<none>}  workdir=$WD  python=$PY"
 
-# Install the generator next to the bridge.
+# Install the generator (and its optional footage-band helper) next to the bridge.
 cp "$SRC_DIR/luna_chronicle.py" "$WD/luna_chronicle.py"
-echo "Installed luna_chronicle.py -> $WD"
+# bar_busyness.py supplies the footage-derived auto close-out band. Without it the
+# generator's `import bar_busyness` fails and the auto-band step is silently skipped
+# every night — so copy it alongside the generator.
+[ -f "$SRC_DIR/bar_busyness.py" ] && cp "$SRC_DIR/bar_busyness.py" "$WD/bar_busyness.py"
+echo "Installed luna_chronicle.py (+ bar_busyness.py) -> $WD"
 
 UDIR="$HOME/.config/systemd/user"
 mkdir -p "$UDIR"

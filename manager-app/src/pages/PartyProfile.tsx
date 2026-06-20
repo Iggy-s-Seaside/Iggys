@@ -70,7 +70,8 @@ function ContactField({
   if (value == null || value === '') return null;
   const copy = async () => {
     try {
-      await navigator.clipboard?.writeText(value);
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       buzz(8);
       setTimeout(() => setCopied(false), 1500);

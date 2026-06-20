@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import { useAuth } from '../context/AuthContext';
 import { useCurrentShiftId } from './useChecklists';
@@ -99,7 +100,7 @@ export function useShiftLog(shiftId?: number | null) {
   // Realtime: keep the floor feed live across devices.
   useEffect(() => {
     const channel = supabase
-      .channel('shift_log-realtime')
+      .channel(uniqueTopic('shift_log-realtime'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_log' }, () => {
         refresh();
       })
