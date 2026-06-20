@@ -16,7 +16,8 @@ import { TodoWidget } from '../components/todos/TodoWidget';
 import { TodaysPulse } from '../components/dashboard/TodaysPulse';
 import { WeatherWatch } from '../components/dashboard/WeatherWatch';
 import { SpecialIdeaCard } from '../components/dashboard/SpecialIdeaCard';
-import { CloseOutCard } from '../components/dashboard/CloseOutCard';
+import { LunaReadCard } from '../components/dashboard/LunaReadCard';
+import { BarCheckInCard } from '../components/dashboard/BarCheckInCard';
 import { OwnerMoneyStrip } from '../components/dashboard/OwnerMoneyStrip';
 import { useDemandLog } from '../hooks/useDemandLog';
 import { useAuth } from '../context/AuthContext';
@@ -127,8 +128,17 @@ export function Dashboard() {
       {/* Luna's creative special-of-the-day */}
       <SpecialIdeaCard special={latestSpecial} />
 
-      {/* Nightly close-out — teaches Luna's forecast */}
-      <CloseOutCard todayRow={demand.todayRow} saving={demand.saving} onLog={demand.logActual} />
+      {/* Luna's busyness read — her own call for the night (from the cameras) + track record.
+          Replaces the manual close-out; actual_band is auto-written by the nightly footage review. */}
+      <LunaReadCard
+        todayRow={demand.todayRow}
+        accuracy={demand.accuracy}
+        saving={demand.saving}
+        onLog={demand.logActual}
+      />
+
+      {/* Check in on the bar — Luna looks at the customer cameras live, on demand */}
+      <BarCheckInCard />
 
       {/* Needs your attention — parties surfaced first */}
       <PartiesTodayWidget />
