@@ -274,6 +274,11 @@ function InsightCard({
 export function Luna() {
   const { user } = useAuth();
   const { messages, loading, sendMessage, retryMessage } = useLunaMessages();
+  // Control rows the dashboard writes (the camera "Look now" and special "Try again" buttons)
+  // aren't real conversation — keep them out of the chat view.
+  const visibleMessages = messages.filter(
+    (m) => !(m.role === 'user' && (m.content === '__look_at_bar__' || m.content === '__regen_special__')),
+  );
   const { insights, loading: insightsLoading, markSeen, dismiss } = useLunaInsights();
   const coarsePointer = useCoarsePointer();
 
@@ -454,7 +459,7 @@ export function Luna() {
                   />
                 ))}
               </div>
-            ) : messages.length === 0 ? (
+            ) : visibleMessages.length === 0 ? (
               <div className="card p-8 text-center">
                 <div className="w-12 h-12 mx-auto rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center mb-3">
                   <Moon size={22} className="text-purple-600 dark:text-purple-400" />
@@ -479,7 +484,7 @@ export function Luna() {
                 </div>
               </div>
             ) : (
-              messages.map((msg) => (
+              visibleMessages.map((msg) => (
                 <MessageBubble key={msg.id} msg={msg} onRetry={handleRetry} />
               ))
             )}
