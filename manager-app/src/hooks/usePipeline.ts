@@ -9,8 +9,9 @@ import type { Party, PartyPackage } from '../types';
  * (inquiry / confirmed / cancelled) plus signals already on the row:
  *   - new:      inquiry, nothing sent yet
  *   - proposal: inquiry with a proposal sent (proposals table) or a follow-up working
- *   - confirmed: status=confirmed, deposit not yet collected
- *   - paid:     status=confirmed and deposit/balance settled (payment_status partial|paid)
+ *   - confirmed: status=confirmed, balance still owed (no deposit yet, OR a partial
+ *               payment with a remaining balance) — money left to collect
+ *   - paid:     status=confirmed and FULLY settled (payment_status === 'paid')
  * Cancelled parties are dropped from the board.
  */
 export const PIPELINE_STAGES = ['new', 'proposal', 'confirmed', 'paid'] as const;
@@ -31,6 +32,8 @@ export interface PipelineCard {
   followUpDue: boolean;
   /** Confirmed but no deposit collected yet — money still owed. */
   depositOwed: boolean;
+  /** Confirmed with a partial payment — a balance is still outstanding. */
+  balanceOwed: boolean;
 }
 
 export interface PipelineColumn {
@@ -50,7 +53,10 @@ function todayKey() {
 function stageFor(p: Party, hasProposal: boolean): PipelineStage | null {
   if (p.status === 'cancelled') return null;
   if (p.status === 'confirmed') {
-    return p.payment_status === 'partial' || p.payment_status === 'paid' ? 'paid' : 'confirmed';
+    // Only a FULLY-paid party belongs in 'paid'. A partial payment still has a balance
+    // owed, so it stays in 'confirmed' (with a "Balance owed" badge) where the manager
+    // is prompted to collect the rest — never masquerading as settled in 'Paid / Done'.
+    return p.payment_status === 'paid' ? 'paid' : 'confirmed';
   }
   // inquiry: split on whether a proposal/confirmation has gone out or a follow-up is working
   if (hasProposal || p.confirmation_sent_at || p.last_contacted_at) return 'proposal';
@@ -113,12 +119,15 @@ export function usePipeline() {
       const followUpDue = p.status === 'inquiry' && !!p.follow_up_date && p.follow_up_date <= today;
       const depositOwed =
         p.status === 'confirmed' && (p.payment_status == null || p.payment_status === 'unpaid');
-      buckets[stage].push({ party: p, estValue, followUpDue, depositOwed });
+      // Partial payment = a balance is still outstanding; surface it so a confirmed
+      // party with money still owed never reads as fully settled on the board.
+      const balanceOwed = p.status === 'confirmed' && p.payment_status === 'partial';
+      buckets[stage].push({ party: p, estValue, followUpDue, depositOwed, balanceOwed });
     }
 
     // Within a column, surface the most actionable first: follow-ups/deposits owed,
     // then by soonest event date, then by highest value.
-    const rank = (c: PipelineCard) => (c.followUpDue || c.depositOwed ? 0 : 1);
+    const rank = (c: PipelineCard) => (c.followUpDue || c.depositOwed || c.balanceOwed ? 0 : 1);
     for (const stage of PIPELINE_STAGES) {
       buckets[stage].sort((a, b) => {
         if (rank(a) !== rank(b)) return rank(a) - rank(b);

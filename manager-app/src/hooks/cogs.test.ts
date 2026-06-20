@@ -46,6 +46,14 @@ describe('recipeCost — batch cost / servings', () => {
     expect(recipeCost({ yield: 1, recipe_ingredients: [{ item_id: 99, qty: 5 }] } as unknown as Recipe, items)).toBe(0);
     expect(recipeCost({ yield: 1, recipe_ingredients: [] } as unknown as Recipe, items)).toBe(0);
   });
+  it('treats a NaN cost_per_unit as 0 instead of NaN-poisoning the recipe cost', () => {
+    const bad = new Map<number, InventoryItem>([[1, item({ id: 1, cost_per_unit: NaN })], [2, item({ id: 2, cost_per_unit: 0.5 })]]);
+    // ingredient 1 (NaN cost) contributes 0; (0 + 0.5*4) / 1 = 2
+    const recipe = { yield: 1, recipe_ingredients: [{ item_id: 1, qty: 3 }, { item_id: 2, qty: 4 }] } as unknown as Recipe;
+    const cost = recipeCost(recipe, bad);
+    expect(Number.isFinite(cost)).toBe(true);
+    expect(cost).toBe(2);
+  });
 });
 
 describe('buildReorderGroups — never produces a NaN total (regression)', () => {

@@ -98,7 +98,9 @@ export function allocateTips(
 
   const weights = rows.map(weight);
   const totalWeight = weights.reduce((s, w) => s + w, 0);
-  if (totalWeight <= 0) {
+  // A NaN weight (e.g. a row with hours=NaN) makes totalWeight NaN, which slips past a
+  // bare `<= 0` check and then NaN-poisons every share_cents. Guard for finiteness.
+  if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
     return rows.map((r) => ({ staff_id: r.staff_id, name: r.name, hours: r.hours, share_cents: 0 }));
   }
 

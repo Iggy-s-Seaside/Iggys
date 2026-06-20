@@ -131,7 +131,9 @@ export function recipeCost(recipe: Recipe, itemsById: Map<number, InventoryItem>
   const batchCost = ingredients.reduce((sum, ing) => {
     if (ing.item_id == null) return sum;
     const item = itemsById.get(ing.item_id);
-    const unitCost = item?.cost_per_unit ?? 0;
+    // Finiteness guard, not `?? 0`: a NaN cost_per_unit passes the nullish check and
+    // NaN-poisons the recipe cost (and every pour-cost % derived from it).
+    const unitCost = Number.isFinite(item?.cost_per_unit) ? (item!.cost_per_unit as number) : 0;
     return sum + unitCost * (ing.qty || 0);
   }, 0);
   const servings = recipe.yield && recipe.yield > 0 ? recipe.yield : 1;

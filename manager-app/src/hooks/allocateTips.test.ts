@@ -27,6 +27,12 @@ describe('allocateTips — tip-pool split (integer cents)', () => {
     expect(allocateTips(10000, rows(0, 0), 'hours').map((r) => r.share_cents)).toEqual([0, 0]);
   });
 
+  it('does not NaN-poison shares when a row has NaN hours (hours mode)', () => {
+    const out = allocateTips(10000, rows(NaN, 4), 'hours');
+    expect(out.map((r) => r.share_cents)).toEqual([0, 0]);
+    expect(sum(out)).toBe(0); // every share finite; nothing NaN, nothing invented
+  });
+
   it('NEVER loses or invents a penny — shares always sum to the pool exactly', () => {
     const cases: Array<[number, number[], 'even' | 'hours' | 'points']> = [
       [10000, [1, 1, 1], 'even'],

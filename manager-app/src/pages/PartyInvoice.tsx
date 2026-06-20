@@ -92,8 +92,11 @@ export function PartyInvoice() {
   const gratuityPct = Math.round((party.gratuity_rate ?? 0.18) * 100);
 
   const paid = party.amount_paid ?? 0;
-  const balance = party.balance_due ?? Math.max(breakdown.grandTotal - paid, 0);
-  const paymentStatus = party.payment_status ?? 'unpaid';
+  // Live balance + status from the current grand total — never the stale stored value
+  // (it drifts the moment the invoice is edited after a payment). Deriving the status
+  // here too keeps the document from ever printing "Paid" beside a nonzero balance.
+  const balance = Math.max(breakdown.grandTotal - paid, 0);
+  const paymentStatus = paid <= 0 ? 'unpaid' : balance <= 0.005 ? 'paid' : 'partial';
 
   const legacyRange = [party.start_time, party.end_time].filter(Boolean).join(' – ');
   const hasStructuredTime = party.all_day || party.start_min != null;

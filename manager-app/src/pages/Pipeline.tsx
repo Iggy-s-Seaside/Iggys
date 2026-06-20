@@ -114,11 +114,6 @@ export function Pipeline() {
     return columns.filter((c) => c.stage !== 'paid').reduce((sum, c) => sum + c.total, 0);
   }, [columns, overrides, baseOpenValue]);
 
-  const stageOf = useCallback(
-    (partyId: number, fallback: PipelineStage): PipelineStage => overrides[partyId] ?? fallback,
-    [overrides],
-  );
-
   const moveCard = useCallback(
     async (card: PipelineCardData, from: PipelineStage, target: PipelineStage) => {
       if (target === from) return;
@@ -244,20 +239,30 @@ export function Pipeline() {
     () => {
       if (!drag) return;
       const target = drag.over;
-      const from = drag.from;
       const partyId = drag.partyId;
       setDrag(null);
-      if (!dragMoved.current || !target || target === from) return;
-      // Find the live card to move.
-      const card = baseColumns
-        .flatMap((c) => c.cards)
-        .find((c) => c.party.id === partyId);
-      if (card) void moveCard(card, stageOf(partyId, from), target);
+      if (!dragMoved.current || !target) return;
+      // Use the card's LIVE stage — the column it actually sits in right now — not the
+      // stale `drag.from` captured at pointer-down. A realtime payment change mid-drag
+      // can move the card (e.g. into 'paid'); the stale stage would slip past moveCard's
+      // paid-guard and demote a payment-backed party. (overrides is empty at drop time,
+      // so stageOf would also be stale — derive straight from the live baseColumns.)
+      const liveCol = baseColumns.find((c) => c.cards.some((cd) => cd.party.id === partyId));
+      const card = liveCol?.cards.find((cd) => cd.party.id === partyId);
+      const from = liveCol?.stage ?? drag.from;
+      if (!card || target === from) return;
+      void moveCard(card, from, target);
     },
-    [drag, baseColumns, moveCard, stageOf],
+    [drag, baseColumns, moveCard],
   );
 
   const isEmpty = !loading && columns.every((c) => c.count === 0);
+
+  // The dragged card's LIVE stage (same derivation endDrag uses) so the drop-target ring
+  // and the ghost's "→ stage" hint stay correct if a realtime payment moved it mid-drag.
+  const liveDragFrom = drag
+    ? baseColumns.find((c) => c.cards.some((cd) => cd.party.id === drag.partyId))?.stage ?? drag.from
+    : null;
 
   return (
     <div>
@@ -301,7 +306,7 @@ export function Pipeline() {
             const stageIdx = PIPELINE_STAGES.indexOf(column.stage);
             const nextStage = PIPELINE_STAGES[stageIdx + 1] ?? null;
             const prevStage = PIPELINE_STAGES[stageIdx - 1] ?? null;
-            const isDropTarget = drag?.over === column.stage && drag.from !== column.stage;
+            const isDropTarget = drag?.over === column.stage && liveDragFrom !== column.stage;
             return (
               <div key={column.stage} className="snap-start">
                 <div
@@ -376,7 +381,7 @@ export function Pipeline() {
           <p className="text-sm font-semibold text-text-primary truncate">
             {dragLabel(baseColumns, drag.partyId)}
           </p>
-          {drag.over && drag.over !== drag.from && (
+          {drag.over && drag.over !== liveDragFrom && (
             <p className="text-xs text-primary font-medium mt-0.5">→ {PIPELINE_STAGE_LABELS[drag.over]}</p>
           )}
         </div>

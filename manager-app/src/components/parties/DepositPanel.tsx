@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, CreditCard, Link2, Copy, Check, CheckCircle2, CalendarClock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -39,11 +39,14 @@ export function DepositPanel({ party, lines, onSave }: DepositPanelProps) {
 
   const depositAmount = party.deposit_amount ?? 0;
   const amountPaid = party.amount_paid ?? 0;
-  // Trust the stored balance when present; otherwise derive from the live grand total.
-  const balanceDue = party.balance_due ?? Math.max(0, grandTotal - amountPaid);
-  // Trust the stored status when present; otherwise derive it from what's been paid.
+  // ALWAYS derive the balance live from the current grand total minus what's been paid.
+  // The stored balance_due goes stale the moment the invoice is edited after a payment
+  // (a manager would otherwise under-collect against a frozen number), and a buggy
+  // webhook can leave it at 0 — so the panel must never trust it for display/collection.
+  const balanceDue = Math.max(0, grandTotal - amountPaid);
+  // Status derived from the LIVE balance too — never show "Paid" while money is owed.
   const resolvedStatus: PaymentStatus =
-    party.payment_status ?? (amountPaid <= 0 ? 'unpaid' : balanceDue <= 0.005 ? 'paid' : 'partial');
+    amountPaid <= 0 ? 'unpaid' : balanceDue <= 0.005 ? 'paid' : 'partial';
   const chip = STATUS_META[resolvedStatus] ?? STATUS_META.unpaid;
 
   const [link, setLink] = useState<string | null>(null);
@@ -54,6 +57,13 @@ export function DepositPanel({ party, lines, onSave }: DepositPanelProps) {
   const [manualAmount, setManualAmount] = useState(
     String((depositAmount > 0 && amountPaid <= 0 ? depositAmount : balanceDue).toFixed(2))
   );
+  // Re-seed the prefill whenever the panel opens or the underlying numbers change
+  // (a payment recorded this session, or an invoice edit). Without this, the second
+  // "Mark paid" still pre-fills the pre-payment amount and the manager over/under-collects.
+  useEffect(() => {
+    if (!manualOpen) return;
+    setManualAmount(String((depositAmount > 0 && amountPaid <= 0 ? depositAmount : balanceDue).toFixed(2)));
+  }, [manualOpen, depositAmount, amountPaid, balanceDue]);
 
   const handleRequest = async () => {
     try {
