@@ -158,6 +158,10 @@ export default function Home() {
     const draftBeers = onTapBeers.slice(0, 4);
     const activeEvents = events.filter((e) => e.active).slice(0, 2);
     const activeSpecials = specials.filter((s) => s.active).slice(0, 2);
+    // Only split into two columns when BOTH have content — otherwise a lone
+    // column leaves the other half of the grid an empty block.
+    const bothEventColumns =
+        activeEvents.length > 0 && activeSpecials.length > 0;
 
     // Pull prices from Supabase, use shortened ingredient descriptions
     const cocktailItems = FEATURED_COCKTAILS.map((featured) => {
@@ -367,7 +371,13 @@ export default function Home() {
                             subtitle="Live music, drag shows, seasonal cocktails — there's always something going on."
                         />
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+                        <div
+                            className={`mt-12 ${
+                                bothEventColumns
+                                    ? 'grid grid-cols-1 lg:grid-cols-2 gap-8'
+                                    : 'max-w-2xl mx-auto'
+                            }`}
+                        >
                             {/* Events column */}
                             {activeEvents.length > 0 && (
                                 <div className="space-y-4">
