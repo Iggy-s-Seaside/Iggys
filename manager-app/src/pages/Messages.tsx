@@ -667,16 +667,26 @@ export function Messages() {
                       <span className="flex items-center gap-1 text-sm text-text-secondary min-w-0">
                         <User size={13} className="shrink-0" /> <span className="truncate">{selected.name}</span>
                       </span>
-                      <span className="text-sm text-text-muted truncate max-w-full">{selected.email}</span>
+                      <a
+                        href={`mailto:${selected.email}`}
+                        aria-label={`Email ${selected.name}`}
+                        className="text-sm text-text-muted truncate max-w-full hover:text-primary hover:underline transition-colors"
+                      >
+                        {selected.email}
+                      </a>
                       {selected.source === 'gmail' && (
                         <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded self-start shrink-0">
                           via Gmail
                         </span>
                       )}
                       {selected.phone && (
-                        <span className="flex items-center gap-1 text-sm text-text-muted">
+                        <a
+                          href={`tel:${selected.phone.replace(/[^\d+]/g, '')}`}
+                          aria-label={`Call ${selected.name}`}
+                          className="flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors"
+                        >
                           <Phone size={13} className="shrink-0" /> {selected.phone}
-                        </span>
+                        </a>
                       )}
                     </div>
                   </div>
