@@ -14,6 +14,7 @@ import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
 import LoadingSkeleton from '../components/menu/LoadingSkeleton';
 import EventsCalendar from '../components/events/EventsCalendar';
+import EventsJsonLd from '../components/events/EventsJsonLd';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials } from '../hooks/useMenuData';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
@@ -179,6 +180,8 @@ export default function Events() {
 
     return (
         <div>
+            {/* Google event rich-results markup — data-driven from the same rows */}
+            <EventsJsonLd events={events} />
             <PageHeader
                 eyebrow="What's Happening"
                 title="Events & Specials"
