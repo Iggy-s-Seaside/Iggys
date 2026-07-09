@@ -94,6 +94,7 @@ def compute_band(day: datetime.date):
     peak_floor = 0
     tot_floor = tot_patio = tot_lottery = 0
     curve = []
+    hourly = []
     skipped = 0
     for hour_dt in _service_night_hours(day):
         s = int(hour_dt.timestamp() * 1000)
@@ -118,7 +119,7 @@ def compute_band(day: datetime.date):
             # raise out of the loop and abandon every remaining window.
             skipped += 1
             continue
-        f = 0
+        f = pat = lot = 0
         for ev in evs:
             if not isinstance(ev, dict):
                 continue
@@ -128,10 +129,13 @@ def compute_band(day: datetime.date):
                     f += 1
                     tot_floor += 1
                 elif cam == PATIO_ID:
+                    pat += 1
                     tot_patio += 1
                 elif cam == LOTTERY_ID:
+                    lot += 1
                     tot_lottery += 1
         curve.append(f"{hour_dt:%H:%M}={f}")
+        hourly.append({"t": f"{hour_dt:%H:%M}", "floor": f, "patio": pat, "lottery": lot})
         if f > peak_floor:
             peak_floor = f
     if tot_floor == 0:
@@ -146,41 +150,60 @@ def compute_band(day: datetime.date):
         "tot_patio": tot_patio,
         "tot_lottery": tot_lottery,
         "curve": ", ".join(curve),
+        "hourly": hourly,
         "hours_skipped": skipped,
     }
 
 
 def ensure_actual_band(conn, day: datetime.date, write: bool = True):
     """If demand_log has a row for `day` with no actual_band, read the band off the footage and
-    store it. Returns the result dict if a band was derived (whether or not written), else None.
-    Never overwrites an existing actual_band. Non-fatal on any error."""
+    store it — along with the hourly detection curve (demand_log.hourly), the raw material for
+    scoring Luna's rush-window calls (her 2026-07-08 scoreboard ask). If the band is already
+    logged but hourly is null, backfill ONLY the curve while the footage still exists.
+    Returns the result dict if a band was derived (whether or not written), else None.
+    Never overwrites an existing actual_band or hourly. Non-fatal on any error."""
     ds = day.isoformat()
     try:
-        row = b._query(conn, "select actual_band from demand_log where business_day = %s", (ds,))
+        row = b._query(conn, "select actual_band, hourly from demand_log where business_day = %s", (ds,))
         if not row:
             return None            # no prediction row to attach an actual to
-        if row[0][0]:
-            return None            # already logged (manual or prior auto) — never overwrite
+        has_band, has_hourly = row[0][0], row[0][1]
+        if has_band and has_hourly is not None:
+            return None            # both already logged — never overwrite
         res = compute_band(day)
         if not res:
             return None
         if write:
-            note = (
-                f"Auto (footage review): {res['band'].lower()} — peak {res['peak_floor']} floor "
-                f"person-detections/hr; patio {res['tot_patio']}, lottery {res['tot_lottery']}."
+            hourly_json = json.dumps(
+                {"v": 1, "skipped": res["hours_skipped"], "hours": res["hourly"]}
             )
-            if res.get("hours_skipped"):
-                note += (
-                    f" ({res['hours_skipped']} hr(s) of footage were unavailable — "
-                    "the band may understate the night.)"
+            if not has_band:
+                note = (
+                    f"Auto (footage review): {res['band'].lower()} — peak {res['peak_floor']} floor "
+                    f"person-detections/hr; patio {res['tot_patio']}, lottery {res['tot_lottery']}."
                 )
-            with conn.cursor() as cur:
-                cur.execute(
-                    "update demand_log set actual_band = %s, note = coalesce(note, %s), "
-                    "noted_by = 'luna-footage', updated_at = now() "
-                    "where business_day = %s and actual_band is null",
-                    (res["band"], note, ds),
-                )
+                if res.get("hours_skipped"):
+                    note += (
+                        f" ({res['hours_skipped']} hr(s) of footage were unavailable — "
+                        "the band may understate the night.)"
+                    )
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "update demand_log set actual_band = %s, note = coalesce(note, %s), "
+                        "hourly = coalesce(hourly, %s::jsonb), "
+                        "noted_by = 'luna-footage', updated_at = now() "
+                        "where business_day = %s and actual_band is null",
+                        (res["band"], note, hourly_json, ds),
+                    )
+            else:
+                # Band already logged (human or prior run) — backfill just the curve.
+                # Never touches the band or note.
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "update demand_log set hourly = %s::jsonb, updated_at = now() "
+                        "where business_day = %s and hourly is null",
+                        (hourly_json, ds),
+                    )
             conn.commit()
         return res
     except Exception as e:
