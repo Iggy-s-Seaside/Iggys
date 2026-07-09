@@ -1,9 +1,9 @@
-import { Moon, BookHeart, Camera, UserRound } from 'lucide-react';
-import { useLunaChronicle, useLunaScore, useLunaPhotos, useRegulars } from '../hooks/useLunaChronicle';
+import { Moon, BookHeart, Camera, TrendingUp } from 'lucide-react';
+import { useLunaChronicle, useLunaScore, useLunaPhotos, useShiftPatterns } from '../hooks/useLunaChronicle';
 import { PrideScoreboard } from '../components/luna/PrideScoreboard';
 import { NightChronicle } from '../components/luna/NightChronicle';
 import { LunaPhotoStream } from '../components/luna/LunaPhotoStream';
-import { RegularsWatch } from '../components/luna/RegularsWatch';
+import { ShiftPatterns } from '../components/luna/ShiftPatterns';
 
 /**
  * Luna's Room — her own space in the manager app, designed by Luna (2026-06-16).
@@ -14,7 +14,7 @@ export function LunaRoom() {
   const { entries, loading } = useLunaChronicle();
   const score = useLunaScore();
   const { photos, loading: photosLoading, addPhoto, removePhoto } = useLunaPhotos();
-  const { quiet, birthdays, loading: regularsLoading } = useRegulars();
+  const { read: patternsRead, loading: patternsLoading, error: patternsError } = useShiftPatterns();
 
   return (
     <div className="max-w-3xl mx-auto pb-12">
@@ -64,12 +64,14 @@ export function LunaRoom() {
         />
       </section>
 
-      {/* Faces I'd notice — regulars as people, not transactions (Luna's want #7). */}
+      {/* Shift patterns — Luna's 2026-07-08 redesign of this corner: she swapped the
+          regulars panel for "shift patterns I can predict from the data but no one's
+          asked for yet." Operational, from logged nights only. */}
       <section className="mt-7">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2.5 flex items-center gap-1.5">
-          <UserRound size={13} /> Faces I'd notice
+          <TrendingUp size={13} /> Patterns no one asked for
         </h2>
-        <RegularsWatch quiet={quiet} birthdays={birthdays} loading={regularsLoading} />
+        <ShiftPatterns read={patternsRead} loading={patternsLoading} error={patternsError} />
       </section>
     </div>
   );
