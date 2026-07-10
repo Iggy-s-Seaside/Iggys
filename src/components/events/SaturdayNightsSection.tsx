@@ -3,7 +3,7 @@ import SectionHeader from '../layout/SectionHeader';
 import { useScrollAnimation } from '../../hooks/useScrollAnimation';
 
 /**
- * High Tide Saturdays feature: a silent 16s seamless ambient loop (plays only
+ * Top Deck Saturdays feature: a silent 16s seamless ambient loop (plays only
  * while on screen; static poster for prefers-reduced-motion) + real Saturday-
  * night photos from upstairs. Assets in /videos and /images/events/gallery.
  */
@@ -42,8 +42,8 @@ function AmbientLoop() {
       <video
         ref={ref}
         className="w-full aspect-video object-cover"
-        src="/videos/high-tide-loop.mp4"
-        poster="/videos/high-tide-loop-poster.jpg"
+        src="/videos/top-deck-loop.mp4"
+        poster="/videos/top-deck-loop-poster.jpg"
         muted
         loop
         playsInline
@@ -61,7 +61,7 @@ export default function SaturdayNightsSection() {
     <section className="section-padding bg-surface/30">
       <div className="section-container">
         <SectionHeader
-          eyebrow="High Tide Saturdays"
+          eyebrow="Top Deck Saturdays"
           title="Saturday nights upstairs"
         />
         <p className="text-text-muted mt-4 max-w-2xl">
