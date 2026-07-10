@@ -257,7 +257,7 @@ export default function Events() {
                 </div>
             </section>
 
-            {/* High Tide Saturdays — hype reel + gallery */}
+            {/* High Tide Saturdays — ambient loop + gallery */}
             <SaturdayNightsSection />
 
             {/* Current Specials */}

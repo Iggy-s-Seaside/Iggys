@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import SectionHeader from '../layout/SectionHeader';
 import { useScrollAnimation } from '../../hooks/useScrollAnimation';
 
 /**
- * High Tide Saturdays feature: the hype reel (muted autoplay, plays only while
- * on screen — battery/bandwidth friendly) + a strip of real Saturday-night
- * photos from upstairs. Assets live in /videos and /images/events/gallery.
+ * High Tide Saturdays feature: a silent 16s seamless ambient loop (plays only
+ * while on screen; static poster for prefers-reduced-motion) + real Saturday-
+ * night photos from upstairs. Assets in /videos and /images/events/gallery.
  */
 
 const GALLERY = [
@@ -15,17 +14,18 @@ const GALLERY = [
   { src: '/images/events/gallery/slay-bar.jpg', alt: 'Back bar glowing pink and blue under the Slay neon' },
   { src: '/images/events/gallery/neon-fireworks.jpg', alt: 'Neon light columns and fireworks in the sunset sky' },
   { src: '/images/events/gallery/taps-dusk.jpg', alt: 'Beer taps against the dusk sky on the upstairs deck' },
-  { src: '/images/events/gallery/night-party.jpg', alt: 'Saturday night crowd dancing upstairs' },
+  { src: '/images/events/gallery/seaside-sunset.jpg', alt: 'Sunset over the Pacific, two blocks from the bar' },
 ];
 
-function HypeVideo() {
-  const ref = useRef<HTMLVideoElement | null>(null);
-  const [muted, setMuted] = useState(true);
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
-  // Play while visible, pause off-screen.
+function AmbientLoop() {
+  const ref = useRef<HTMLVideoElement | null>(null);
+
+  // Play while visible, pause off-screen; never autoplay for reduced-motion users.
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || window.matchMedia(REDUCED_MOTION).matches) return;
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) el.play().catch(() => {});
@@ -38,25 +38,18 @@ function HypeVideo() {
   }, []);
 
   return (
-    <div className="relative glass-card overflow-hidden rounded-2xl">
+    <div className="glass-card overflow-hidden rounded-2xl">
       <video
         ref={ref}
         className="w-full aspect-video object-cover"
-        src="/videos/high-tide-hype.mp4"
-        poster="/videos/high-tide-hype-poster.jpg"
-        muted={muted}
+        src="/videos/high-tide-loop.mp4"
+        poster="/videos/high-tide-loop-poster.jpg"
+        muted
         loop
         playsInline
         preload="metadata"
+        aria-label="Slow-motion scenes from Saturday nights upstairs: fireworks over town and the dance floor"
       />
-      <button
-        type="button"
-        onClick={() => setMuted((m) => !m)}
-        aria-label={muted ? 'Unmute video' : 'Mute video'}
-        className="absolute bottom-4 right-4 w-11 h-11 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-      >
-        {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-      </button>
     </div>
   );
 }
@@ -73,12 +66,11 @@ export default function SaturdayNightsSection() {
         />
         <p className="text-text-muted mt-4 max-w-2xl">
           Rotating DJs from the Hit Squad, full bar upstairs, dance floor open
-          all night — every Saturday, all summer, never a cover. This is what
-          it looks like.
+          all night — every Saturday, all summer, never a cover.
         </p>
 
         <div className="mt-8">
-          <HypeVideo />
+          <AmbientLoop />
         </div>
 
         <div
