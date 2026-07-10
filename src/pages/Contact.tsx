@@ -6,7 +6,7 @@ import Select from '../components/ui/Select';
 
 const infoRows = [
   { icon: MapPin, text: '200 S Franklin St, Seaside, OR 97138', href: 'https://maps.google.com/?q=200+S+Franklin+St,+Seaside,+OR+97138' },
-  { icon: Clock, text: '7 Days / 12pm – 12am' },
+  { icon: Clock, text: '7 Days · 12pm–12am' },
   { icon: Sparkles, text: 'Happy Hour: Daily 3pm – 5pm' },
   { icon: Phone, text: '(503) 738-0672', href: 'tel:+15037380672' },
   { icon: Mail, text: 'iggysbarevents@gmail.com', href: 'mailto:iggysbarevents@gmail.com' },
@@ -82,8 +82,8 @@ export default function Contact() {
       {/* Hero with bar top photo */}
       <section className="relative py-24 lg:py-32 pt-32 text-center overflow-hidden">
         <img
-          src={images.barTop}
-          alt="Iggy's bar top"
+          src={images.wallInside}
+          alt="The teal-tiled backbar inside Iggy's"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-background/75" />

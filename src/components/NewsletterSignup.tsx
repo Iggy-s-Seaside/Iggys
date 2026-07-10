@@ -116,7 +116,7 @@ export default function NewsletterSignup({
   const inputClass =
     'w-full bg-white/[0.06] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition';
   const checkboxClass =
-    'mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.06] text-primary focus:ring-primary/40 focus:ring-offset-0 cursor-pointer';
+    'mt-0.5 h-5 w-5 shrink-0 rounded border-white/20 bg-white/[0.06] text-primary focus:ring-primary/40 focus:ring-offset-0 cursor-pointer';
 
   return (
     <div className={wrapperClass}>

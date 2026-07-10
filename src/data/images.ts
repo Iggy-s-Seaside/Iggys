@@ -1,35 +1,38 @@
 const SUPABASE_STORAGE = 'https://nouxyrqpulkbjusriugx.supabase.co/storage/v1/object/public/images';
 
+// Heavy photos are served as local web derivatives (public/images/opt/,
+// ~200-600KB) — the Supabase originals run 2-13MB each and blanked out
+// galleries on slow connections. Regenerate via ffmpeg scale=1600 q:v 4.
 export const images = {
   // Hero / Background
-  backgroundImage: `${SUPABASE_STORAGE}/IMG_8238.jpg`,
-  nightOutside: `${SUPABASE_STORAGE}/IMG_8318.jpg`,
-  iggyBuilding: `${SUPABASE_STORAGE}/iggybuilding.jpg`,
+  backgroundImage: '/images/opt/background.jpg',
+  nightOutside: '/images/opt/night-outside.jpg',
+  iggyBuilding: '/images/opt/iggy-building.jpg',
 
   // Interior shots (professional - Kaitlin Green)
-  wallInside: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-7.jpg`,
-  barTop: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-11.jpg`,
-  mural: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-15.jpg`,
-  tapOutside: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-19.jpg`,
-  jellyFish: `${SUPABASE_STORAGE}/Iggys-KaitlinGreen-39.jpg`,
+  wallInside: '/images/opt/kg-wall-inside.jpg',
+  barTop: '/images/opt/kg-bar-top.jpg',
+  mural: '/images/opt/kg-mural.jpg',
+  tapOutside: '/images/opt/kg-taps-outside.jpg',
+  jellyFish: '/images/opt/kg-jellyfish.jpg',
 
   // Event / DJ
   djFlyer: `${SUPABASE_STORAGE}/dj.jpg`,
-  djNight: `${SUPABASE_STORAGE}/djnight.jpeg`,
+  djNight: '/images/opt/dj-night.jpg',
   showUp: `${SUPABASE_STORAGE}/show_up.jpg`,
 
   // Slay nights
-  slayClose: `${SUPABASE_STORAGE}/Slay_close.jpg`,
+  slayClose: '/images/opt/slay-close.jpg',
   slayWide: `${SUPABASE_STORAGE}/Slay_wide.jpg`,
   slayVid: `${SUPABASE_STORAGE}/Slay_vid.mp4`,
 
   // Food & drinks
-  wineCrab: `${SUPABASE_STORAGE}/wineCrab.JPG`,
+  wineCrab: '/images/opt/wine-crab.jpg',
   cat: `${SUPABASE_STORAGE}/cat.jpg`,
-  iggysFamily: `${SUPABASE_STORAGE}/Iggys-fam.jpg`,
+  iggysFamily: '/images/opt/iggys-family.jpg',
 
   // Additional
-  wallInside2: `${SUPABASE_STORAGE}/wall%20inside%202.jpg`,
+  wallInside2: '/images/opt/wall-inside-2.jpg',
   wallInsideOrig: `${SUPABASE_STORAGE}/wall%20inside.jpg`,
   tapsOutside: `${SUPABASE_STORAGE}/taps%20outside.jpg`,
 
@@ -38,18 +41,6 @@ export const images = {
   martiniVector: `${SUPABASE_STORAGE}/martini%20converted.svg`,
   drinks2: `${SUPABASE_STORAGE}/drinks2.svg`,
 };
-
-// Drink photos (cocktail carousel)
-export const drinkImages = [
-  `${SUPABASE_STORAGE}/DRINK_6604.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6605.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6607.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6609.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6614.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6615.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6617.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6619.jpg`,
-];
 
 // Curated cocktail cards (Cocktails page carousel) — one photo per distinct
 // menu drink, cropped 4:5 and color-graded to match; served locally

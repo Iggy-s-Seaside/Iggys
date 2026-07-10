@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
+import RouteTitle from './components/RouteTitle';
 import Home from './pages/Home';
 import Beers from './pages/Beers';
 import Cocktails from './pages/Cocktails';
@@ -22,6 +23,7 @@ import NotFound from './pages/NotFound';
 function App() {
   return (
     <Layout>
+      <RouteTitle />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/beers" element={<Beers />} />

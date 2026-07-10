@@ -112,8 +112,8 @@ export default function Feedback() {
       {/* Hero */}
       <section className="relative py-24 lg:py-28 pt-32 text-center overflow-hidden">
         <img
-          src={images.barTop}
-          alt="Iggy's bar top"
+          src={images.nightOutside}
+          alt="The fire pit outside Iggy's at night"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-background/75" />
@@ -142,7 +142,7 @@ export default function Feedback() {
               </p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-6 md:items-start">
               {/* Public review — shown to EVERY guest, never gated by sentiment */}
               <div className="glass-card p-6 flex flex-col">
                 <div className="flex items-center gap-2 mb-3">

@@ -260,7 +260,9 @@ export default function Events() {
             {/* High Tide Saturdays — ambient loop + gallery */}
             <SaturdayNightsSection />
 
-            {/* Current Specials */}
+            {/* Current Specials — hidden entirely when none are running;
+                the happy-hour CTA below already carries the fallback ask */}
+            {(specialsLoading || activeSpecials.length > 0) && (
             <section className="section-padding bg-surface/30">
                 <div className="section-container">
                     <SectionHeader
@@ -280,24 +282,11 @@ export default function Events() {
                                     />
                                 ))}
                             </div>
-                        ) : (
-                            <div className="glass-card p-12 text-center">
-                                <Sparkles className="w-10 h-10 text-accent/40 mx-auto mb-4" />
-                                <h3 className="font-heading text-xl text-white mb-2">
-                                    No current specials
-                                </h3>
-                                <p className="text-text-muted mb-6">
-                                    Our regular menu is always available. Happy
-                                    hour is daily 3-5pm!
-                                </p>
-                                <Link to="/happy-hour" className="btn-primary text-sm">
-                                    View Happy Hour Deals
-                                </Link>
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </section>
+            )}
 
             {/* Happy Hour CTA */}
             <section className="section-padding">
