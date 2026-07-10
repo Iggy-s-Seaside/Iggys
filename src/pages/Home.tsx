@@ -371,7 +371,7 @@ export default function Home() {
                         <SectionHeader
                             eyebrow="What's Happening"
                             title="Events & specials"
-                            subtitle="Live music, drag shows, seasonal cocktails — there's always something going on."
+                            subtitle="Live music, DJ nights, seasonal cocktails — there's always something going on."
                         />
 
                         <div
