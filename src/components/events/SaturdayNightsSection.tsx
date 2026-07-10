@@ -13,7 +13,7 @@ const GALLERY = [
   { src: '/images/events/gallery/dj-decks.jpg', alt: 'DJ on the decks under the string lights' },
   { src: '/images/events/gallery/slay-bar.jpg', alt: 'Back bar glowing pink and blue under the Slay neon' },
   { src: '/images/events/gallery/neon-fireworks.jpg', alt: 'Neon light columns and fireworks in the sunset sky' },
-  { src: '/images/events/gallery/taps-dusk.jpg', alt: 'Beer taps against the dusk sky on the upstairs deck' },
+  { src: '/images/events/gallery/upstairs-deck.jpg', alt: 'The upstairs deck at night — string lights on and the floor filling up' },
   { src: '/images/events/gallery/seaside-sunset.jpg', alt: 'Sunset over the Pacific, two blocks from the bar' },
 ];
 
