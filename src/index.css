@@ -134,21 +134,6 @@
     display: none;
   }
 
-  /* Drink photo carousel — CSS-only infinite scroll */
-  .carousel-track {
-    animation: carousel-scroll 60s linear infinite;
-    width: max-content;
-  }
-
-  @keyframes carousel-scroll {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(-50%);
-    }
-  }
-
   /* Ambient gradient for solid-dark sections */
   .section-glow {
     position: relative;
@@ -173,9 +158,5 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .carousel-track {
-    animation: none !important;
   }
 }

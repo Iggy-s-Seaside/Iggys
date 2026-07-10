@@ -51,12 +51,12 @@ export const drinkImages = [
   `${SUPABASE_STORAGE}/DRINK_6619.jpg`,
 ];
 
-// Additional drink photos (extras)
-export const drinkImagesExtra = [
-  `${SUPABASE_STORAGE}/DRINK_4043.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6608.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6612.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6613.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6616.jpg`,
-  `${SUPABASE_STORAGE}/DRINK_6618.jpg`,
+// Curated cocktail cards (Cocktails page carousel) — one photo per distinct
+// menu drink, cropped 4:5 and color-graded to match; served locally
+export const cocktailCards = [
+  { src: '/images/cocktails/burlini-espresso-martini.jpg', name: 'Burlini Espresso Martini' },
+  { src: '/images/cocktails/iggys-old-fashion.jpg', name: "Iggy's Old Fashion" },
+  { src: '/images/cocktails/dirty-chai.jpg', name: 'Dirty Chai' },
+  { src: '/images/cocktails/margarita-on-the-rocks.jpg', name: 'Margarita on the Rocks' },
+  { src: '/images/cocktails/negroni.jpg', name: 'Negroni' },
 ];
