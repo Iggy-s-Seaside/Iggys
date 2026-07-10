@@ -18,6 +18,7 @@ import EventsJsonLd from '../components/events/EventsJsonLd';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials } from '../hooks/useMenuData';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
+import { eventDateKeys, todayKey } from '../lib/calendarDates';
 import { isSpecialLive } from '../utils/specialsWindow';
 import type { IggyEvent, Special } from '../types/menu';
 
@@ -30,9 +31,21 @@ function formatDate(dateStr: string) {
     };
 }
 
+/** Recurring events badge their NEXT occurrence, not the (stale) anchor date. */
+function displayDateFor(event: IggyEvent): string {
+    if (!event.is_recurring) return event.date;
+    const from = todayKey();
+    const [y, m, d] = from.split('-').map(Number);
+    const to = new Date(y, m - 1, d + 13);
+    const toKey = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(
+        to.getDate(),
+    ).padStart(2, '0')}`;
+    return eventDateKeys(event, from, toKey)[0] ?? event.date;
+}
+
 function EventCard({ event }: { event: IggyEvent }) {
     const { ref, isVisible } = useScrollAnimation();
-    const date = formatDate(event.date);
+    const date = formatDate(displayDateFor(event));
 
     return (
         <div

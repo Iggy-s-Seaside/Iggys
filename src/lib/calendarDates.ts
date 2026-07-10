@@ -74,10 +74,16 @@ export const WEEKDAY_INDEX: Record<string, number> = {
 
 /**
  * one-off -> [ev.date] only if fromKey <= ev.date <= toKey
- * recurring -> every date in [fromKey, toKey] whose weekday === WEEKDAY_INDEX[ev.recurring_day]
+ * recurring -> every date in [fromKey, toKey] whose weekday === WEEKDAY_INDEX[ev.recurring_day],
+ *              capped at ev.recurring_until (inclusive) when set — e.g. a summer-only series.
  */
 export function eventDateKeys(
-  ev: { date: string; is_recurring: boolean; recurring_day: string | null },
+  ev: {
+    date: string;
+    is_recurring: boolean;
+    recurring_day: string | null;
+    recurring_until?: string | null;
+  },
   fromKey: DateKey,
   toKey: DateKey
 ): DateKey[] {
@@ -88,8 +94,12 @@ export function eventDateKeys(
   const target = WEEKDAY_INDEX[ev.recurring_day];
   if (target === undefined) return [];
 
+  const effectiveTo =
+    ev.recurring_until && ev.recurring_until < toKey ? ev.recurring_until : toKey;
+  if (effectiveTo < fromKey) return [];
+
   const [fy, fm, fd] = fromKey.split('-').map(Number);
-  const [ty, tm, td] = toKey.split('-').map(Number);
+  const [ty, tm, td] = effectiveTo.split('-').map(Number);
   const keys: DateKey[] = [];
   const cursor = new Date(fy, fm - 1, fd);
   const end = new Date(ty, tm - 1, td);

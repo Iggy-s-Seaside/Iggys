@@ -62,6 +62,8 @@ export interface IggyEvent {
   image_url: string | null;
   is_recurring: boolean;
   recurring_day: string | null;
+  /** last date a recurring event repeats (inclusive); null = indefinitely */
+  recurring_until: string | null;
   active: boolean;
   start_min: number | null;
   end_min: number | null;
