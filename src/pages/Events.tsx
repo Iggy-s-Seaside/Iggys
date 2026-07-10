@@ -15,6 +15,7 @@ import SectionHeader from '../components/layout/SectionHeader';
 import LoadingSkeleton from '../components/menu/LoadingSkeleton';
 import EventsCalendar from '../components/events/EventsCalendar';
 import EventsJsonLd from '../components/events/EventsJsonLd';
+import SaturdayNightsSection from '../components/events/SaturdayNightsSection';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials } from '../hooks/useMenuData';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
@@ -255,6 +256,9 @@ export default function Events() {
                     </div>
                 </div>
             </section>
+
+            {/* High Tide Saturdays — hype reel + gallery */}
+            <SaturdayNightsSection />
 
             {/* Current Specials */}
             <section className="section-padding bg-surface/30">
