@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useParties } from './useParties';
 import { computeInvoice, partyToInvoiceInputs } from '../utils/invoice';
+import { todaysBusinessDay } from '../utils/businessDay';
 import type { Party, PartyPackage } from '../types';
 
 /**
@@ -34,6 +35,9 @@ export interface PipelineCard {
   depositOwed: boolean;
   /** Confirmed with a partial payment — a balance is still outstanding. */
   balanceOwed: boolean;
+  /** The event date is behind us but the card never reached Paid — needs a
+   *  close-out (collect, mark paid, or cancel), not a deposit chase. */
+  eventPassed: boolean;
 }
 
 export interface PipelineColumn {
@@ -45,8 +49,23 @@ export interface PipelineColumn {
   total: number;
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * Actionability flags for one party, against the 9am-cutoff Pacific business
+ * day (so a card doesn't flip to "passed" mid-service at midnight). Once the
+ * event date is behind us, the money nags (deposit/balance/follow-up) yield to
+ * a single "event passed" close-out signal — a June party still sitting in
+ * Confirmed shouldn't keep counting as a deposit to chase on the money strip.
+ */
+export function cardFlags(p: Party, today: string) {
+  const eventPassed = !!p.event_date && p.event_date < today && p.status !== 'cancelled' && p.payment_status !== 'paid';
+  return {
+    followUpDue:
+      p.status === 'inquiry' && !eventPassed && !!p.follow_up_date && p.follow_up_date <= today,
+    depositOwed:
+      p.status === 'confirmed' && !eventPassed && (p.payment_status == null || p.payment_status === 'unpaid'),
+    balanceOwed: p.status === 'confirmed' && !eventPassed && p.payment_status === 'partial',
+    eventPassed,
+  };
 }
 
 /** Derive the funnel stage for a single party from its status + existing signals. */
@@ -108,7 +127,7 @@ export function usePipeline() {
   }, []);
 
   const columns = useMemo<PipelineColumn[]>(() => {
-    const today = todayKey();
+    const today = todaysBusinessDay();
     const buckets: Record<PipelineStage, PipelineCard[]> = { new: [], proposal: [], confirmed: [], paid: [] };
 
     for (const p of parties) {
@@ -116,18 +135,13 @@ export function usePipeline() {
       if (!stage) continue;
       const lines = linesByParty[p.id] || [];
       const estValue = computeInvoice(partyToInvoiceInputs(p), lines).grandTotal;
-      const followUpDue = p.status === 'inquiry' && !!p.follow_up_date && p.follow_up_date <= today;
-      const depositOwed =
-        p.status === 'confirmed' && (p.payment_status == null || p.payment_status === 'unpaid');
-      // Partial payment = a balance is still outstanding; surface it so a confirmed
-      // party with money still owed never reads as fully settled on the board.
-      const balanceOwed = p.status === 'confirmed' && p.payment_status === 'partial';
-      buckets[stage].push({ party: p, estValue, followUpDue, depositOwed, balanceOwed });
+      buckets[stage].push({ party: p, estValue, ...cardFlags(p, today) });
     }
 
-    // Within a column, surface the most actionable first: follow-ups/deposits owed,
-    // then by soonest event date, then by highest value.
-    const rank = (c: PipelineCard) => (c.followUpDue || c.depositOwed || c.balanceOwed ? 0 : 1);
+    // Within a column, surface the most actionable first: follow-ups/deposits owed
+    // and past-date close-outs, then by soonest event date, then by highest value.
+    const rank = (c: PipelineCard) =>
+      c.followUpDue || c.depositOwed || c.balanceOwed || c.eventPassed ? 0 : 1;
     for (const stage of PIPELINE_STAGES) {
       buckets[stage].sort((a, b) => {
         if (rank(a) !== rank(b)) return rank(a) - rank(b);

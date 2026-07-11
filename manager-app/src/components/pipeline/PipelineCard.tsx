@@ -64,7 +64,7 @@ export function PipelineCard({
   dragging,
   celebrate,
 }: PipelineCardProps) {
-  const { party: p, estValue, followUpDue, depositOwed, balanceOwed } = card;
+  const { party: p, estValue, followUpDue, depositOwed, balanceOwed, eventPassed } = card;
   const space = p.space_name || p.space;
 
   // Age since the card entered the pipeline. Subtle by default; escalates only
@@ -122,8 +122,13 @@ export function PipelineCard({
           </span>
         </div>
 
-        {(followUpDue || depositOwed || balanceOwed) && (
+        {(followUpDue || depositOwed || balanceOwed || eventPassed) && (
           <div className="flex flex-wrap gap-1.5 pt-0.5">
+            {eventPassed && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full badge-accent">
+                <CalendarClock size={11} /> Event date passed
+              </span>
+            )}
             {followUpDue && (
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-warning-light text-accent-hover">
                 <Clock size={11} /> Follow-up due
