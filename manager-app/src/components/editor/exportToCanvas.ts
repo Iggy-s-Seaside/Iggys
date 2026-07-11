@@ -1,6 +1,19 @@
 import type { EditorState, TextLayer } from '../../types';
 import { buildFilterString, drawImageCover, renderGradient } from './canvasUtils';
 import { CANVAS_BLEND_MAP } from './editorConstants';
+import { resolveMediaSrc, revokeMediaUrl } from '../../lib/mediaStore';
+
+/**
+ * Measure a line's rendered width the same way drawText positions its characters:
+ * summed per-glyph widths plus one letter-spacing gap between each pair of glyphs
+ * (not after the last one). Used to size underlines so they match the drawn text.
+ */
+export function measureLineWidth(ctx: CanvasRenderingContext2D, line: string, spacing: number): number {
+  if (spacing === 0 || line.length === 0) return ctx.measureText(line).width;
+  let width = 0;
+  for (const ch of line) width += ctx.measureText(ch).width + spacing;
+  return width - spacing;
+}
 
 /**
  * Draw text with letter-spacing support.
@@ -41,7 +54,7 @@ function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: num
 /**
  * Draw a single text layer to a canvas context.
  */
-function drawLayerToCtx(ctx: CanvasRenderingContext2D, layer: TextLayer) {
+export function drawLayerToCtx(ctx: CanvasRenderingContext2D, layer: TextLayer) {
   ctx.save();
 
   // Rotation around layer center
@@ -99,19 +112,24 @@ function drawLayerToCtx(ctx: CanvasRenderingContext2D, layer: TextLayer) {
   ctx.fillStyle = layer.fill;
   drawText(ctx, displayText, textX, layer.y, layer.letterSpacing, false, lh);
 
-  // Underline
+  // Underline — one stroke per rendered line, at that line's own y-offset,
+  // sized with the same per-glyph + letter-spacing math the draw loop uses
+  // (a single first-line-only underline was cut off on multi-line text).
   if (layer.textDecoration === 'underline') {
-    const metrics = ctx.measureText(displayText.split('\n')[0]);
-    const uY = layer.y + layer.fontSize + 2;
     ctx.strokeStyle = layer.fill;
     ctx.lineWidth = Math.max(1, layer.fontSize / 20);
-    let uX = textX;
-    if (layer.align === 'center') uX = textX - metrics.width / 2;
-    else if (layer.align === 'right') uX = textX - metrics.width;
-    ctx.beginPath();
-    ctx.moveTo(uX, uY);
-    ctx.lineTo(uX + metrics.width, uY);
-    ctx.stroke();
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineWidth = measureLineWidth(ctx, line, layer.letterSpacing);
+      const uY = layer.y + i * lineHeight + layer.fontSize + 2;
+      let uX = textX;
+      if (layer.align === 'center') uX = textX - lineWidth / 2;
+      else if (layer.align === 'right') uX = textX - lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(uX, uY);
+      ctx.lineTo(uX + lineWidth, uY);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
@@ -188,7 +206,7 @@ function drawDividerToCtx(ctx: CanvasRenderingContext2D, layer: TextLayer) {
  * If `preloaded` is provided it is used directly; otherwise falls back to a
  * synchronous `new Image()` (only works for already-cached/data-URL sources).
  */
-function drawImageLayerToCtx(
+export function drawImageLayerToCtx(
   ctx: CanvasRenderingContext2D,
   layer: TextLayer,
   preloaded?: HTMLImageElement
@@ -275,6 +293,9 @@ function drawImageLayerToCtx(
   }
 
   ctx.filter = 'none';
+  // Reset blend mode before the overlay fill — otherwise a non-normal blendMode
+  // leaks into the fillRect below and tints/inverts the overlay color.
+  ctx.globalCompositeOperation = 'source-over';
 
   // Overlay color
   if (layer.imageFilters && layer.imageFilters.overlayOpacity > 0) {
@@ -290,7 +311,7 @@ function drawImageLayerToCtx(
  * Draw a video layer element to the canvas context.
  * Canvas 2D drawImage() natively accepts HTMLVideoElement — draws the current frame.
  */
-function drawVideoLayerToCtx(
+export function drawVideoLayerToCtx(
   ctx: CanvasRenderingContext2D,
   layer: TextLayer,
   videoElement: HTMLVideoElement
@@ -366,6 +387,9 @@ function drawVideoLayerToCtx(
   }
 
   ctx.filter = 'none';
+  // Reset blend mode before the overlay fill — otherwise a non-normal blendMode
+  // leaks into the fillRect below and tints/inverts the overlay color.
+  ctx.globalCompositeOperation = 'source-over';
 
   // Overlay
   if (layer.imageFilters && layer.imageFilters.overlayOpacity > 0) {
@@ -402,6 +426,12 @@ function preloadImage(src: string): Promise<HTMLImageElement | null> {
  * Synchronously render the editor state to an off-screen canvas.
  * Returns the canvas element for toDataURL() or toBlob().
  * Pass videoRefs to include video layer current frames.
+ *
+ * WARNING: this path cannot await IndexedDB lookups, so any layer whose
+ * imageSrc/videoSrc/backgroundImage is an `idb://` reference (locally-uploaded
+ * media) will silently fail to load here — `new Image().src` is fed a URL
+ * scheme the browser can never fetch. Use exportToCanvasAsync() for any state
+ * that may contain idb:// references; it resolves them via resolveMediaSrc().
  */
 export function exportToCanvas(
   state: EditorState,
@@ -497,20 +527,32 @@ export async function exportToCanvasAsync(
   // 0. Preload EVERY image up-front (background + visible image layers) so nothing
   //    renders from an uncached <img>. idb:// blob URLs and fresh Supabase URLs are a
   //    cache race for the synchronous path — decoding here guarantees they're ready.
+  //    Layer sources are resolved through resolveMediaSrc() first: an `idb://` ref
+  //    can never load as an <img>.src directly, it has to come out of IndexedDB as
+  //    an object URL. Those object URLs are revoked once the canvas is drawn.
   const layerImages = new Map<string, HTMLImageElement>();
   let bgImg: HTMLImageElement | null = null;
+  const objectUrlsToRevoke: string[] = [];
 
   const preloadTasks: Promise<void>[] = [];
   if (state.backgroundImage) {
     const bgSrc = state.backgroundImage;
-    preloadTasks.push(preloadImage(bgSrc).then((img) => { bgImg = img; }));
+    preloadTasks.push(
+      resolveMediaSrc(bgSrc).then((resolvedSrc) => {
+        if (resolvedSrc !== bgSrc) objectUrlsToRevoke.push(resolvedSrc);
+        return preloadImage(resolvedSrc).then((img) => { bgImg = img; });
+      })
+    );
   }
   for (const layer of state.layers) {
     if (!layer.visible) continue;
     if (layer.elementType === 'image' && layer.imageSrc) {
       const { id, imageSrc } = layer;
       preloadTasks.push(
-        preloadImage(imageSrc).then((img) => { if (img) layerImages.set(id, img); })
+        resolveMediaSrc(imageSrc).then((resolvedSrc) => {
+          if (resolvedSrc !== imageSrc) objectUrlsToRevoke.push(resolvedSrc);
+          return preloadImage(resolvedSrc).then((img) => { if (img) layerImages.set(id, img); });
+        })
       );
     }
   }
@@ -560,6 +602,10 @@ export async function exportToCanvasAsync(
       drawLayerToCtx(ctx, layer);
     }
   }
+
+  // The canvas is now rasterized (drawImage copies pixels, it doesn't hold a
+  // live reference), so the object URLs created above can be freed.
+  for (const url of objectUrlsToRevoke) revokeMediaUrl(url);
 
   return canvas;
 }

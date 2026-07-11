@@ -28,11 +28,21 @@ interface UseElementInteractionOptions {
 }
 
 type DragState =
-  | { type: 'pending'; id: string; startX: number; startY: number; startTime: number }
-  | { type: 'move'; id: string; offsetX: number; offsetY: number; currentX: number; currentY: number }
-  | { type: 'resize'; id: string; handle: string; startX: number; startY: number; startWidth: number; startHeight: number; startFontSize: number; startImageHeight: number; isImage: boolean; startLayerX: number; startLayerY: number; currentWidth: number; currentFontSize: number; currentImageHeight: number; currentLayerX: number; currentLayerY: number }
-  | { type: 'rotate'; id: string; centerX: number; centerY: number; startAngle: number; currentRotation: number }
+  | { type: 'pending'; id: string; startX: number; startY: number; startTime: number; pointerId: number }
+  | { type: 'move'; id: string; offsetX: number; offsetY: number; currentX: number; currentY: number; pointerId: number }
+  | { type: 'resize'; id: string; handle: string; startX: number; startY: number; startWidth: number; startHeight: number; startFontSize: number; startImageHeight: number; isImage: boolean; startLayerX: number; startLayerY: number; currentWidth: number; currentFontSize: number; currentImageHeight: number; currentLayerX: number; currentLayerY: number; pointerId: number }
+  | { type: 'rotate'; id: string; centerX: number; centerY: number; startAngle: number; currentRotation: number; pointerId: number }
   | null;
+
+/**
+ * Clamp a resize-in-progress width to the room available on the anchored (non-dragged)
+ * side FIRST. Clamping the derived x afterward instead lets the anchored corner drift
+ * (e.g. a left-handle resize would silently walk the right edge inward).
+ */
+export function clampResizeWidth(isRight: boolean, rawWidth: number, startLayerX: number, startWidth: number, canvasWidth: number): number {
+  const maxWidth = isRight ? canvasWidth - startLayerX : startLayerX + startWidth;
+  return Math.max(50, Math.min(rawWidth, maxWidth));
+}
 
 function estimateHeight(layer: TextLayer): number {
   if (layer.elementType === 'image') {
@@ -155,6 +165,11 @@ export function useElementInteraction({
 
     e.stopPropagation(); // Prevent canvas pan
 
+    // A second pointerdown while a gesture is already in progress must not touch the
+    // shared dragRef — resetting it (or letting a second finger's events reach the
+    // in-progress closures) is what corrupts multi-touch. Ignore it outright.
+    if (dragRef.current) return;
+
     // Multi-tap detection: double-tap = edit mode, triple-tap = fit to canvas
     const now = Date.now();
     const prev = lastElementTapRef.current;
@@ -201,6 +216,7 @@ export function useElementInteraction({
       startX: x,
       startY: y,
       startTime: performance.now(),
+      pointerId: e.pointerId,
     };
 
     // Haptic on select
@@ -209,7 +225,9 @@ export function useElementInteraction({
     // Listen for global move/up on this pointer
     const onMove = (me: PointerEvent) => {
       const drag = dragRef.current;
-      if (!drag) return;
+      // Document-level listeners fire for every pointer, not just the one that started
+      // this gesture — a second finger's moves must not steal the shared dragRef.
+      if (!drag || me.pointerId !== drag.pointerId) return;
 
       const { x: cx, y: cy } = clientToCanvas(me.clientX, me.clientY);
 
@@ -225,6 +243,7 @@ export function useElementInteraction({
             offsetY: layer.y - cy,
             currentX: layer.x,
             currentY: layer.y,
+            pointerId: drag.pointerId,
           };
         }
         return;
@@ -261,8 +280,21 @@ export function useElementInteraction({
           lastSnapXRef.current = null;
         }
         if (snaps.y.length > 0) {
+          const centerY = newY + layer.fontSize / 2;
+          for (const sy of snaps.y) {
+            if (Math.abs(centerY - sy) < SNAP_THRESHOLD) {
+              finalY = sy - layer.fontSize / 2;
+              break;
+            }
+            if (Math.abs(newY - sy) < SNAP_THRESHOLD) {
+              finalY = sy;
+              break;
+            }
+          }
+          // Haptic on snap — only when the snapped y value changes (not every frame)
           if (snaps.y[0] !== lastSnapYRef.current) {
             lastSnapYRef.current = snaps.y[0];
+            buzz([5, 5, 5]);
           }
         } else {
           lastSnapYRef.current = null;
@@ -291,11 +323,14 @@ export function useElementInteraction({
       // This handler only creates 'pending' or 'move' drag states.
     };
 
-    const onUp = () => {
+    const onUp = (me: PointerEvent) => {
       const drag = dragRef.current;
+      if (!drag || me.pointerId !== drag.pointerId) return;
 
-      // Commit final position to React state
-      if (drag?.type === 'move') {
+      // Commit final position to React state — but skip the update if a slow tap
+      // crossed the DRAG_DELAY promotion into 'move' without actually moving, so it
+      // doesn't pollute undo history with a position-unchanged entry.
+      if (drag.type === 'move' && (drag.currentX !== layer.x || drag.currentY !== layer.y)) {
         onUpdateLayer(drag.id, { x: drag.currentX, y: drag.currentY });
       }
 
@@ -312,11 +347,16 @@ export function useElementInteraction({
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
     document.addEventListener('pointercancel', onUp);
-  }, [layers, selectedLayerId, clientToCanvas, contentRef, onSelectLayer, onUpdateLayer, onLayerTapped, onEnterEditMode, calcSnapLines, updateSnapLinesDOM, canvasWidth, canvasHeight]);
+  }, [layers, selectedLayerId, clientToCanvas, contentRef, onSelectLayer, onUpdateLayer, onLayerTapped, onEnterEditMode, onTripleTap, calcSnapLines, updateSnapLinesDOM, canvasWidth, canvasHeight]);
 
   // Handle pointer down on a selection handle
   const handleHandlePointerDown = useCallback((e: React.PointerEvent, handle: string) => {
     e.stopPropagation();
+
+    // Same shared-dragRef hazard as element drag: a second pointerdown mid-gesture
+    // must be ignored rather than clobbering the in-progress resize/rotate.
+    if (dragRef.current) return;
+
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
     const layer = layers.find(l => l.id === selectedLayerId);
@@ -337,6 +377,7 @@ export function useElementInteraction({
         centerY,
         startAngle,
         currentRotation: layer.rotation,
+        pointerId: e.pointerId,
       };
     } else {
       const startHeight = estimateHeight(layer);
@@ -359,13 +400,16 @@ export function useElementInteraction({
         currentImageHeight: layer.imageHeight || layer.width,
         currentLayerX: layer.x,
         currentLayerY: layer.y,
+        pointerId: e.pointerId,
       };
     }
 
     // Same global listeners pattern — direct DOM during drag, commit on up
     const onMove = (me: PointerEvent) => {
       const drag = dragRef.current;
-      if (!drag) return;
+      // Document-level listeners fire for every pointer — ignore any pointer other
+      // than the one that started this resize/rotate gesture.
+      if (!drag || me.pointerId !== drag.pointerId) return;
 
       const { x: cx, y: cy } = clientToCanvas(me.clientX, me.clientY);
 
@@ -388,7 +432,7 @@ export function useElementInteraction({
         const newFontSize = Math.max(8, Math.round(drag.startFontSize * scale));
         const newImageHeight = Math.max(30, Math.round(drag.startImageHeight * scale));
 
-        newWidth = Math.max(50, Math.min(newWidth, canvasWidth));
+        newWidth = clampResizeWidth(isRight, newWidth, drag.startLayerX, drag.startWidth, canvasWidth);
 
         // For images, also limit height to canvas bounds
         let clampedImageHeight = newImageHeight;
@@ -471,15 +515,16 @@ export function useElementInteraction({
       }
     };
 
-    const onUp = () => {
+    const onUp = (me: PointerEvent) => {
       const drag = dragRef.current;
+      if (!drag || me.pointerId !== drag.pointerId) return;
 
       // Commit to React state
-      if (drag?.type === 'resize') {
+      if (drag.type === 'resize') {
         const changes: Partial<TextLayer> = { width: drag.currentWidth, fontSize: drag.currentFontSize, x: drag.currentLayerX, y: drag.currentLayerY };
         if (drag.isImage) changes.imageHeight = drag.currentImageHeight;
         onUpdateLayer(drag.id, changes);
-      } else if (drag?.type === 'rotate') {
+      } else if (drag.type === 'rotate') {
         onUpdateLayer(drag.id, { rotation: drag.currentRotation });
       }
 

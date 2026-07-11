@@ -23,6 +23,36 @@ export function clampPanAxis(pan: number, viewport: number, scaled: number): num
   return Math.max(viewport - scaled * (1 - margin), Math.min(pan, scaled * margin));
 }
 
+/**
+ * Ground-truth post-pinch clamp for one axis. Unlike clampPanAxis (which works
+ * off the CSS-centered base math), this takes actual on-screen rect edges —
+ * a hard two-finger fling can leave the mobile canvas fully off-screen, and
+ * the mobile base offset lives in CSS left/top, not pan, so we can't derive
+ * the same range from pan alone. Returns the delta to add to that axis's pan
+ * to restore at least a 25% content/viewport overlap, or 0 if already met.
+ * Exported for tests.
+ */
+export function pinchOverlapDelta(
+  contentStart: number,
+  contentSize: number,
+  viewportStart: number,
+  viewportSize: number
+): number {
+  if (contentSize <= 0) return 0;
+  const minOverlap = contentSize * 0.25;
+  const contentEnd = contentStart + contentSize;
+  const viewportEnd = viewportStart + viewportSize;
+  // Drifted past the left/top edge — not enough of the trailing edge remains onscreen.
+  if (contentEnd < viewportStart + minOverlap) {
+    return viewportStart + minOverlap - contentEnd;
+  }
+  // Drifted past the right/bottom edge — not enough of the leading edge remains onscreen.
+  if (contentStart > viewportEnd - minOverlap) {
+    return viewportEnd - minOverlap - contentStart;
+  }
+  return 0;
+}
+
 interface UseCanvasGesturesOptions {
   viewportRef: React.RefObject<HTMLDivElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
@@ -225,6 +255,23 @@ export function useCanvasGestures({
       // Once we drop below two fingers, the pinch is over — commit and reset.
       if (activePointersRef.current.size < 2 && pinchStartRef.current) {
         pinchStartRef.current = null;
+
+        // Ground-truth clamp: a hard fling can leave the canvas mostly or
+        // fully off-screen. Reading actual rects (rather than replaying the
+        // CSS-centered base math) keeps this correct regardless of the
+        // mobile base offset.
+        const contentRect = contentRef.current?.getBoundingClientRect();
+        const viewportRect = viewportRef.current?.getBoundingClientRect();
+        if (contentRect && viewportRect) {
+          const dx = pinchOverlapDelta(contentRect.left, contentRect.width, viewportRect.left, viewportRect.width);
+          const dy = pinchOverlapDelta(contentRect.top, contentRect.height, viewportRect.top, viewportRect.height);
+          if (dx !== 0 || dy !== 0) {
+            panXRef.current += dx;
+            panYRef.current += dy;
+            applyTransform();
+          }
+        }
+
         setIsGesturing(false);
         commitToState();
       }
@@ -258,6 +305,10 @@ export function useCanvasGestures({
       panTravelRef.current = 0;
       lastPanPointRef.current = { x: e.clientX, y: e.clientY };
       setIsGesturing(true);
+      // Without capture, releasing over a sibling panel never fires this
+      // viewport's onPointerUp, leaving isPanningRef stuck true. Mirrors
+      // useElementInteraction's pattern; release is implicit on pointerup/cancel.
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
     }
   }, [isMobile, hasSelectedElement, isEditing]);
 

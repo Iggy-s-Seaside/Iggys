@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useRef, useLayoutEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, Image, Layers, SlidersHorizontal,
@@ -85,6 +85,17 @@ export const MobileToolbar = memo(function MobileToolbar({
 }: MobileToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const toolbarBarRef = useRef<HTMLDivElement>(null);
+  // Distance from the viewport bottom to the top of the toolbar strip, so the
+  // portaled popover (see below) can anchor itself without living inside the
+  // toolbar wrapper's transform.
+  const [addMenuBottomOffset, setAddMenuBottomOffset] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!addMenuOpen || !toolbarBarRef.current) return;
+    const rect = toolbarBarRef.current.getBoundingClientRect();
+    setAddMenuBottomOffset(window.innerHeight - rect.top + 8); // +8 = former mb-2 gap
+  }, [addMenuOpen]);
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-[60] safe-area-bottom"
@@ -96,13 +107,16 @@ export const MobileToolbar = memo(function MobileToolbar({
         WebkitTransform: gestureActive ? 'translateY(10px)' : 'translateZ(0)',
       }}
     >
-      {/* Add element popover */}
-      {addMenuOpen && (
+      {/* Add element popover — portaled to body (like the More drawer below) so the
+          dismiss backdrop covers the full viewport instead of being contained by the
+          toolbar wrapper's transform (a non-none transform creates a new containing
+          block for fixed descendants, which trapped 'fixed inset-0' to the toolbar strip). */}
+      {addMenuOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
+          <div className="fixed inset-0 z-[65]" onClick={() => setAddMenuOpen(false)} />
           <div
-            className="absolute bottom-full left-3 mb-2 z-50 bg-surface/95 backdrop-blur-xl border border-border/30 rounded-2xl shadow-modal p-1.5 min-w-[160px]"
-            style={{ animation: 'popUp 200ms cubic-bezier(0.32, 0.72, 0, 1)' }}
+            className="fixed left-3 z-[66] bg-surface/95 backdrop-blur-xl border border-border/30 rounded-2xl shadow-modal p-1.5 min-w-[160px]"
+            style={{ bottom: addMenuBottomOffset, animation: 'popUp 200ms cubic-bezier(0.32, 0.72, 0, 1)' }}
           >
             <button
               onClick={() => { onAddText(); setAddMenuOpen(false); }}
@@ -135,7 +149,8 @@ export const MobileToolbar = memo(function MobileToolbar({
               </button>
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
 
       {/* More — half-sheet drawer (portaled to body to escape toolbar's transform containment) */}
@@ -292,7 +307,7 @@ export const MobileToolbar = memo(function MobileToolbar({
           (shrink-0) so the primary Save action can NEVER be clipped off-screen;
           the lower-frequency tools scroll horizontally in the remaining space on
           narrow phones instead of pushing Save out of reach. */}
-      <div className="flex items-center px-2 py-1.5 bg-surface/95 backdrop-blur-xl border-t border-border/30">
+      <div ref={toolbarBarRef} className="flex items-center px-2 py-1.5 bg-surface/95 backdrop-blur-xl border-t border-border/30">
         <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto overscroll-x-contain scrollbar-hide">
           <ToolButton icon={Plus} label="Add" onClick={() => { if (!addMenuOpen) onCloseOverlays(); setAddMenuOpen(!addMenuOpen); setMoreOpen(false); }} active={addMenuOpen} />
           <ToolButton icon={Layers} label="Layers" onClick={onOpenLayers} highlighted={activeSheet === 'layers'} />

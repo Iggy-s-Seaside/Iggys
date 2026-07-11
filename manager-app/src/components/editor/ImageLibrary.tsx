@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, Trash2, Search, FolderOpen, Image, Loader2, RefreshCw } from 'lucide-react';
 import { useMediaLibrary } from '../../hooks/useMediaLibrary';
 import { useImageUpload } from '../../hooks/useImageUpload';
@@ -67,8 +68,8 @@ export function ImageLibrary({ open, onClose, onSelect }: ImageLibraryProps) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex">
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
@@ -197,6 +198,7 @@ export function ImageLibrary({ open, onClose, onSelect }: ImageLibraryProps) {
         message={`Delete "${deleteTarget?.name}"? This cannot be undone.`}
         confirmLabel="Delete"
       />
-    </div>
+    </div>,
+    document.body
   );
 }
