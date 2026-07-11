@@ -939,18 +939,15 @@ export function SpecialEditor() {
     return () => window.removeEventListener('keydown', handler);
   }, [dispatch, state.selectedLayerId, state.layers, selectedLayer, handleDuplicate]);
 
-  // Hide the main app nav header on mobile when editor is open
-  useEffect(() => {
-    const navBar = document.querySelector('.lg\\:hidden.fixed.top-0') as HTMLElement;
-    if (navBar) navBar.style.display = 'none';
-    return () => {
-      if (navBar) navBar.style.display = '';
-    };
-  }, []);
-
   return (
     <VideoRefProvider>
-    <div className="md:h-[calc(100dvh-3rem)] md:-m-6 lg:-m-8 md:relative md:flex md:flex-col fixed inset-0 z-50 flex flex-col bg-background">
+    {/* Full-screen focused surface on EVERY breakpoint. The old desktop
+        variant (md:relative + negative margins) sat inside the app shell,
+        where the layout's overflow-x-hidden wrapper clipped the layers panel
+        and the reach banner shoved the canvas off-center. The fixed overlay
+        covers the z-40 mobile top bar outright; the layout's z-50 floating
+        chrome stands down via DashboardLayout's immersive-route check. */}
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Desktop Toolbar — hidden on mobile (MobileToolbar handles it) */}
       <div className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-surface border-b border-border shrink-0 overflow-x-auto">
         <button onClick={handleBack} className="btn-ghost text-xs py-1.5 px-2" aria-label="Back to specials">
