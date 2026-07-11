@@ -51,19 +51,20 @@ export interface PipelineColumn {
 
 /**
  * Actionability flags for one party, against the 9am-cutoff Pacific business
- * day (so a card doesn't flip to "passed" mid-service at midnight). Once the
- * event date is behind us, the money nags (deposit/balance/follow-up) yield to
- * a single "event passed" close-out signal — a June party still sitting in
- * Confirmed shouldn't keep counting as a deposit to chase on the money strip.
+ * day (so a card doesn't flip to "passed" mid-service at midnight). The money
+ * flags (deposit/balance owed) stay TRUE past the event date — uncollected
+ * money on a delivered event is the oldest receivable on the board and must
+ * keep counting on the owner money strip — while eventPassed adds the
+ * close-out signal on top. Only follow-up nags go quiet once the date is
+ * behind us (chasing a proposal for an event that already happened is noise).
  */
 export function cardFlags(p: Party, today: string) {
   const eventPassed = !!p.event_date && p.event_date < today && p.status !== 'cancelled' && p.payment_status !== 'paid';
   return {
     followUpDue:
       p.status === 'inquiry' && !eventPassed && !!p.follow_up_date && p.follow_up_date <= today,
-    depositOwed:
-      p.status === 'confirmed' && !eventPassed && (p.payment_status == null || p.payment_status === 'unpaid'),
-    balanceOwed: p.status === 'confirmed' && !eventPassed && p.payment_status === 'partial',
+    depositOwed: p.status === 'confirmed' && (p.payment_status == null || p.payment_status === 'unpaid'),
+    balanceOwed: p.status === 'confirmed' && p.payment_status === 'partial',
     eventPassed,
   };
 }
@@ -92,6 +93,19 @@ export function usePipeline() {
   const [linesByParty, setLinesByParty] = useState<Record<number, PartyPackage[]>>({});
   const [proposalPartyIds, setProposalPartyIds] = useState<Set<number>>(new Set());
   const [auxLoading, setAuxLoading] = useState(true);
+  // The board can sit open all night — refresh the business-day key on a slow
+  // tick so eventPassed/followUpDue flip at the 9am cutoff without a reload
+  // (same pattern as WeatherWatch's frozen-now fix).
+  const [dayKey, setDayKey] = useState(todaysBusinessDay);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setDayKey((prev) => {
+        const next = todaysBusinessDay();
+        return next === prev ? prev : next;
+      });
+    }, 10 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -127,7 +141,7 @@ export function usePipeline() {
   }, []);
 
   const columns = useMemo<PipelineColumn[]>(() => {
-    const today = todaysBusinessDay();
+    const today = dayKey;
     const buckets: Record<PipelineStage, PipelineCard[]> = { new: [], proposal: [], confirmed: [], paid: [] };
 
     for (const p of parties) {
@@ -159,7 +173,7 @@ export function usePipeline() {
       count: buckets[stage].length,
       total: buckets[stage].reduce((sum, c) => sum + c.estValue, 0),
     }));
-  }, [parties, linesByParty, proposalPartyIds]);
+  }, [parties, linesByParty, proposalPartyIds, dayKey]);
 
   /** Open (non-paid, non-cancelled) pipeline value — the live revenue on the board. */
   const openValue = useMemo(

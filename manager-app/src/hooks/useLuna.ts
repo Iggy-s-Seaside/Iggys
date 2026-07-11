@@ -7,8 +7,9 @@ import { decodeEntities } from '../utils/entities';
 
 /** Insight titles/bodies can carry HTML entities from scraped sources (the
  * bridge stores what the feed said — "NABIP Medicare &#038; Annual…"). Decode
- * once at the fetch boundary so every consumer (banner, cards, feed) heals. */
-const decodeInsight = (i: LunaInsight): LunaInsight => ({
+ * once at the fetch boundary so every consumer (banner, cards, feed) heals.
+ * Exported for the other luna_insights fetch path (useActivityFeed). */
+export const decodeInsight = (i: LunaInsight): LunaInsight => ({
   ...i,
   title: decodeEntities(i.title),
   body: i.body ? decodeEntities(i.body) : i.body,

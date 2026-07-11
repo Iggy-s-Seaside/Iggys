@@ -12,10 +12,10 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
 import { createPartyFromLead, findOpenPartyForContact } from '../utils/partyUpsell';
-import { useConfirm } from '../hooks/useConfirm';
+import { Modal } from '../components/ui/Modal';
 import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
-import type { Message } from '../types';
+import type { Message, Party } from '../types';
 import { needsReplyNow, messageTriage, categoryLabel } from '../utils/triage';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
@@ -75,10 +75,12 @@ export function Messages() {
   } = useMessages();
   const handoff = useLunaHandoff();
   const navigate = useNavigate();
-  const confirm = useConfirm();
   const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [convertingParty, setConvertingParty] = useState(false);
+  // A same-contact open party found at Make-a-party time — drives the
+  // duplicate-warning dialog. Dismissing it (X/Escape/backdrop) is a no-op.
+  const [dupParty, setDupParty] = useState<Party | null>(null);
   const [drafting, setDrafting] = useState(false);
 
   const handleSyncGmail = async () => {
@@ -394,24 +396,19 @@ export function Messages() {
     setConvertingParty(true);
     // Same-contact guard: converting two messages from one thread once minted
     // two pipeline cards for a single booking. Surface the existing open party
-    // and make a second card the deliberate choice — Cancel/Escape opens the
-    // existing party instead (harmless either way).
+    // in a dialog with explicit choices — plain dismissal does nothing.
     const existing = await findOpenPartyForContact(selected.email, selected.name);
+    setConvertingParty(false);
     if (existing) {
-      const createAnyway = await confirm({
-        title: 'Already in the pipeline',
-        message: `${selected.name} already has an open party${
-          existing.title?.trim() ? ` — “${existing.title.trim()}”` : ''
-        }${existing.event_date ? ` (${existing.event_date})` : ''}, status ${existing.status}.\n\nCreate a second party for this contact?`,
-        confirmLabel: 'Create anyway',
-        cancelLabel: 'Open existing',
-      });
-      if (!createAnyway) {
-        setConvertingParty(false);
-        navigate(`/parties/${existing.id}`);
-        return;
-      }
+      setDupParty(existing);
+      return;
     }
+    await convertLeadToParty();
+  };
+
+  const convertLeadToParty = async () => {
+    if (!selected || convertingParty) return;
+    setConvertingParty(true);
     // Luna's extracted event details (date/time/guests/space/price) pre-fill the
     // party form so the manager doesn't re-type what's already in the thread.
     const ed = (selected.luna_classification?.event_details ?? {}) as Record<string, unknown>;
@@ -844,6 +841,37 @@ export function Messages() {
           )}
         </div>
       </div>
+
+      {/* Duplicate-party warning: two explicit choices; X/Escape/backdrop is a
+          plain dismiss (no create, no navigation). */}
+      <Modal open={!!dupParty} onClose={() => setDupParty(null)} title="Already in the pipeline" maxWidth="max-w-sm">
+        <p className="text-text-secondary text-sm mb-6">
+          {selected?.name} already has an open party
+          {dupParty?.title?.trim() ? ` — “${dupParty.title.trim()}”` : ''}
+          {dupParty?.event_date ? ` (${dupParty.event_date})` : ''}, status {dupParty?.status}.
+        </p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={() => {
+              const p = dupParty;
+              setDupParty(null);
+              if (p) navigate(`/parties/${p.id}`);
+            }}
+            className="btn-secondary"
+          >
+            Open existing
+          </button>
+          <button
+            onClick={() => {
+              setDupParty(null);
+              convertLeadToParty();
+            }}
+            className="btn-primary"
+          >
+            Create anyway
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

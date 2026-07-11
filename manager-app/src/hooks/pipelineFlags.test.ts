@@ -20,14 +20,14 @@ describe('cardFlags — pipeline actionability against the business day', () => 
     expect(f.eventPassed).toBe(false);
   });
 
-  it('confirmed + unpaid but the event date is behind us → close-out, not a deposit chase', () => {
+  it('confirmed + unpaid past its date → close-out signal ON TOP of the deposit flag (money stays visible on the owner strip)', () => {
     const f = cardFlags(party({ status: 'confirmed', payment_status: 'unpaid', event_date: '2026-06-15' }), TODAY);
-    expect(f).toEqual({ followUpDue: false, depositOwed: false, balanceOwed: false, eventPassed: true });
+    expect(f).toEqual({ followUpDue: false, depositOwed: true, balanceOwed: false, eventPassed: true });
   });
 
-  it('confirmed + partial past its date → close-out replaces the balance badge', () => {
+  it('confirmed + partial past its date → balance still owed, plus the close-out signal', () => {
     const f = cardFlags(party({ status: 'confirmed', payment_status: 'partial', event_date: '2026-06-15' }), TODAY);
-    expect(f.balanceOwed).toBe(false);
+    expect(f.balanceOwed).toBe(true);
     expect(f.eventPassed).toBe(true);
   });
 

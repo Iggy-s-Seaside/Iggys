@@ -125,7 +125,7 @@ export function PipelineCard({
         {(followUpDue || depositOwed || balanceOwed || eventPassed) && (
           <div className="flex flex-wrap gap-1.5 pt-0.5">
             {eventPassed && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full badge-accent">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full badge-danger">
                 <CalendarClock size={11} /> Event date passed
               </span>
             )}
