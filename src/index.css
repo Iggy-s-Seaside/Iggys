@@ -12,7 +12,10 @@
   }
 
   html, body {
+    /* clip (unlike hidden) doesn't create a scroll container, so
+       position:sticky descendants keep working; hidden is the fallback */
     overflow-x: hidden;
+    overflow-x: clip;
   }
 
   body {
