@@ -9,7 +9,42 @@
 
 import { createParty } from '../hooks/useParties';
 import { findOrCreateContact } from '../hooks/useContacts';
+import { supabase } from '../lib/supabase';
 import type { Party } from '../types';
+
+/** Escape LIKE/ILIKE wildcards so an email like jo_hn@x.com matches literally. */
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, '\\$&');
+
+/**
+ * The most recent non-cancelled party already on file for this contact —
+ * matched by email first (case-insensitive exact), falling back to exact name.
+ * Create-time dedup guard: converting two messages from the same thread once
+ * minted two pipeline cards for one booking. Fails open (null) on query errors
+ * so a hiccup here never blocks a legitimate create.
+ */
+export async function findOpenPartyForContact(
+  email?: string | null,
+  name?: string | null
+): Promise<Party | null> {
+  const e = email?.trim();
+  const n = name?.trim();
+  if (!e && !n) return null;
+
+  let q = supabase
+    .from('parties')
+    .select('*')
+    .neq('status', 'cancelled')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  q = e ? q.ilike('contact_email', escapeLike(e)) : q.ilike('contact_name', escapeLike(n!));
+
+  const { data, error } = await q;
+  if (error) {
+    console.error('findOpenPartyForContact:', error);
+    return null;
+  }
+  return ((data as Party[]) || [])[0] ?? null;
+}
 
 /** Maps Luna's extracted space code to the party form's space_name label. */
 const SPACE_LABELS: Record<string, string> = {

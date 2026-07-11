@@ -11,7 +11,8 @@ import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
-import { createPartyFromLead } from '../utils/partyUpsell';
+import { createPartyFromLead, findOpenPartyForContact } from '../utils/partyUpsell';
+import { useConfirm } from '../hooks/useConfirm';
 import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
 import type { Message } from '../types';
@@ -74,6 +75,7 @@ export function Messages() {
   } = useMessages();
   const handoff = useLunaHandoff();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [convertingParty, setConvertingParty] = useState(false);
@@ -390,6 +392,26 @@ export function Messages() {
   const handleMakeParty = async () => {
     if (!selected || convertingParty) return;
     setConvertingParty(true);
+    // Same-contact guard: converting two messages from one thread once minted
+    // two pipeline cards for a single booking. Surface the existing open party
+    // and make a second card the deliberate choice — Cancel/Escape opens the
+    // existing party instead (harmless either way).
+    const existing = await findOpenPartyForContact(selected.email, selected.name);
+    if (existing) {
+      const createAnyway = await confirm({
+        title: 'Already in the pipeline',
+        message: `${selected.name} already has an open party${
+          existing.title?.trim() ? ` — “${existing.title.trim()}”` : ''
+        }${existing.event_date ? ` (${existing.event_date})` : ''}, status ${existing.status}.\n\nCreate a second party for this contact?`,
+        confirmLabel: 'Create anyway',
+        cancelLabel: 'Open existing',
+      });
+      if (!createAnyway) {
+        setConvertingParty(false);
+        navigate(`/parties/${existing.id}`);
+        return;
+      }
+    }
     // Luna's extracted event details (date/time/guests/space/price) pre-fill the
     // party form so the manager doesn't re-type what's already in the thread.
     const ed = (selected.luna_classification?.event_details ?? {}) as Record<string, unknown>;
