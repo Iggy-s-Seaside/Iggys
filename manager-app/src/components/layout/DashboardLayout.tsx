@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { QuickAddParty } from '../parties/QuickAddParty';
@@ -16,6 +16,11 @@ export function DashboardLayout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  // Immersive routes (the specials editor) take the whole screen in a fixed
+  // overlay — the floating chrome (bell, command button) must stand down or it
+  // paints over the editor header at the same z-index.
+  const { pathname } = useLocation();
+  const immersive = pathname.startsWith('/specials/editor');
 
   // The command palette fires decoupled window events for modal-style quick
   // actions. The layout is the natural host: New Party opens the global
@@ -82,10 +87,10 @@ export function DashboardLayout() {
       <ShortcutsSheet />
 
       {/* Global notification bell — self-contained, fixed top-right */}
-      <NotificationBell />
+      {!immersive && <NotificationBell />}
 
       {/* Mobile-only command-palette entry — fixed top-right beside the bell */}
-      <MobileCommandButton />
+      {!immersive && <MobileCommandButton />}
 
       {/* Mobile-only "back to top" once the content scroller is a screenful down */}
       <ScrollToTop scrollRef={scrollRef} />
