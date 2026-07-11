@@ -11,10 +11,11 @@ import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { syncGmailInbox, fetchGmailThread, type ThreadMessage } from '../lib/partyActions';
-import { createPartyFromLead } from '../utils/partyUpsell';
+import { createPartyFromLead, findOpenPartyForContact } from '../utils/partyUpsell';
+import { Modal } from '../components/ui/Modal';
 import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
-import type { Message } from '../types';
+import type { Message, Party } from '../types';
 import { needsReplyNow, messageTriage, categoryLabel } from '../utils/triage';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
@@ -41,7 +42,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
   if (messages.length === 0) {
     return (
       <div className="card p-5">
-        <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">{fallback}</p>
+        <p className="text-sm text-text-primary whitespace-pre-wrap break-words leading-relaxed">{fallback}</p>
       </div>
     );
   }
@@ -60,7 +61,7 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
               {safeFmtDate(m.date, 'MMM d, h:mm a')}
             </span>
           </div>
-          <p className="text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">{m.body}</p>
+          <p className="text-sm text-text-secondary whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
         </div>
       ))}
     </div>
@@ -77,6 +78,9 @@ export function Messages() {
   const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [convertingParty, setConvertingParty] = useState(false);
+  // A same-contact open party found at Make-a-party time — drives the
+  // duplicate-warning dialog. Dismissing it (X/Escape/backdrop) is a no-op.
+  const [dupParty, setDupParty] = useState<Party | null>(null);
   const [drafting, setDrafting] = useState(false);
 
   const handleSyncGmail = async () => {
@@ -132,6 +136,18 @@ export function Messages() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Cleanup: if the component unmounts while a Luna draft is in-flight, clear the
+  // timeout and remove the Supabase channel so we don't leak or setState on an
+  // unmounted tree.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     let result = messages;
@@ -334,7 +350,8 @@ export function Messages() {
     const finish = (text?: string) => {
       if (settled) return;
       settled = true;
-      supabase.removeChannel(channel);
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
       setDrafting(false);
       if (text) {
         if (selectedIdRef.current === targetId) {
@@ -345,7 +362,7 @@ export function Messages() {
         }
       }
     };
-    const channel = supabase
+    channelRef.current = supabase
       .channel(`luna-draft-${reqId}`)
       .on(
         'postgres_changes',
@@ -357,7 +374,7 @@ export function Messages() {
       )
       .subscribe();
     // Luna reasons before answering (30-90s typical). Give her up to 2.5 min.
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       if (!settled) {
         finish();
         toast('Luna is taking a while — her draft will land in the Luna tab.');
@@ -375,6 +392,21 @@ export function Messages() {
   // sender and subject. Reuses the app's standard party-create path and sends no
   // email — the message stays in the inbox; this is purely additive.
   const handleMakeParty = async () => {
+    if (!selected || convertingParty) return;
+    setConvertingParty(true);
+    // Same-contact guard: converting two messages from one thread once minted
+    // two pipeline cards for a single booking. Surface the existing open party
+    // in a dialog with explicit choices — plain dismissal does nothing.
+    const existing = await findOpenPartyForContact(selected.email, selected.name);
+    setConvertingParty(false);
+    if (existing) {
+      setDupParty(existing);
+      return;
+    }
+    await convertLeadToParty();
+  };
+
+  const convertLeadToParty = async () => {
     if (!selected || convertingParty) return;
     setConvertingParty(true);
     // Luna's extracted event details (date/time/guests/space/price) pre-fill the
@@ -463,7 +495,8 @@ export function Messages() {
           type="checkbox"
           checked={selectedIds.has(msg.id)}
           onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
-          className="mt-1 accent-primary"
+          aria-label="Select message"
+          className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
@@ -501,7 +534,7 @@ export function Messages() {
           {showMobileDetail && (
             <button
               onClick={() => setShowMobileDetail(false)}
-              className="md:hidden min-h-[44px] min-w-[44px] -ml-1.5 inline-flex items-center justify-center rounded-lg hover:bg-surface-hover"
+              className="md:hidden min-h-[44px] min-w-[44px] -ml-1.5 inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
               aria-label="Back to messages"
             >
               <ArrowLeft size={18} className="text-text-primary" />
@@ -552,6 +585,8 @@ export function Messages() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 className="input-field pl-8 text-xs py-2"
+                type="search"
+                aria-label="Search messages"
                 placeholder="Search messages..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -651,16 +686,26 @@ export function Messages() {
                       <span className="flex items-center gap-1 text-sm text-text-secondary min-w-0">
                         <User size={13} className="shrink-0" /> <span className="truncate">{selected.name}</span>
                       </span>
-                      <span className="text-sm text-text-muted truncate max-w-full">{selected.email}</span>
+                      <a
+                        href={`mailto:${selected.email}`}
+                        aria-label={`Email ${selected.name}`}
+                        className="text-sm text-text-muted truncate max-w-full hover:text-primary hover:underline transition-colors"
+                      >
+                        {selected.email}
+                      </a>
                       {selected.source === 'gmail' && (
                         <span className="text-[10px] font-bold uppercase tracking-wide bg-surface-hover text-text-muted px-1.5 py-0.5 rounded self-start shrink-0">
                           via Gmail
                         </span>
                       )}
                       {selected.phone && (
-                        <span className="flex items-center gap-1 text-sm text-text-muted">
+                        <a
+                          href={`tel:${selected.phone.replace(/[^\d+]/g, '')}`}
+                          aria-label={`Call ${selected.name}`}
+                          className="flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors"
+                        >
                           <Phone size={13} className="shrink-0" /> {selected.phone}
-                        </span>
+                        </a>
                       )}
                     </div>
                   </div>
@@ -698,7 +743,7 @@ export function Messages() {
                   <GmailThreadView messages={thread} loading={threadLoading} fallback={selected.message} />
                 ) : (
                   <div className="card p-5">
-                    <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-text-primary whitespace-pre-wrap break-words leading-relaxed">
                       {selected.message}
                     </p>
                   </div>
@@ -714,7 +759,7 @@ export function Messages() {
                         {selected.replied_by && ` by ${selected.replied_by}`}
                       </span>
                     </div>
-                    <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.reply_text}</p>
+                    <p className="text-sm text-text-secondary whitespace-pre-wrap break-words">{selected.reply_text}</p>
                   </div>
                 )}
 
@@ -796,6 +841,37 @@ export function Messages() {
           )}
         </div>
       </div>
+
+      {/* Duplicate-party warning: two explicit choices; X/Escape/backdrop is a
+          plain dismiss (no create, no navigation). */}
+      <Modal open={!!dupParty} onClose={() => setDupParty(null)} title="Already in the pipeline" maxWidth="max-w-sm">
+        <p className="text-text-secondary text-sm mb-6">
+          {selected?.name} already has an open party
+          {dupParty?.title?.trim() ? ` — “${dupParty.title.trim()}”` : ''}
+          {dupParty?.event_date ? ` (${dupParty.event_date})` : ''}, status {dupParty?.status}.
+        </p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={() => {
+              const p = dupParty;
+              setDupParty(null);
+              if (p) navigate(`/parties/${p.id}`);
+            }}
+            className="btn-secondary"
+          >
+            Open existing
+          </button>
+          <button
+            onClick={() => {
+              setDupParty(null);
+              convertLeadToParty();
+            }}
+            className="btn-primary"
+          >
+            Create anyway
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

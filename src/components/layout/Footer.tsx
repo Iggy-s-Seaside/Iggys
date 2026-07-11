@@ -26,13 +26,18 @@ const menuLinks = [
 const visitLinks = [
   { label: 'About', to: '/about' },
   { label: 'Contact', to: '/contact' },
-  { label: 'Book an Event', to: '/contact' },
-  { label: 'Shop Merch', to: '/shop' },
+  { label: 'Book an Event', to: '/book' },
+  { label: 'Shop', to: '/shop' },
 ];
+
+// Pages that end with their own contextual CTA — the generic strip would
+// stack a duplicate ask right on top of it.
+const HIDE_CTA_STRIP = ['/non-alcoholic'];
 
 export default function Footer() {
   const location = useLocation();
   const cta = ctaOptions.find((o) => o.path === location.pathname) ?? ctaOptions[0];
+  const showCtaStrip = !HIDE_CTA_STRIP.includes(location.pathname);
 
   return (
     <footer className="relative overflow-hidden">
@@ -40,27 +45,29 @@ export default function Footer() {
       <div className="h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
 
       {/* CTA strip */}
-      <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 border-b border-white/[0.04]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-white/80 text-sm font-medium">
-            Ready for good drinks and great company?
-          </p>
-          <div className="flex gap-3">
-            <Link
-              to={cta.to}
-              className="text-sm px-5 py-2 rounded-full bg-primary text-background font-semibold hover:bg-primary/90 transition-colors"
-            >
-              {cta.label}
-            </Link>
-            <Link
-              to="/contact"
-              className="text-sm px-5 py-2 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 transition-colors"
-            >
-              Get in Touch
-            </Link>
+      {showCtaStrip && (
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 border-b border-white/[0.04]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-white/80 text-sm font-medium">
+              Ready for good drinks and great company?
+            </p>
+            <div className="flex gap-3">
+              <Link
+                to={cta.to}
+                className="text-sm px-5 py-2 rounded-full bg-primary text-background font-semibold hover:bg-primary/90 transition-colors"
+              >
+                {cta.label}
+              </Link>
+              <Link
+                to="/contact"
+                className="text-sm px-5 py-2 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 transition-colors"
+              >
+                Get in Touch
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main footer */}
       <div className="bg-[#080c0c] relative overflow-hidden">

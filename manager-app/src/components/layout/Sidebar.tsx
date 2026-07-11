@@ -1,12 +1,13 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, HelpCircle, ChevronDown, BookHeart } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRole, type Role } from '../../hooks/useRole';
 import { useUnreadCount } from '../../hooks/useMessages';
 import { useNewInsightCount } from '../../hooks/useLuna';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 type NavItem = { to: string; icon: LucideIcon; label: string; badge?: 'messages' | 'luna'; roles?: Role[]; end?: boolean };
 type NavSection = { id: string; label: string; items: NavItem[] };
@@ -121,6 +122,10 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
   const unreadCount = useUnreadCount();
+
+  // Trap focus inside the mobile nav drawer while open (ESC closes, focus restores).
+  const mobileDrawerRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(mobileOpen, mobileDrawerRef, { onEscape: () => setMobileOpen(false) });
   const newInsightCount = useNewInsightCount();
 
   const activeSection = activeSectionId(location.pathname);
@@ -153,7 +158,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+      <nav aria-label="Primary" className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
         {visibleSections.map((section) => {
           // The active route's section is always shown, even if the user collapsed it.
           const isOpen = !collapsed.includes(section.id) || section.id === activeSection;
@@ -233,11 +238,11 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-surface border-b border-border">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-surface border-b border-border">
         <button
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation menu"
-          className="p-2.5 -ml-1 rounded-lg hover:bg-surface-hover min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="p-2.5 -ml-1 rounded-lg hover:bg-surface-hover transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <Menu size={20} />
         </button>
@@ -250,17 +255,17 @@ export function Sidebar() {
             <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
           </NavLink>
         )}
-      </div>
+      </header>
 
       {/* Mobile overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Navigation menu">
           <div className="fixed inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <div className="relative w-64 h-full bg-surface border-r border-border">
+          <div ref={mobileDrawerRef} tabIndex={-1} className="relative w-64 h-full bg-surface border-r border-border focus:outline-none">
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-hover"
+              className="absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
             >
               <X size={18} />
             </button>

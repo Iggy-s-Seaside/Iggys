@@ -1,0 +1,3 @@
+# Iggy's Manager is an internal back-of-house tool — keep it out of search engines.
+User-agent: *
+Disallow: /

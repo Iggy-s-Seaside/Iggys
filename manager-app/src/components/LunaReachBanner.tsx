@@ -52,7 +52,7 @@ export function LunaReachBanner() {
       <button
         onClick={() => acknowledge(reach.id)}
         aria-label="Dismiss Luna's reach"
-        className="p-1 rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary shrink-0"
+        className="p-1 rounded-lg text-text-muted hover:bg-surface-hover transition-colors hover:text-text-primary shrink-0"
       >
         <X size={16} />
       </button>

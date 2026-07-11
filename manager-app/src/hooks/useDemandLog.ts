@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { todaysBusinessDay } from '../utils/businessDay';
 
 export type Band = 'SLOW' | 'STEADY' | 'BUSY' | 'PACKED';
 
@@ -21,17 +21,23 @@ export interface DemandRow {
  */
 export function useDemandLog() {
   const { user } = useAuth();
-  const today = format(new Date(), 'yyyy-MM-dd');
   const [todayRow, setTodayRow] = useState<DemandRow | null>(null);
   const [accuracy, setAccuracy] = useState<{ pct: number; n: number } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const refresh = useCallback(async () => {
-    const { data } = await supabase
+    // Computed per-call (not captured at render) so a 9am business-day flip on a
+    // long-mounted session resolves the correct day — matches useShift's pattern.
+    const today = todaysBusinessDay();
+    const { data, error } = await supabase
       .from('demand_log')
       .select('business_day,predicted_band,actual_band,hotels_full,note')
       .order('business_day', { ascending: false })
       .limit(21);
+    if (error) {
+      console.error('[useDemandLog] refresh failed:', error);
+      return;
+    }
     const rows = (data as DemandRow[]) || [];
     setTodayRow(rows.find((r) => r.business_day === today) ?? null);
     const scored = rows.filter((r) => r.predicted_band && r.actual_band).slice(0, 7);
@@ -41,15 +47,16 @@ export function useDemandLog() {
     } else {
       setAccuracy(null);
     }
-  }, [today]);
+  }, []);
 
   useEffect(() => {
-    refresh();
+    refresh().catch(console.error);
   }, [refresh]);
 
   const logActual = useCallback(
     async (band: Band, note?: string, hotelsFull?: boolean) => {
       setSaving(true);
+      const today = todaysBusinessDay();
       const payload: Record<string, unknown> = {
         business_day: today,
         actual_band: band,
@@ -65,7 +72,7 @@ export function useDemandLog() {
       if (!error) await refresh();
       return !error;
     },
-    [today, user, refresh]
+    [user, refresh]
   );
 
   return { todayRow, accuracy, saving, logActual, refresh };

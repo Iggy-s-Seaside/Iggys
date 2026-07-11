@@ -27,6 +27,9 @@ export interface OutboxEntry {
   rowId?: number | string;
   /** Epoch ms; entries replay oldest-first. */
   createdAt: number;
+  /** How many replay passes this entry has come back with a data-level Supabase
+   *  error. Used to quarantine a poison entry instead of deadlocking the queue. */
+  attempts?: number;
 }
 
 export interface FlushResult {
@@ -43,6 +46,14 @@ const STORAGE_KEY = 'iggys.outbox.v1';
  * budget. When full we drop the oldest entry (FIFO eviction) to make room.
  */
 const MAX_ENTRIES = 200;
+
+/**
+ * How many replay passes an entry may return a data-level Supabase error
+ * (NOT NULL / FK / RLS / unique violation) before it is dropped. A genuine
+ * network failure THROWS instead and is retried indefinitely — only
+ * server-rejected entries count here, so one poison row can't wedge the queue.
+ */
+const MAX_REPLAY_ATTEMPTS = 3;
 
 /** True when the browser reports no network interface up. SSR-safe. */
 export function isOffline(): boolean {
@@ -161,63 +172,100 @@ export function clear(): void {
  */
 let flushing: Promise<FlushResult> | null = null;
 
-export async function flush(supabase: SupabaseClient): Promise<FlushResult> {
+export interface FlushOptions {
+  /** Called once for each entry PERMANENTLY dropped without ever reaching the
+   *  server — a poison entry that exhausted its retries, or a malformed entry
+   *  with no target rowId. Lets the UI surface the otherwise-silent offline-write
+   *  loss (e.g. a toast) instead of only a console.error. */
+  onPoisonDrop?: (entry: OutboxEntry) => void;
+}
+
+export async function flush(supabase: SupabaseClient, opts: FlushOptions = {}): Promise<FlushResult> {
   // Single-flight guard: useSupabaseCRUD mounts on 10+ screens and each calls
   // flush() on mount + on the window 'online' event. Without this, two flushes
   // would read the same not-yet-removed entry (removeById only runs AFTER the
   // network insert resolves) and replay it twice — a duplicate INSERT. Concurrent
   // callers share the one in-flight pass.
   if (flushing) return flushing;
-  flushing = doFlush(supabase).finally(() => { flushing = null; });
+  flushing = doFlush(supabase, opts).finally(() => { flushing = null; });
   return flushing;
 }
 
-async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
+async function doFlush(supabase: SupabaseClient, opts: FlushOptions = {}): Promise<FlushResult> {
   const queue = getAll();
   if (queue.length === 0) return { flushed: 0, remaining: 0 };
 
   let flushed = 0;
 
   for (const entry of queue) {
-    let failed = false;
+    let returnedError = false; // server rejected it (data-level — won't self-heal)
+    let threw = false;         // network failure (request didn't reach the server)
+    let malformed = false;     // no rowId to target — undeliverable, drop + notify
     try {
       if (entry.op === 'insert') {
         const { error } = await supabase
           .from(entry.table)
           .insert((entry.payload ?? {}) as Record<string, unknown>);
-        failed = !!error;
+        returnedError = !!error;
         if (error) console.error(`[outbox] replay insert ${entry.table} failed:`, error.message);
       } else if (entry.op === 'update') {
         if (entry.rowId == null) {
           // Malformed entry — can't target a row; drop it rather than loop forever.
           console.error('[outbox] update entry missing rowId, dropping:', entry.id);
+          malformed = true;
         } else {
           const { error } = await supabase
             .from(entry.table)
             .update((entry.payload ?? {}) as Record<string, unknown>)
             .eq('id', entry.rowId);
-          failed = !!error;
+          returnedError = !!error;
           if (error) console.error(`[outbox] replay update ${entry.table} failed:`, error.message);
         }
       } else {
         // delete
         if (entry.rowId == null) {
           console.error('[outbox] delete entry missing rowId, dropping:', entry.id);
+          malformed = true;
         } else {
           const { error } = await supabase.from(entry.table).delete().eq('id', entry.rowId);
-          failed = !!error;
+          returnedError = !!error;
           if (error) console.error(`[outbox] replay delete ${entry.table} failed:`, error.message);
         }
       }
     } catch (err) {
-      // Network/throw — keep the entry and bail so order is preserved.
+      // Network throw — keep the entry and bail so order is preserved; retry next pass.
       console.error('[outbox] replay threw:', err);
-      failed = true;
+      threw = true;
     }
 
-    if (failed) break;
+    if (threw) break;
 
-    // Success (or dropped malformed entry): remove just this one and continue.
+    if (malformed) {
+      // Undeliverable (no target row): drop it and surface the loss. It never
+      // reached the server, so it must NOT be counted as a flushed write.
+      opts.onPoisonDrop?.(entry);
+      removeById(entry.id);
+      continue;
+    }
+
+    if (returnedError) {
+      // The server rejected this entry (RLS / FK / NOT NULL / unique). It won't
+      // heal on plain retry, but give it a few passes (it may be transient, or
+      // depend on an earlier entry landing first), then QUARANTINE it so one bad
+      // row can't wedge everything queued behind it forever.
+      const attempts = (entry.attempts ?? 0) + 1;
+      if (attempts >= MAX_REPLAY_ATTEMPTS) {
+        console.error(`[outbox] dropping poison entry ${entry.id} (${entry.op} ${entry.table}) after ${attempts} failed attempts`);
+        opts.onPoisonDrop?.(entry);
+        removeById(entry.id);
+        continue;
+      }
+      bumpAttempts(entry.id, attempts);
+      break;
+    }
+
+    // Success: the entry was written to the server — remove just this one and continue.
+    // (Malformed entries are handled+dropped above and never reach here.)
     removeById(entry.id);
     flushed += 1;
   }
@@ -227,6 +275,11 @@ async function doFlush(supabase: SupabaseClient): Promise<FlushResult> {
 
 function removeById(id: string): void {
   const queue = readQueue().filter((e) => e.id !== id);
+  writeQueue(queue);
+}
+
+function bumpAttempts(id: string, attempts: number): void {
+  const queue = readQueue().map((e) => (e.id === id ? { ...e, attempts } : e));
   writeQueue(queue);
 }
 

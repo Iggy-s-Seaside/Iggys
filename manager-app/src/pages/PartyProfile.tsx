@@ -2,12 +2,13 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, CheckCircle2, XCircle, RotateCcw, Pencil, Send,
-  CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine, FileText,
+  CalendarCheck, RefreshCw, Mail, Phone, Building2, Users, Clock, MapPin, Utensils, Wine, FileText, Copy, Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useParty } from '../hooks/useParties';
 import { EmptyState } from '../components/ui/EmptyState';
 import { safeFmtDate } from '../utils/format';
+import { buzz } from '../utils/haptics';
 import { usePartyPackages } from '../hooks/usePackages';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { PackagePicker } from '../components/packages/PackagePicker';
@@ -45,6 +46,57 @@ function Field({ icon: Icon, label, value }: { icon: React.ElementType; label: s
       <div className="min-w-0">
         <p className="text-xs text-text-muted">{label}</p>
         <p className="text-sm text-text-primary whitespace-pre-wrap break-words">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A contact field whose value is a tappable tel:/mailto: link plus a copy button —
+ * so a manager on a phone can one-tap to call/email, or copy to paste elsewhere.
+ */
+function ContactField({
+  icon: Icon,
+  label,
+  value,
+  href,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | null | undefined;
+  href: (v: string) => string;
+}) {
+  const [copied, setCopied] = useState(false);
+  if (value == null || value === '') return null;
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      buzz(8);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error('Copy unavailable on this device');
+    }
+  };
+  return (
+    <div className="flex items-start gap-2.5">
+      <Icon size={15} className="text-text-muted mt-0.5 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-text-muted">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <a href={href(value)} className="text-sm text-primary hover:underline break-all min-w-0">
+            {value}
+          </a>
+          <button
+            type="button"
+            onClick={copy}
+            aria-label={copied ? `${label} copied` : `Copy ${label.toLowerCase()}`}
+            className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors"
+          >
+            {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -247,8 +299,8 @@ export function PartyProfile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field icon={Users} label="Name" value={party.contact_name} />
             <Field icon={Building2} label="Company / group" value={party.company} />
-            <Field icon={Mail} label="Email" value={party.contact_email} />
-            <Field icon={Phone} label="Phone" value={party.contact_phone} />
+            <ContactField icon={Mail} label="Email" value={party.contact_email} href={(v) => `mailto:${v}`} />
+            <ContactField icon={Phone} label="Phone" value={party.contact_phone} href={(v) => `tel:${v.replace(/[^\d+]/g, '')}`} />
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
+import { buzz } from '../utils/haptics';
 import type { TextLayer } from '../types';
 
 const SNAP_THRESHOLD = 5;
@@ -38,7 +39,7 @@ function estimateHeight(layer: TextLayer): number {
     return layer.imageHeight || layer.width; // Images have explicit height
   }
   const lines = layer.text.split('\n');
-  const lineHeight = layer.fontSize * 1.3;
+  const lineHeight = layer.fontSize * (layer.lineHeight ?? 1.3);
   return lines.length > 1 ? (lines.length - 1) * lineHeight + layer.fontSize : layer.fontSize;
 }
 
@@ -84,6 +85,10 @@ export function useElementInteraction({
   const snapLinesRef = useRef<SnapLines>({ x: [], y: [] });
   const [snapLines, setSnapLines] = useState<SnapLines>({ x: [], y: [] });
   const lastElementTapRef = useRef<{ layerId: string; time: number; count: number }>({ layerId: '', time: 0, count: 0 });
+  // Track last snapped values to avoid firing haptic every frame
+  const lastSnapXRef = useRef<number | null>(null);
+  const lastSnapYRef = useRef<number | null>(null);
+  const lastSnapAngleRef = useRef<number | null>(null);
 
   // Convert client coordinates to canvas coordinates
   const clientToCanvas = useCallback((clientX: number, clientY: number) => {
@@ -159,7 +164,9 @@ export function useElementInteraction({
     if (isSameLayer && isQuick && !layer.locked) {
       const newCount = prev.count + 1;
       if (newCount >= 3) {
-        // Triple-tap → fit to canvas (for image/video layers)
+        // Triple-tap → fit to canvas. Image/video CONSUME the gesture (return);
+        // other layer types fall through to normal selection/drag — returning for
+        // them would make a triple-tap dead (no select, no drag, no edit).
         lastElementTapRef.current = { layerId: '', time: 0, count: 0 };
         if ((layer.elementType === 'image' || layer.elementType === 'video') && onTripleTap) {
           onTripleTap(layerId);
@@ -197,7 +204,7 @@ export function useElementInteraction({
     };
 
     // Haptic on select
-    if ('vibrate' in navigator) navigator.vibrate(10);
+    buzz(10);
 
     // Listen for global move/up on this pointer
     const onMove = (me: PointerEvent) => {
@@ -245,8 +252,20 @@ export function useElementInteraction({
               break;
             }
           }
-          // Haptic on snap
-          if ('vibrate' in navigator) navigator.vibrate([5, 5, 5]);
+          // Haptic on snap — only when the snapped x value changes (not every frame)
+          if (snaps.x[0] !== lastSnapXRef.current) {
+            lastSnapXRef.current = snaps.x[0];
+            buzz([5, 5, 5]);
+          }
+        } else {
+          lastSnapXRef.current = null;
+        }
+        if (snaps.y.length > 0) {
+          if (snaps.y[0] !== lastSnapYRef.current) {
+            lastSnapYRef.current = snaps.y[0];
+          }
+        } else {
+          lastSnapYRef.current = null;
         }
 
         // Clamp to canvas bounds — keep element fully within canvas
@@ -283,6 +302,8 @@ export function useElementInteraction({
       dragRef.current = null;
       snapLinesRef.current = { x: [], y: [] };
       setSnapLines({ x: [], y: [] });
+      lastSnapXRef.current = null;
+      lastSnapYRef.current = null;
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       document.removeEventListener('pointercancel', onUp);
@@ -419,12 +440,21 @@ export function useElementInteraction({
         let angle = rawAngle - drag.startAngle;
         angle = ((angle % 360) + 360) % 360;
 
+        let rotationSnapped = false;
         for (const snap of ROTATION_SNAP_ANGLES) {
           if (Math.abs(angle - snap) <= ROTATION_SNAP_THRESHOLD) {
             angle = snap === 360 ? 0 : snap;
-            if ('vibrate' in navigator) navigator.vibrate(10);
+            // Haptic on rotation snap — only when the snapped angle changes (not every frame)
+            if (angle !== lastSnapAngleRef.current) {
+              lastSnapAngleRef.current = angle;
+              buzz(10);
+            }
+            rotationSnapped = true;
             break;
           }
+        }
+        if (!rotationSnapped) {
+          lastSnapAngleRef.current = null;
         }
 
         const finalAngle = Math.round(angle);
@@ -456,6 +486,7 @@ export function useElementInteraction({
       dragRef.current = null;
       snapLinesRef.current = { x: [], y: [] };
       setSnapLines({ x: [], y: [] });
+      lastSnapAngleRef.current = null;
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       document.removeEventListener('pointercancel', onUp);

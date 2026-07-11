@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { QuickAddParty } from '../parties/QuickAddParty';
 import { CommandPalette, CMD_NEW_PARTY, CMD_QUICK_POST } from '../CommandPalette';
+import { ShortcutsSheet } from '../ShortcutsSheet';
 import { OfflineBanner } from '../OfflineBanner';
+import { SyncPendingPill } from '../SyncPendingPill';
 import { LunaReachBanner } from '../LunaReachBanner';
 import { NotificationBell } from '../NotificationBell';
 import { MobileCommandButton } from '../MobileCommandButton';
+import { ScrollToTop } from '../ui/ScrollToTop';
 
 export function DashboardLayout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   // The command palette fires decoupled window events for modal-style quick
@@ -32,8 +36,9 @@ export function DashboardLayout() {
     // the inner content div is the ONE scroller (no body rubber-band). Desktop
     // (lg) reverts to normal in-flow layout + body scroll.
     <div className="flex h-[100dvh] overflow-hidden lg:h-auto lg:min-h-[100dvh] lg:overflow-visible">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-white focus:shadow-lg">Skip to content</a>
       <Sidebar />
-      <main className="flex-1 min-w-0 flex flex-col overflow-hidden lg:overflow-visible">
+      <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 flex flex-col overflow-hidden lg:overflow-visible">
         {/* The single scroll container. overscroll-contain stops scroll-chaining;
             safe-area padding clears the notch (top) + bottom nav + home indicator.
             On lg we hand vertical scroll back to the body (overflow-visible), but
@@ -45,8 +50,10 @@ export function DashboardLayout() {
             THIS lg container: overflow-x-hidden + overflow-y-visible is an invalid
             combo where the visible axis silently computes to auto, which would
             re-introduce an inner scrollbar on desktop.) */}
-        <div className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
+        <div ref={scrollRef} className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
           <OfflineBanner />
+          {/* Back-online-but-still-replaying signal so offline writes aren't stranded. */}
+          <SyncPendingPill />
           {/* Luna's unprompted reach — top of every screen when she raises one. */}
           <LunaReachBanner />
           {/* Width-bounded, horizontally-clipped wrapper around the routed page.
@@ -71,11 +78,17 @@ export function DashboardLayout() {
       {/* Global Cmd/Ctrl+K command palette — mounted once, event-driven */}
       <CommandPalette />
 
+      {/* "?" keyboard-shortcuts cheatsheet — mounted once, opens on the ? key */}
+      <ShortcutsSheet />
+
       {/* Global notification bell — self-contained, fixed top-right */}
       <NotificationBell />
 
-      {/* Mobile-only command-palette entry — fixed top-left (no keyboard on mobile) */}
+      {/* Mobile-only command-palette entry — fixed top-right beside the bell */}
       <MobileCommandButton />
+
+      {/* Mobile-only "back to top" once the content scroller is a screenful down */}
+      <ScrollToTop scrollRef={scrollRef} />
     </div>
   );
 }

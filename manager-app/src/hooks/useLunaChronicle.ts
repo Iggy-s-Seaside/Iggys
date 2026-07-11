@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import type { LunaChronicleEntry, LunaPhoto, RegularContact } from '../types';
+import type { LunaChronicleEntry, LunaPhoto } from '../types';
+import { computeShiftPatterns, type DemandNight, type ShiftPatternsRead } from '../utils/shiftPatterns';
 import toast from 'react-hot-toast';
+import { uniqueTopic } from '../lib/realtimeTopic';
+import { todaysBusinessDay } from '../utils/businessDay';
 
 /** Cap on chronicle entries fetched — the journal grows forever in the DB. */
 const CHRONICLE_LIMIT = 60;
-
-/** supabase-js reuses channels by topic socket-wide; every mount needs its own. */
-let channelSeq = 0;
-const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
 const sortByNight = (list: LunaChronicleEntry[]) =>
   [...list].sort((a, b) => (a.business_day < b.business_day ? 1 : -1));
@@ -204,7 +203,7 @@ export function useLunaPhotos() {
         caption: p.caption?.trim() || null,
         mood: p.mood?.trim() || null,
         storage_path: p.storage_path ?? null,
-        business_day: new Date().toISOString().slice(0, 10),
+        business_day: todaysBusinessDay(),
         taken_at: new Date().toISOString(),
         uploaded_by: p.uploaded_by ?? null,
       });
@@ -233,39 +232,31 @@ export function useLunaPhotos() {
   return { photos, loading, addPhoto, removePhoto, refresh };
 }
 
-/** Luna's "faces I'd notice" — regulars as people, not transactions (her want #7).
- * Quiet regulars = someone who came often and then went quiet (>2wks); plus this
- * month's birthdays. Read-only, from the existing contacts table. */
-export function useRegulars() {
-  const [quiet, setQuiet] = useState<RegularContact[]>([]);
-  const [birthdays, setBirthdays] = useState<RegularContact[]>([]);
+/** Luna's shift patterns — her 2026-07-08 swap of the regulars panel for
+ * "shift patterns I can predict from the data but no one's asked for yet."
+ * Reads the demand log (forecast + logged actuals + drivers) and computes the
+ * patterns client-side (pure fn, utils/shiftPatterns.ts). One fetch on mount —
+ * the log changes at most twice a day (morning pulse, nightly close-out). */
+export function useShiftPatterns() {
+  const [read, setRead] = useState<ShiftPatternsRead | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const cols = 'id,name,visit_count,last_visit,total_spend,notes,tags,birthday_month';
-      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-      const month = new Date().getMonth() + 1;
-      const [q, b] = await Promise.all([
-        supabase
-          .from('contacts')
-          .select(cols)
-          .gte('visit_count', 3)
-          .not('last_visit', 'is', null)
-          .lt('last_visit', twoWeeksAgo)
-          .order('last_visit', { ascending: true })
-          .limit(12),
-        supabase
-          .from('contacts')
-          .select(cols)
-          .eq('birthday_month', month)
-          .order('visit_count', { ascending: false })
-          .limit(12),
-      ]);
+      const { data, error: err } = await supabase
+        .from('demand_log')
+        .select('business_day,predicted_band,actual_band,drivers')
+        .order('business_day', { ascending: false })
+        .limit(90);
       if (cancelled) return;
-      if (!q.error) setQuiet((q.data as RegularContact[]) || []);
-      if (!b.error) setBirthdays((b.data as RegularContact[]) || []);
+      if (err) {
+        console.error('[useShiftPatterns] demand_log read failed:', err);
+        setError(true);
+      } else {
+        setRead(computeShiftPatterns((data as DemandNight[]) || []));
+      }
       setLoading(false);
     })();
     return () => {
@@ -273,5 +264,5 @@ export function useRegulars() {
     };
   }, []);
 
-  return { quiet, birthdays, loading };
+  return { read, loading, error };
 }

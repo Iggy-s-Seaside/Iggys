@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Loader2, Printer, Send, Save, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { Party, PartyPackage } from '../../types';
+import type { Party, PartyPackage, PaymentStatus } from '../../types';
 import { computeInvoice, partyToInvoiceInputs, buildInvoiceText, buildInvoiceHtml } from '../../utils/invoice';
 import { money as fmtMoney } from '../../utils/format';
 import { sendPartyEmail } from '../../lib/partyActions';
@@ -37,12 +37,21 @@ export function InvoicePanel({ party, lines, onSave }: InvoicePanelProps) {
 
   const handleSave = async () => {
     setSaving(true);
+    // Keep BOTH denormalized money fields in sync with the new total, the same way
+    // usePayments.markPaid does — otherwise a post-payment invoice edit leaves a stale
+    // balance the manager under-collects against AND a stale payment_status that strands
+    // the party in the wrong pipeline column / invoice filter (stageFor + Invoices read it).
+    const paid = party.amount_paid ?? 0;
+    const newBalance = Math.max(0, breakdown.grandTotal - paid);
+    const newStatus: PaymentStatus = paid <= 0 ? 'unpaid' : newBalance <= 0.005 ? 'paid' : 'partial';
     const ok = await onSave({
       room_rate: previewParty.room_rate,
       room_hours: previewParty.room_hours,
       food_total: previewParty.food_total,
       drink_total: previewParty.drink_total,
       gratuity_rate: previewParty.gratuity_rate,
+      balance_due: newBalance,
+      payment_status: newStatus,
     });
     if (ok) toast.success('Invoice saved');
     setSaving(false);

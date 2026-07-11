@@ -105,7 +105,12 @@ export function usePublicCalendar(): PublicCalendarData {
     for (const ev of events) {
       if (!ev.active) continue;
       const keys = eventDateKeys(
-        { date: ev.date, is_recurring: ev.is_recurring, recurring_day: ev.recurring_day },
+        {
+          date: ev.date,
+          is_recurring: ev.is_recurring,
+          recurring_day: ev.recurring_day,
+          recurring_until: ev.recurring_until,
+        },
         fromKey,
         toKey
       );

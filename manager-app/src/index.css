@@ -77,7 +77,7 @@
      per-button text-xs/py-1.5 overrides. active:scale gives the <100ms pressed
      feedback that hover: never provides on touch (rushed bartender needs it). */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 min-h-[44px] text-sm font-medium transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 min-h-[44px] text-sm font-medium transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
     @apply btn bg-primary text-white hover:bg-primary-hover active:bg-primary-hover focus:ring-primary;
@@ -90,6 +90,13 @@
   }
   :root:not(.dark) .btn-primary:hover {
     background-color: #115e59;
+  }
+  /* Dark mode (the default theme): keep the vivid brand teal background but use a
+     near-black label instead of white. white-on-#2dd4bf is only 1.86:1; near-black
+     on #2dd4bf is ~11:1 — clears WCAG AA while preserving the brand pop. Icons use
+     currentColor, so they darken to match. */
+  .dark .btn-primary {
+    color: #03201c;
   }
   .btn-secondary {
     @apply btn bg-surface border border-border text-text-secondary hover:bg-surface-hover active:bg-surface-active focus:ring-primary;
@@ -163,6 +170,15 @@
   animation: fade-in 200ms ease-out;
 }
 
+@keyframes slide-in {
+  from { transform: translateY(6px); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slide-in 200ms ease-out;
+}
+
 /* ── Prevent iOS Safari auto-zoom on input focus ── */
 @media screen and (max-width: 768px) {
   input[type="text"],
@@ -184,6 +200,11 @@
 /* ── Prevent double-tap zoom on interactive elements ── */
 button, a, label, [role="button"] {
   touch-action: manipulation;
+}
+
+/* ── Brand-tint native form controls instead of the OS blue/grey ── */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #2dd4bf;
 }
 
 /* ── Mobile safe area ── */
@@ -226,6 +247,53 @@ button, a, label, [role="button"] {
   overflow: hidden;
   overscroll-behavior: none;
 }
+
+/* ── Notch flourish: a seaside "tide" in the top safe-area band ───────────────
+   Fills the strip behind the iPhone status bar / around the notch with a subtle
+   branded teal tide: a gentle idle drift, a launch "tide-in" sweep, and a glowing
+   waterline. pointer-events:none so it never intercepts taps; the host element's
+   height is driven by env(safe-area-inset-top), so it's simply absent on devices
+   without a notch (NotchBar returns null when the inset is 0). The reduced-motion
+   rule below collapses all of this to a static dark band + faint waterline. */
+.notch-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+  background: #0a0f0f;
+}
+.notch-bar > div { position: absolute; }
+.notch-tide {
+  inset: -50% -20% auto -20%;
+  height: 200%;
+  opacity: 0.7;
+  background:
+    radial-gradient(120px 60px at 22% 120%, rgba(45, 212, 191, 0.45), transparent 70%),
+    radial-gradient(160px 70px at 78% 130%, rgba(13, 148, 136, 0.4), transparent 70%);
+  animation: notch-tide 9s ease-in-out infinite alternate;
+}
+.notch-sweep {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.55), transparent);
+  animation: notch-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) 0.15s 1 both;
+}
+.notch-line {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.9) 30%, rgba(45, 212, 191, 0.9) 70%, transparent);
+  animation: notch-glow 4s ease-in-out infinite;
+}
+@keyframes notch-tide { 0% { transform: translateX(-8%); } 100% { transform: translateX(8%); } }
+@keyframes notch-sweep { 0% { transform: translateX(-120%); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateX(230%); opacity: 0; } }
+@keyframes notch-glow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.8; } }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {

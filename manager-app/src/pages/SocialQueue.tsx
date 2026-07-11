@@ -57,7 +57,7 @@ function PostCard({
   return (
     <div className="card-hover overflow-hidden flex flex-col">
       {post.image_url ? (
-        <img src={post.image_url} alt="" className="w-full h-44 object-cover" />
+        <img src={post.image_url} alt="" loading="lazy" className="w-full h-44 object-cover" />
       ) : (
         <div className="w-full h-44 bg-gradient-to-br from-surface-hover to-surface-active flex items-center justify-center">
           <ImageIcon size={32} className="text-text-muted" />
@@ -255,7 +255,7 @@ export function SocialQueue() {
         </div>
       )}
 
-      <CreateSocialPostModal open={showCreate} onClose={() => setShowCreate(false)} />
+      {showCreate && <CreateSocialPostModal open={showCreate} onClose={() => setShowCreate(false)} />}
 
       {/* Schedule picker */}
       {scheduleTarget && (

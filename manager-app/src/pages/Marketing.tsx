@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useId, useRef } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   Megaphone, Users, Search, Mail, MessageSquare, Send, Loader2, ShieldCheck,
   ShieldAlert, Cake, UserMinus, CheckCircle2, Phone, X, Sparkles, Inbox,
@@ -209,6 +210,8 @@ export function Marketing() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 className="input-field pl-9 text-sm"
+                type="search"
+                aria-label="Search customers"
                 placeholder="Search customers..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -408,6 +411,9 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
   const [body, setBody] = useState('');
   const [segmentId, setSegmentId] = useState('all');
   const [sending, setSending] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onClose });
 
   const activeSegment = SEGMENTS.find((s) => s.id === segmentId) ?? SEGMENTS[0];
 
@@ -532,12 +538,12 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[92dvh] overflow-y-auto mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[92dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface z-10">
-          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <h2 id={titleId} className="font-semibold text-text-primary flex items-center gap-2">
             <Sparkles size={16} className="text-primary" /> New Campaign
           </h2>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -556,7 +562,7 @@ function CampaignComposer({ recipients, onClose, onCreate, onUpdate }: ComposerP
                     className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
                       channel === ch
                         ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-border text-text-secondary hover:bg-surface-hover'
+                        : 'border-border text-text-secondary hover:bg-surface-hover transition-colors'
                     }`}
                   >
                     <Icon size={15} /> {ch === 'sms' ? 'SMS' : 'Email'}

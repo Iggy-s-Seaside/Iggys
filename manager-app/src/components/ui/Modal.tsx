@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface ModalProps {
   open: boolean;
@@ -10,30 +11,9 @@ interface ModalProps {
   maxWidth?: string;
 }
 
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'textarea:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-function getFocusable(container: HTMLElement): HTMLElement[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-  ).filter(
-    (el) =>
-      el.offsetWidth > 0 ||
-      el.offsetHeight > 0 ||
-      el === document.activeElement
-  );
-}
-
 export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   // Lock body scroll while open.
   useEffect(() => {
@@ -43,59 +23,8 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
     }
   }, [open]);
 
-  // Focus management: trap focus inside, restore on close.
-  useEffect(() => {
-    if (!open) return;
-
-    // Remember what had focus so we can restore it on close.
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-
-    // Move focus into the dialog (first focusable, else the dialog itself).
-    const dialog = dialogRef.current;
-    if (dialog) {
-      const focusable = getFocusable(dialog);
-      (focusable[0] ?? dialog).focus();
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (e.key !== 'Tab' || !dialogRef.current) return;
-
-      const focusable = getFocusable(dialogRef.current);
-      if (focusable.length === 0) {
-        // Nothing focusable — keep focus on the dialog container.
-        e.preventDefault();
-        dialogRef.current.focus();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-
-      if (e.shiftKey) {
-        if (active === first || !dialogRef.current.contains(active)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !dialogRef.current.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true);
-      // Restore focus to the element that opened the dialog.
-      previouslyFocused.current?.focus?.();
-    };
-  }, [open, onClose]);
+  // Focus trap + Escape-to-close + focus restore (shared via useFocusTrap).
+  useFocusTrap(open, dialogRef, { onEscape: onClose });
 
   if (!open) return null;
 
@@ -112,7 +41,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 id={titleId} className="text-lg font-semibold text-text-primary">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors text-text-muted">
+          <button onClick={onClose} aria-label="Close" className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <X size={18} />
           </button>
         </div>

@@ -199,19 +199,29 @@ serve(async (req: Request) => {
         return json({ received: true, duplicate: true });
       }
 
-      // Apply the deposit ADDITIVELY and recompute the balance, preserving the
-      // balance_due = grandTotal − amount_paid invariant (so a manual payment
-      // already on file isn't clobbered). Fully covered → 'paid', else 'partial'.
+      // Apply the deposit ADDITIVELY. A party_deposit is, by definition, a PARTIAL
+      // payment — create-checkout only ever charges deposit_amount, never the full
+      // balance — so NEVER infer 'paid' here. The previous code derived the new balance
+      // from a stored balance_due that defaults to 0/NULL on a fresh party, so the FIRST
+      // deposit computed newBalance = max(0, 0 − deposit) = 0 → flipped the party to
+      // 'paid'/$0 and silently discarded the rest of the bill on every normal booking.
+      // The true balance is recomputed LIVE in the UI (computeInvoice over the current
+      // invoice + lines); final settlement is recorded via the manager's "Mark paid"
+      // flow. We only update balance_due when a trustworthy prior balance exists (>0) —
+      // otherwise we omit it rather than fabricate a wrong 0.
       const priorPaid = Number(party?.amount_paid) || 0;
-      const priorBalance = Number(party?.balance_due) || 0;
+      const priorBalance = Number(party?.balance_due);
       const newPaid = priorPaid + amountTotal;
-      const newBalance = Math.max(0, Math.round((priorBalance - amountTotal) * 100) / 100);
+      const trustPrior = Number.isFinite(priorBalance) && priorBalance > 0;
+      const newBalance = trustPrior
+        ? Math.max(0, Math.round((priorBalance - amountTotal) * 100) / 100)
+        : null;
       const { error: updErr } = await admin
         .from("parties")
         .update({
-          payment_status: newBalance <= 0 ? "paid" : "partial",
+          payment_status: "partial",
           amount_paid: newPaid,
-          balance_due: newBalance,
+          ...(newBalance !== null ? { balance_due: newBalance } : {}),
           payment_intent_id: paymentIntentId,
           paid_at: new Date().toISOString(),
         })

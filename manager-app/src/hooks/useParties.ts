@@ -3,12 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Party } from '../types';
 import toast from 'react-hot-toast';
 import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
-
-// Unique realtime channel name per mount — this hook can be mounted several times on
-// one screen (e.g. the dashboard's pulse + daily read + weather cross-signal), and
-// two channels of the same name collide. Same pattern as useLuna/useLunaChronicle.
-let channelSeq = 0;
-const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
+import { uniqueTopic } from '../lib/realtimeTopic';
 
 /** All parties, with realtime updates (used by the pipeline list + dashboard). */
 export function useParties() {

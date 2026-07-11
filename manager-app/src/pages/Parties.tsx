@@ -106,7 +106,7 @@ export function Parties() {
       {/* Search */}
       <div className="relative mb-4">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input className="input-field pl-9" placeholder="Search by name, company, email…"
+        <input className="input-field pl-9" type="search" aria-label="Search parties" placeholder="Search by name, company, email…"
           value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 

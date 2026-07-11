@@ -18,7 +18,7 @@ export const nonAlcoholicData: NonAlcoholicCategory[] = [
     accentColor: 'primary',
     items: [
       { name: 'Heineken N/A', description: 'Classic lager taste', price: '$6.00' },
-      { name: 'Best Day Kolsch', description: 'Light and crisp', price: '$6.00' },
+      { name: 'Best Day Kölsch', description: 'Light and crisp', price: '$6.00' },
       { name: 'Best Day West Coast IPA', description: 'Hoppy and bold', price: '$6.00' },
     ],
   },
@@ -30,7 +30,7 @@ export const nonAlcoholicData: NonAlcoholicCategory[] = [
       { name: 'Pepsi / Diet Pepsi / Starry / Dr Pepper / Root Beer', price: '$3.00' },
       { name: 'Orange / Cranberry / Pineapple Juice', price: '$3.00' },
       { name: 'Lemonade', price: '$3.00' },
-      { name: 'Cock n Bull Ginger Beer', price: '$4.00' },
+      { name: 'Cock ’n Bull Ginger Beer', price: '$4.00' },
     ],
   },
   {

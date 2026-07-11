@@ -177,20 +177,22 @@ export function Calendar() {
       </PageHeader>
 
       {/* View toggle */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <SegmentedControl<View>
-          ariaLabel="Calendar view"
-          value={view}
-          onChange={setView}
-          options={[
-            { value: 'month', label: 'Month' },
-            { value: 'list', label: 'List' },
-          ]}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="shrink-0">
+          <SegmentedControl<View>
+            ariaLabel="Calendar view"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'month', label: 'Month' },
+              { value: 'list', label: 'List' },
+            ]}
+          />
+        </div>
 
 
         {view === 'month' && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setMonth((m) => subMonths(m, 1))}
               aria-label="Previous month"

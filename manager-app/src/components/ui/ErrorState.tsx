@@ -30,7 +30,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   const Icon = offline ? WifiOff : AlertTriangle;
   return (
-    <div className={`card p-12 text-center ${className ?? ''}`} role="alert">
+    <div className={`card p-12 text-center animate-slide-in ${className ?? ''}`} role="alert">
       <Icon size={40} className="mx-auto text-danger mb-3" aria-hidden="true" />
       <p className="text-text-secondary font-medium">{title}</p>
       {description && <p className="text-sm text-text-muted mt-1">{description}</p>}

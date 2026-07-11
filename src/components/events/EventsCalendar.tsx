@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -203,8 +204,10 @@ export default function EventsCalendar({
         </span>
       </div>
 
-      {/* Detail modal */}
-      {selected && (
+      {/* Detail modal — portaled to <body>: ancestor scroll-animations use
+          transforms, which trap a fixed overlay's z-index and containing block
+          in their stacking context (page headings painted over the modal). */}
+      {selected && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           role="dialog"
@@ -325,7 +328,8 @@ export default function EventsCalendar({
               </Link>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

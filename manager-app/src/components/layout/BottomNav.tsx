@@ -42,7 +42,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
+      <nav aria-label="Primary" className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
         {ops ? (
           <div className="grid grid-cols-6 items-center">
             <Tab to="/" icon={LayoutDashboard} label="Home" end />

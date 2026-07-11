@@ -59,6 +59,9 @@ function ProductRow({
           <img
             src={product.image}
             alt=""
+            loading="lazy"
+            width={44}
+            height={44}
             className="w-11 h-11 rounded-lg object-cover border border-border shrink-0"
           />
         ) : (
@@ -128,7 +131,7 @@ function ProductRow({
             <button
               type="button"
               onClick={() => onDelete(product)}
-              className="text-xs text-text-muted hover:text-danger flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors"
+              className="text-xs text-text-muted hover:text-danger inline-flex items-center gap-1 px-2.5 py-2 min-h-[44px] rounded-lg hover:bg-red-500/10 transition-colors"
             >
               <Trash2 size={13} /> Delete
             </button>
@@ -196,6 +199,8 @@ export function Merch() {
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
+            type="search"
+            aria-label="Search merch"
             className="input-field pl-9 w-full sm:w-56"
             placeholder="Search merch..."
             value={search}

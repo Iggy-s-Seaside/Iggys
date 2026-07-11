@@ -1,0 +1,7 @@
+# Netlify cache headers — static media isn't content-hashed, so cache for a
+# week and revalidate in the background rather than immutable-forever.
+/images/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/videos/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400

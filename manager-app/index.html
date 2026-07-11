@@ -6,15 +6,24 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Iggy's" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Internal back-of-house tool — keep it out of search engines. -->
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#0a0f0f" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Iggy's Manager Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Lobster&family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Pacifico&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Anton&display=swap" rel="stylesheet" />
+    <!-- Inter is the app UI font — load it render-blocking so first paint is correct. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Display families are used ONLY by the specials/social graphic editor + its
+         previews. Load them async (media=print → all on load) so they never block
+         first paint; Google Fonts still fetches each woff2 only when a glyph renders. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lobster&family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Pacifico&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Anton&display=swap" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lobster&family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Pacifico&family=Montserrat:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Anton&display=swap" /></noscript>
   </head>
   <body>
     <div id="root"></div>

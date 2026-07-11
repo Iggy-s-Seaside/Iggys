@@ -82,10 +82,10 @@ export function ImageLibrary({ open, onClose, onSelect }: ImageLibraryProps) {
             <span className="text-xs text-text-muted">{items.length} images</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => refresh()} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted" title="Refresh">
+            <button onClick={() => refresh()} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-muted" title="Refresh">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover text-text-muted">
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-muted">
               <X size={18} />
             </button>
           </div>
@@ -97,7 +97,8 @@ export function ImageLibrary({ open, onClose, onSelect }: ImageLibraryProps) {
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
-                type="text"
+                type="search"
+                aria-label="Search images"
                 placeholder="Search images..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

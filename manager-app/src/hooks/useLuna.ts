@@ -2,19 +2,22 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { LunaMessage, LunaInsight } from '../types';
 import toast from 'react-hot-toast';
+import { uniqueTopic } from '../lib/realtimeTopic';
+import { decodeEntities } from '../utils/entities';
+
+/** Insight titles/bodies can carry HTML entities from scraped sources (the
+ * bridge stores what the feed said — "NABIP Medicare &#038; Annual…"). Decode
+ * once at the fetch boundary so every consumer (banner, cards, feed) heals.
+ * Exported for the other luna_insights fetch path (useActivityFeed). */
+export const decodeInsight = (i: LunaInsight): LunaInsight => ({
+  ...i,
+  title: decodeEntities(i.title),
+  body: i.body ? decodeEntities(i.body) : i.body,
+});
 
 /** Cap on rows fetched — the thread/feed grow forever in the DB. */
 const MESSAGE_LIMIT = 100;
 const INSIGHT_LIMIT = 20;
-
-/**
- * supabase-js reuses channel instances by topic name socket-wide, so two
- * components subscribing to the same fixed topic silently break each other
- * (binding-count mismatch → CHANNEL_ERROR, or a dying channel gets reused
- * across route transitions). Every mount needs its own topic.
- */
-let channelSeq = 0;
-const uniqueTopic = (base: string) => `${base}-${++channelSeq}-${Date.now()}`;
 
 /** Command rows (e.g. '__regen_special__') are control signals for the bridge,
  * not chat — keep them out of the visible thread. */
@@ -72,7 +75,9 @@ export function useLunaMessages() {
               );
               const withoutTemp =
                 idx === -1 ? prev : [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-              return [...withoutTemp, row];
+              // Cap the in-memory thread so realtime inserts don't grow it unbounded
+              // past the initial fetch (chronological, so keep the newest tail).
+              return [...withoutTemp, row].slice(-MESSAGE_LIMIT);
             });
           } else if (payload.eventType === 'UPDATE') {
             const row = payload.new as LunaMessage;
@@ -166,7 +171,7 @@ export function useLunaInsights() {
       toast.error('Failed to load Luna insights');
       console.error(error);
     } else {
-      setInsights((data as LunaInsight[]) || []);
+      setInsights(((data as LunaInsight[]) || []).map(decodeInsight));
     }
     setLoading(false);
   }, []);
@@ -183,12 +188,12 @@ export function useLunaInsights() {
         { event: '*', schema: 'public', table: 'luna_insights' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const row = payload.new as LunaInsight;
+            const row = decodeInsight(payload.new as LunaInsight);
             setInsights((prev) =>
               prev.some((i) => i.id === row.id) ? prev : [row, ...prev]
             );
           } else if (payload.eventType === 'UPDATE') {
-            const row = payload.new as LunaInsight;
+            const row = decodeInsight(payload.new as LunaInsight);
             setInsights((prev) => prev.map((i) => (i.id === row.id ? row : i)));
           } else if (payload.eventType === 'DELETE') {
             const old = payload.old as { id: number };
@@ -285,7 +290,7 @@ export function useLunaReach() {
         const d = i.data as Record<string, unknown> | null;
         return !!d && (d.reach === true || d.reach === 'true');
       }) ?? null;
-    setReach(r);
+    setReach(r ? decodeInsight(r) : null);
   }, []);
 
   useEffect(() => {

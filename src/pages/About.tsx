@@ -1,6 +1,7 @@
 import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
 import { images } from '../data/images';
+import { Martini, Leaf, Flame } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 const stats = [
@@ -12,21 +13,21 @@ const stats = [
 
 const vibes = [
   {
-    icon: '🍸',
+    icon: Martini,
     title: 'Indoor Bar',
     description:
       'Full bar with TVs for sports, lottery, and good company. Cozy and comfortable rain or shine.',
     image: images.wallInside,
   },
   {
-    icon: '🌿',
+    icon: Leaf,
     title: 'Covered Upstairs Patio',
     description:
       'An outdoor covered patio upstairs with fresh air, cold drinks, and a view of downtown Seaside.',
     image: images.tapOutside,
   },
   {
-    icon: '🔥',
+    icon: Flame,
     title: 'Fire Pit',
     description:
       'Hang out around the fire pit right outside on the ground floor. Dogs welcome, always.',
@@ -50,9 +51,9 @@ function VibeCard({ vibe }: { vibe: (typeof vibes)[number] }) {
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
       </div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/10" />
       <div className="absolute bottom-0 left-0 right-0 p-6">
-        <span className="text-3xl">{vibe.icon}</span>
+        <vibe.icon className="w-7 h-7 text-primary" aria-hidden="true" />
         <h3 className="font-heading text-xl font-semibold text-white mt-2">
           {vibe.title}
         </h3>
@@ -111,7 +112,7 @@ export default function About() {
                   className="w-full object-cover"
                 />
               </div>
-              <div className="absolute -bottom-6 -left-6 glass-card p-4 hidden md:block">
+              <div className="absolute bottom-4 left-4 glass-card p-4 hidden md:block backdrop-blur-md bg-black/45">
                 <p className="text-primary font-heading text-lg font-bold">
                   Est. 1983
                 </p>

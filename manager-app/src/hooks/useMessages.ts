@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import type { Message } from '../types';
 import toast from 'react-hot-toast';
 
@@ -14,7 +15,8 @@ export function useMessages() {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error) {
       toast.error('Failed to load messages');
@@ -35,13 +37,13 @@ export function useMessages() {
   // Realtime subscription for new messages
   useEffect(() => {
     const channel = supabase
-      .channel('messages-realtime')
+      .channel(uniqueTopic('messages-realtime'))
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const row = payload.new as Message;
-          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [row, ...prev]));
+          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [row, ...prev].slice(0, 200)));
           // Only announce genuinely-fresh mail — a Gmail backfill inserts rows
           // with their original (often old) date, which shouldn't toast.
           const ageMs = Date.now() - new Date(row.created_at).getTime();
@@ -163,7 +165,7 @@ export function useUnreadCount() {
 
     // Realtime for count updates
     const channel = supabase
-      .channel('unread-count')
+      .channel(uniqueTopic('unread-count'))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },

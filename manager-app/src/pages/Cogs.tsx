@@ -12,7 +12,7 @@
 //
 // All costing is pure (see useCogs helpers); the screen just composes + renders.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useId, useRef } from 'react';
 import {
   Calculator,
   Plus,
@@ -62,6 +62,7 @@ import { Sparkline } from '../components/charts/Sparkline';
 import { BarChart } from '../components/charts/BarChart';
 import Select from '../components/ui/Select';
 import { Field } from '../components/ui/Field';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import type { InventoryItem } from '../types';
 
 const TARGET_POUR_COST = 20; // % — bar industry rule of thumb for liquor pour cost
@@ -110,6 +111,9 @@ function RecipeFormModal({ open, onClose, items, unitOptions, initial, onSubmitC
     (initial?.recipe_ingredients ?? []).map((ing) => ({ item_id: ing.item_id, qty: ing.qty, unit: ing.unit ?? 'oz' }))
   );
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   if (!open) return null;
 
@@ -148,10 +152,10 @@ function RecipeFormModal({ open, onClose, items, unitOptions, initial, onSubmitC
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface">
-          <h2 className="font-semibold text-text-primary">{initial ? 'Edit Recipe' : 'New Recipe'}</h2>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <h2 id={titleId} className="font-semibold text-text-primary">{initial ? 'Edit Recipe' : 'New Recipe'}</h2>
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors">
             <X size={18} />
           </button>
         </div>

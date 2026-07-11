@@ -1,6 +1,8 @@
 import { X, Loader2 } from 'lucide-react';
+import { useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { useMerchVariantLogs } from '../../hooks/useMerch';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface MerchLogDrawerProps {
   open: boolean;
@@ -12,13 +14,18 @@ interface MerchLogDrawerProps {
 /** Right-side activity drawer for a single merch variant — mirrors InventoryLogDrawer. */
 export function MerchLogDrawer({ open, onClose, variantId, label }: MerchLogDrawerProps) {
   const { logs, loading } = useMerchVariantLogs(open ? variantId : null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />}
 
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-surface border-l border-border shadow-lg transform transition-transform duration-300 ${
+        ref={panelRef}
+        tabIndex={-1}
+        inert={!open}
+        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-surface border-l border-border shadow-lg transform transition-transform duration-300 focus:outline-none ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
         role="dialog"
@@ -33,7 +40,7 @@ export function MerchLogDrawer({ open, onClose, variantId, label }: MerchLogDraw
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-2 rounded-lg hover:bg-surface-hover transition-colors"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-surface-hover transition-colors"
           >
             <X size={18} />
           </button>

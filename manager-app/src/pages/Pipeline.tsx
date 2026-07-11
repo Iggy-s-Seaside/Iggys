@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KanbanSquare, PartyPopper } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,11 +16,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PipelineCard } from '../components/pipeline/PipelineCard';
 import type { Party } from '../types';
-
-/** A short, guarded haptic tap — mirrors the app's existing `navigator.vibrate` convention. */
-function buzz(pattern: number | number[]) {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern);
-}
+import { buzz } from '../utils/haptics';
 
 /**
  * Pipeline stages are *derived* (see usePipeline), so advancing a card means
@@ -76,6 +72,18 @@ export function Pipeline() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const columnRefs = useRef<Map<PipelineStage, HTMLElement>>(new Map());
   const dragMoved = useRef(false);
+  // Per-card celebrate timers, keyed by party id (see the win block for why a single
+  // shared timer was wrong: two wins within 700ms cancelled each other's clear).
+  const celebrateTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Clear every pending celebrate timer on unmount so none fire after the page is gone.
+  useEffect(() => {
+    const timers = celebrateTimersRef.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
 
   // Rebuild columns honoring optimistic overrides.
   const columns = useMemo<PipelineColumn[]>(() => {
@@ -105,11 +113,6 @@ export function Pipeline() {
     if (Object.keys(overrides).length === 0) return baseOpenValue;
     return columns.filter((c) => c.stage !== 'paid').reduce((sum, c) => sum + c.total, 0);
   }, [columns, overrides, baseOpenValue]);
-
-  const stageOf = useCallback(
-    (partyId: number, fallback: PipelineStage): PipelineStage => overrides[partyId] ?? fallback,
-    [overrides],
-  );
 
   const moveCard = useCallback(
     async (card: PipelineCardData, from: PipelineStage, target: PipelineStage) => {
@@ -141,14 +144,22 @@ export function Pipeline() {
       buzz(won ? [12, 24, 36] : 10);
 
       if (won) {
-        setCelebrating((prev) => new Set(prev).add(card.party.id));
-        window.setTimeout(() => {
+        const pid = card.party.id;
+        setCelebrating((prev) => new Set(prev).add(pid));
+        // Per-card timer keyed by party id: two wins within 700ms must not cancel each
+        // other's clear (a single shared timer left the first winner's sparkles stuck
+        // on forever). Re-winning the same card resets just its own timer.
+        const existing = celebrateTimersRef.current.get(pid);
+        if (existing) clearTimeout(existing);
+        const t = setTimeout(() => {
+          celebrateTimersRef.current.delete(pid);
           setCelebrating((prev) => {
             const next = new Set(prev);
-            next.delete(card.party.id);
+            next.delete(pid);
             return next;
           });
         }, 700);
+        celebrateTimersRef.current.set(pid, t);
       }
 
       const ok = await update(card.party.id, fields);
@@ -228,20 +239,30 @@ export function Pipeline() {
     () => {
       if (!drag) return;
       const target = drag.over;
-      const from = drag.from;
       const partyId = drag.partyId;
       setDrag(null);
-      if (!dragMoved.current || !target || target === from) return;
-      // Find the live card to move.
-      const card = baseColumns
-        .flatMap((c) => c.cards)
-        .find((c) => c.party.id === partyId);
-      if (card) void moveCard(card, stageOf(partyId, from), target);
+      if (!dragMoved.current || !target) return;
+      // Use the card's LIVE stage — the column it actually sits in right now — not the
+      // stale `drag.from` captured at pointer-down. A realtime payment change mid-drag
+      // can move the card (e.g. into 'paid'); the stale stage would slip past moveCard's
+      // paid-guard and demote a payment-backed party. (overrides is empty at drop time,
+      // so stageOf would also be stale — derive straight from the live baseColumns.)
+      const liveCol = baseColumns.find((c) => c.cards.some((cd) => cd.party.id === partyId));
+      const card = liveCol?.cards.find((cd) => cd.party.id === partyId);
+      const from = liveCol?.stage ?? drag.from;
+      if (!card || target === from) return;
+      void moveCard(card, from, target);
     },
-    [drag, baseColumns, moveCard, stageOf],
+    [drag, baseColumns, moveCard],
   );
 
   const isEmpty = !loading && columns.every((c) => c.count === 0);
+
+  // The dragged card's LIVE stage (same derivation endDrag uses) so the drop-target ring
+  // and the ghost's "→ stage" hint stay correct if a realtime payment moved it mid-drag.
+  const liveDragFrom = drag
+    ? baseColumns.find((c) => c.cards.some((cd) => cd.party.id === drag.partyId))?.stage ?? drag.from
+    : null;
 
   return (
     <div>
@@ -285,7 +306,7 @@ export function Pipeline() {
             const stageIdx = PIPELINE_STAGES.indexOf(column.stage);
             const nextStage = PIPELINE_STAGES[stageIdx + 1] ?? null;
             const prevStage = PIPELINE_STAGES[stageIdx - 1] ?? null;
-            const isDropTarget = drag?.over === column.stage && drag.from !== column.stage;
+            const isDropTarget = drag?.over === column.stage && liveDragFrom !== column.stage;
             return (
               <div key={column.stage} className="snap-start">
                 <div
@@ -360,7 +381,7 @@ export function Pipeline() {
           <p className="text-sm font-semibold text-text-primary truncate">
             {dragLabel(baseColumns, drag.partyId)}
           </p>
-          {drag.over && drag.over !== drag.from && (
+          {drag.over && drag.over !== liveDragFrom && (
             <p className="text-xs text-primary font-medium mt-0.5">→ {PIPELINE_STAGE_LABELS[drag.over]}</p>
           )}
         </div>

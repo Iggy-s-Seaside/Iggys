@@ -32,6 +32,10 @@ import urllib.request
 from datetime import date, datetime, timedelta
 
 import psycopg2
+try:
+    import bar_look
+except Exception:
+    bar_look = None
 
 import weather_reach  # weather × reservation cross-signal → reach (sibling module)
 
@@ -66,6 +70,14 @@ MAX_EVENT_LINES = 40
 MAX_PARTY_LINES = 10
 MAX_LINE_CHARS = 160       # per context bullet line
 MAX_QUESTION_CHARS = 4000  # cap on the manager's question text
+
+# Past context so "how did the show last Saturday go / how many came" is
+# answerable — the forward event window above hides anything before today, and
+# the nightly camera/footage read (band + headcount) lives in luna_chronicle +
+# demand_log.note, neither of which the Q&A path used to surface.
+PAST_EVENT_DAYS = 60       # how far back to surface already-happened events
+MAX_PAST_EVENT_LINES = 20
+NIGHT_LOG_DAYS = 14        # recent nights' footage verdict + headcount to surface
 
 ERROR_COLUMN_MAX = 500     # luna_messages.error truncation
 
@@ -225,7 +237,8 @@ def gather_context(conn) -> dict:
     horizon = today + timedelta(days=CONTEXT_DAYS)
     ctx = {"today": today, "events": [], "recurring": [], "parties": [],
            "new_messages": None, "low_stock": [], "specials": [],
-           "happy_hour": [], "todos": [], "followups": []}
+           "happy_hour": [], "todos": [], "followups": [],
+           "past_events": [], "night_log": []}
 
     rows = _query(
         conn,
@@ -392,6 +405,62 @@ def gather_context(conn) -> dict:
             bits.append(str(space))
         ctx["followups"].append(trunc(" | ".join(bits), MAX_LINE_CHARS))
 
+    # Recent PAST events (already happened). The forward window above hides
+    # anything before today, so without this a question like "how did the show
+    # last Saturday go" can't even match the event row — the original cause of
+    # the "I don't have a record of that event" miss.
+    rows = _query(
+        conn,
+        """
+        SELECT date, time, all_day, title, category, space
+        FROM events
+        WHERE active = true
+          AND is_recurring IS NOT TRUE
+          AND date < %s AND date >= %s
+        ORDER BY date DESC, start_min NULLS LAST, title
+        LIMIT %s
+        """,
+        (today, today - timedelta(days=PAST_EVENT_DAYS), MAX_PAST_EVENT_LINES),
+    )
+    for r in rows or []:
+        d, t, all_day, title, category, space = r
+        when = "all day" if all_day else (str(t) if t else "")
+        extras = ", ".join(x for x in (category, space) if x)
+        line = f"{d} {when} | {title}" + (f" ({extras})" if extras else "")
+        ctx["past_events"].append(trunc(line, MAX_LINE_CHARS))
+
+    # Recent nights' camera/footage read. The band verdict lives in
+    # luna_chronicle; the numeric peak ("peak 305 floor person-detections/hr")
+    # lives in demand_log.note (business_day is unique, so the join is 1:1).
+    # Surfacing both lets "how busy / how many on the 20th" answer from real data.
+    rows = _query(
+        conn,
+        """
+        SELECT c.business_day,
+               c.context->>'actual_band'      AS band,
+               c.context->>'busyness_totals'  AS totals,
+               d.note                          AS footage_note
+        FROM luna_chronicle c
+        LEFT JOIN demand_log d ON d.business_day = c.business_day
+        WHERE c.business_day < %s AND c.business_day >= %s
+        ORDER BY c.business_day DESC
+        LIMIT %s
+        """,
+        (today, today - timedelta(days=NIGHT_LOG_DAYS), NIGHT_LOG_DAYS),
+    )
+    for r in rows or []:
+        bday, band, totals, note = r
+        bits = [str(bday)]
+        if band:
+            bits.append(band)
+        # Prefer structured totals; else the prose footage note (where the peak
+        # headcount currently lives for nights like 2026-06-20).
+        if totals:
+            bits.append(totals)
+        elif note:
+            bits.append(trunc(note, 160))
+        ctx["night_log"].append(trunc(" | ".join(bits), MAX_LINE_CHARS))
+
     # End the read snapshot cleanly (important behind a session pooler).
     try:
         conn.rollback()
@@ -501,6 +570,14 @@ def context_block(ctx: dict) -> str:
         lines.append("\nRecurring weekly events:")
         lines += [f"- {e}" for e in ctx["recurring"]]
 
+    if ctx.get("past_events"):
+        lines.append("\nRecent past events (already happened — use for 'how did the show/night last week go' questions):")
+        lines += [f"- {e}" for e in ctx["past_events"]]
+
+    if ctx.get("night_log"):
+        lines.append("\nRecent nights — camera/footage read (band + peak person-detections/hr; this is a busyness PROXY, NOT a unique head count):")
+        lines += [f"- {n}" for n in ctx["night_log"]]
+
     lines.append("\nUpcoming parties / private bookings:")
     if ctx["parties"]:
         lines += [f"- {p}" for p in ctx["parties"]]
@@ -604,6 +681,13 @@ QUESTION_PREAMBLE = (
     "SAFETY-CRITICAL: never guess whether an item is gluten-free, dairy-free, nut-free, etc. "
     "State a dietary/allergen fact only if it is explicit in the MENU data; otherwise say you'll "
     "confirm with the kitchen. A wrong allergen answer can put a guest in the hospital.\n"
+    "PAST NIGHTS & EVENTS: the CONTEXT includes 'Recent past events' (shows/events that already "
+    "happened) and 'Recent nights' (the camera/footage read for recent business days). When asked "
+    "how an event or night went, or 'how many people' were there, answer from these - match the "
+    "event by name and date. Report the footage figure as what it is: a busyness proxy (person-"
+    "detection events per hour, and a SLOW/STEADY/BUSY/PACKED band), never as an exact count of "
+    "unique people - say e.g. 'PACKED - the cameras logged a peak of ~305 person-detections an "
+    "hour on the floor', not '305 people were there'.\n"
     "Answer directly: concise, concrete, plain text, no markdown (no ** or # markers; simple "
     "dashes for lists). When your answer rests on data, end with a short 'Sources:' line."
 )
@@ -1045,6 +1129,8 @@ def process_pending(conn) -> int:
             continue
         if (content or "").strip() == CMD_REGEN_SPECIAL:
             handle_special_regen(conn, qid)
+        elif bar_look is not None and (content or "").strip() == bar_look.CMD:
+            bar_look.handle(conn, qid)
         else:
             handle_question(conn, qid, content, author_email)
         handled += 1
@@ -1081,6 +1167,22 @@ def handle_special_regen(conn, qid) -> None:
         conn.commit()
 
 
+def _bridge_heartbeat(conn) -> None:
+    """Tell the Lighthouse cloud relay that home is alive (writes
+    luna_bridge_health.last_seen). Best-effort: a failed heartbeat must never
+    sink the loop — the relay simply treats a stale heartbeat as 'home down'
+    and covers for us. The relay only steps in when this goes stale."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT public.luna_bridge_heartbeat()")
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+
 def run_daemon() -> None:
     log(f"bridge daemon starting (poll every {POLL_SECONDS}s, triage every "
         f"{TRIAGE_INTERVAL}s, Luna at {LUNA_API_URL})")
@@ -1096,6 +1198,7 @@ def run_daemon() -> None:
                 conn = connect_db()
                 requeue_stuck(conn)
                 backoff = 2
+            _bridge_heartbeat(conn)   # Lighthouse: signal home is alive each tick
             if process_pending(conn) == 0:
                 # Idle tick: interactive Q&A always wins. On quiet ticks fold in
                 # background work — at most one heavy op per tick: the inbox
@@ -2172,9 +2275,33 @@ def compute_pulse(w, conventions, d, calib=None, tourism=None) -> dict:
         else:
             confidence = f"learning · {n} night{'s' if n != 1 else ''} logged"
 
+    # ── Rush-window call (v1 heuristic) ─────────────────────────────────────
+    # Luna's TIMING call, logged to demand_log.predicted_rush so the footage
+    # hourly curves can score it later — the scoreboard data she asked for on
+    # 2026-07-08 ("I want the data to exist so future-me can actually earn that
+    # score"). Deterministic + transparent like the rest of this function:
+    # weekday base window, pulled earlier when a convention crowd spills out
+    # for dinner, held later on holiday / mega-surge nights. v1 is a seed to
+    # be scored against, not a claim of timing skill.
+    names = {n for (n, _s, _d) in drivers}
+    if wd in (4, 5):
+        rush_start, rush_end, rush_why = 20, 23, "Fri/Sat base 20:00-23:00"
+    elif wd == 6:
+        rush_start, rush_end, rush_why = 18, 21, "Sunday base 18:00-21:00"
+    else:
+        rush_start, rush_end, rush_why = 19, 21, "weeknight base 19:00-21:00"
+    if "convention" in names and rush_start > 18:
+        rush_start = 18
+        rush_why += "; convention dinner spillover pulls the start to 18:00"
+    if ("holiday" in names or "mega surge" in names) and rush_end < 23:
+        rush_end = 23
+        rush_why += "; holiday/mega-surge night holds late"
+    rush = {"start": f"{rush_start:02d}:00", "end": f"{rush_end:02d}:00",
+            "why": rush_why, "v": 1}
+
     band = ("SLOW" if score < 38 else "STEADY" if score < 58 else "BUSY" if score < 78 else "PACKED")
     return {"band": band, "score": round(score), "base_score": round(base_score),
-            "drivers": drivers, "confidence": confidence}
+            "drivers": drivers, "confidence": confidence, "rush": rush}
 
 
 def _candidate_specials(band, w) -> list:
@@ -2226,8 +2353,15 @@ def build_pulse_user(p, w, conventions, tourism=None) -> str:
     conv = "; ".join(c["title"] + (" (in progress)" if c.get("ongoing") else "") for c in conventions[:3]) or "none listed"
     tour = "; ".join(c["title"] for c in (tourism or [])[:3]) or "none listed"
     specials = " OR ".join(_candidate_specials(p["band"], w))
+    rush = p.get("rush") or {}
+    rush_line = (
+        f"Your rush-window call (deterministic): expect the push {rush.get('start')}-{rush.get('end')} "
+        f"({rush.get('why')}). Fold the timing in naturally if it earns a mention."
+        if rush.get("start") else "Rush-window call: none computed."
+    )
     return "\n".join([
         f"Computed band: {p['band']} (confidence: {p['confidence']}). Lean on the drivers below, not a precise number.",
+        rush_line,
         f"Model drivers: {drivers}.",
         f"Weather: high {w.get('high')}F, low {w.get('low')}F, {w.get('precip')}% rain, max gust {w.get('gust')} mph; "
         f"sunset {w.get('sunset') or 'n/a'}; Portland high {w.get('pdx_high')}F.",
@@ -2313,7 +2447,7 @@ def run_pulse(conn) -> None:
             body, action = _pulse_fallback(p), None
         data = {
             "band": p["band"], "score": p["score"], "base_score": p["base_score"],
-            "confidence": p["confidence"],
+            "confidence": p["confidence"], "rush": p.get("rush"),
             "drivers": [{"name": n, "sign": s, "detail": d} for (n, s, d) in p["drivers"]],
             "sunset": w.get("sunset"),
             "weather": {k: w.get(k) for k in ("high", "low", "precip", "gust", "pdx_high", "code")},
@@ -2358,12 +2492,14 @@ def run_pulse(conn) -> None:
             # Log the prediction for the forecast-vs-actual trust loop. The
             # manager's nightly close-out fills actual_band on the same row.
             cur.execute(
-                "INSERT INTO demand_log (business_day, predicted_band, predicted_score, base_score, drivers) "
-                "VALUES (%s, %s, %s, %s, %s::jsonb) "
+                "INSERT INTO demand_log (business_day, predicted_band, predicted_score, base_score, drivers, predicted_rush) "
+                "VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb) "
                 "ON CONFLICT (business_day) DO UPDATE SET "
                 "predicted_band = EXCLUDED.predicted_band, predicted_score = EXCLUDED.predicted_score, "
-                "base_score = EXCLUDED.base_score, drivers = EXCLUDED.drivers, updated_at = now()",
-                (date.today(), p["band"], p["score"], p["base_score"], json.dumps(data["drivers"])),
+                "base_score = EXCLUDED.base_score, drivers = EXCLUDED.drivers, "
+                "predicted_rush = EXCLUDED.predicted_rush, updated_at = now()",
+                (date.today(), p["band"], p["score"], p["base_score"], json.dumps(data["drivers"]),
+                 json.dumps(p.get("rush"))),
             )
             # If tonight is a plannable surprise (a conference in town, a mega
             # day), reach out — once per kind per evening, not every 4h tick.

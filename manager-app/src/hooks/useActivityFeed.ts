@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getLowStockItems } from './useInventory';
+import { decodeInsight } from './useLuna';
 import type {
   Party,
   Message,
@@ -114,7 +115,7 @@ export function useActivityFeed() {
 
     if (!partyRes.error) setParties((partyRes.data as Party[]) || []);
     if (!msgRes.error) setMessages((msgRes.data as Message[]) || []);
-    if (!insightRes.error) setInsights((insightRes.data as LunaInsight[]) || []);
+    if (!insightRes.error) setInsights(((insightRes.data as LunaInsight[]) || []).map(decodeInsight));
     if (!invRes.error) setInventory((invRes.data as InventoryItem[]) || []);
     if (!resvRes.error)
       setWaitlist(

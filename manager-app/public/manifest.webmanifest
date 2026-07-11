@@ -7,7 +7,7 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "theme_color": "#2dd4bf",
+  "theme_color": "#0a0f0f",
   "background_color": "#0a0f0f",
   "categories": ["business", "productivity", "food"],
   "icons": [
@@ -30,10 +30,42 @@
       "purpose": "any"
     },
     {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Run Sheet",
+      "short_name": "Run Sheet",
+      "url": "/run-sheet",
+      "icons": [{ "src": "/shortcut-runsheet.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Messages",
+      "short_name": "Messages",
+      "url": "/messages",
+      "icons": [{ "src": "/shortcut-messages.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Today's Shift",
+      "short_name": "Shift",
+      "url": "/shift",
+      "icons": [{ "src": "/shortcut-shift.png", "sizes": "96x96", "type": "image/png" }]
     }
   ]
 }

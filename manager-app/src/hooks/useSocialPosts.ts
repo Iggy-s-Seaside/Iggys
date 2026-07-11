@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { uniqueTopic } from '../lib/realtimeTopic';
 import toast from 'react-hot-toast';
 import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 
@@ -69,7 +70,8 @@ export function useSocialPosts() {
     const { data, error } = await supabase
       .from('social_posts')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
     if (error) {
       toast.error('Failed to load social posts');
       console.error('[social_posts] load error:', error.message);
@@ -86,7 +88,7 @@ export function useSocialPosts() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('social-posts-realtime')
+      .channel(uniqueTopic('social-posts-realtime'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => {
         refresh();
       })

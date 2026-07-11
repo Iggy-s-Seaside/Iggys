@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { X, Globe, Loader2, Calendar as CalIcon } from 'lucide-react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -49,6 +50,9 @@ export function PromoteEventModal({
   const [category, setCategory] = useState('');
   const [space, setSpace] = useState<Space>('whole');
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onClose });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,15 +93,20 @@ export function PromoteEventModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
       <div
-        className="bg-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-card max-h-[92dvh] overflow-y-auto"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="bg-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-card max-h-[92dvh] overflow-y-auto focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-surface">
           <div className="flex items-center gap-2">
             <Globe size={18} className="text-primary" />
-            <h2 className="font-semibold text-text-primary">Add to public calendar</h2>
+            <h2 id={titleId} className="font-semibold text-text-primary">Add to public calendar</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg hover:bg-surface-hover transition-colors text-text-muted">
             <X size={18} />
           </button>
         </div>

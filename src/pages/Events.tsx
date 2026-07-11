@@ -14,9 +14,12 @@ import PageHeader from '../components/layout/PageHeader';
 import SectionHeader from '../components/layout/SectionHeader';
 import LoadingSkeleton from '../components/menu/LoadingSkeleton';
 import EventsCalendar from '../components/events/EventsCalendar';
+import EventsJsonLd from '../components/events/EventsJsonLd';
+import SaturdayNightsSection from '../components/events/SaturdayNightsSection';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials } from '../hooks/useMenuData';
 import { usePublicCalendar } from '../hooks/usePublicCalendar';
+import { eventDateKeys, todayKey } from '../lib/calendarDates';
 import { isSpecialLive } from '../utils/specialsWindow';
 import type { IggyEvent, Special } from '../types/menu';
 
@@ -29,9 +32,21 @@ function formatDate(dateStr: string) {
     };
 }
 
+/** Recurring events badge their NEXT occurrence, not the (stale) anchor date. */
+function displayDateFor(event: IggyEvent): string {
+    if (!event.is_recurring) return event.date;
+    const from = todayKey();
+    const [y, m, d] = from.split('-').map(Number);
+    const to = new Date(y, m - 1, d + 13);
+    const toKey = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(
+        to.getDate(),
+    ).padStart(2, '0')}`;
+    return eventDateKeys(event, from, toKey)[0] ?? event.date;
+}
+
 function EventCard({ event }: { event: IggyEvent }) {
     const { ref, isVisible } = useScrollAnimation();
-    const date = formatDate(event.date);
+    const date = formatDate(displayDateFor(event));
 
     return (
         <div
@@ -179,6 +194,8 @@ export default function Events() {
 
     return (
         <div>
+            {/* Google event rich-results markup — data-driven from the same rows */}
+            <EventsJsonLd events={events} />
             <PageHeader
                 eyebrow="What's Happening"
                 title="Events & Specials"
@@ -240,7 +257,12 @@ export default function Events() {
                 </div>
             </section>
 
-            {/* Current Specials */}
+            {/* High Tide Saturdays — ambient loop + gallery */}
+            <SaturdayNightsSection />
+
+            {/* Current Specials — hidden entirely when none are running;
+                the happy-hour CTA below already carries the fallback ask */}
+            {(specialsLoading || activeSpecials.length > 0) && (
             <section className="section-padding bg-surface/30">
                 <div className="section-container">
                     <SectionHeader
@@ -260,24 +282,11 @@ export default function Events() {
                                     />
                                 ))}
                             </div>
-                        ) : (
-                            <div className="glass-card p-12 text-center">
-                                <Sparkles className="w-10 h-10 text-accent/40 mx-auto mb-4" />
-                                <h3 className="font-heading text-xl text-white mb-2">
-                                    No current specials
-                                </h3>
-                                <p className="text-text-muted mb-6">
-                                    Our regular menu is always available. Happy
-                                    hour is daily 3-5pm!
-                                </p>
-                                <Link to="/happy-hour" className="btn-primary text-sm">
-                                    View Happy Hour Deals
-                                </Link>
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </section>
+            )}
 
             {/* Happy Hour CTA */}
             <section className="section-padding">

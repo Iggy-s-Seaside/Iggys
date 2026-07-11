@@ -179,15 +179,15 @@ export function TodaysPulse({ events, activeSpecials, lowStockCount, unreadCount
                   {action.label || 'Do it'} <ArrowRight size={13} />
                 </button>
               )}
-              {accuracy && accuracy.n >= 2 && (
-                <p className="text-[11px] text-white/70 mt-2">
-                  Luna's last {accuracy.n} calls: {accuracy.pct}% on the money
-                </p>
-              )}
             </div>
           );
         })() : (
           <p className="text-[13px] text-white/90 mt-3.5 leading-snug">{vibe}</p>
+        )}
+        {accuracy && accuracy.n >= 2 && (
+          <p className="text-[11px] text-white/70 mt-2">
+            Luna's last {accuracy.n} calls: {accuracy.pct}% on the money
+          </p>
         )}
       </div>
     </div>

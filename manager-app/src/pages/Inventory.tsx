@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId, useRef } from 'react';
 import {
   Package,
   Plus,
@@ -7,12 +7,12 @@ import {
   Trash2,
   History,
   AlertTriangle,
-  Loader2,
   X,
   ClipboardList,
   Clock,
 } from 'lucide-react';
 import { ErrorState } from '../components/ui/ErrorState';
+import { Skeleton } from '../components/ui/Skeleton';
 import {
   useInventoryItems,
   useInventoryCategories,
@@ -30,6 +30,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { useOrderScanner } from '../hooks/useOrderScanner';
 import Select from '../components/ui/Select';
 import { Field } from '../components/ui/Field';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { QuickAdjust } from '../components/inventory/QuickAdjust';
 import { InventoryLogDrawer } from '../components/inventory/InventoryLogDrawer';
 import { ScanOrderButton } from '../components/inventory/ScanOrderButton';
@@ -61,6 +62,9 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
     active: initial?.active ?? true,
   });
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   if (!open) return null;
 
@@ -79,12 +83,12 @@ function ItemFormModal({ open, onClose, onSubmit, categories, initial }: ItemFor
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative bg-surface border border-border rounded-xl shadow-lg w-full max-w-lg max-h-[90dvh] overflow-y-auto mx-4 focus:outline-none">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-semibold text-text-primary">
+          <h2 id={titleId} className="font-semibold text-text-primary">
             {initial ? 'Edit Item' : 'Add Item'}
           </h2>
-          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover">
+          <button onClick={onClose} aria-label="Close" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-surface-hover transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -329,6 +333,8 @@ export function Inventory() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               className="input-field pl-9 w-full sm:w-64"
+              type="search"
+              aria-label="Search inventory items"
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -463,8 +469,17 @@ export function Inventory() {
 
       {/* Content */}
       {loading ? (
-        <div className="card p-16 flex items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-text-muted" />
+        <div className="card divide-y divide-border" aria-busy="true" aria-label="Loading inventory">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-4">
+              <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+              <Skeleton className="w-16 h-8 rounded-lg shrink-0" />
+            </div>
+          ))}
         </div>
       ) : error && items.length === 0 ? (
         <ErrorState onRetry={refresh} description="We couldn't load your inventory. Your counts are safe." />
@@ -647,8 +662,8 @@ export function Inventory() {
         open={scanModalOpen}
         onClose={() => {
           setScanModalOpen(false);
+          scanner.reset();
           if (scanner.state === 'done') {
-            scanner.reset();
             refresh();
           }
         }}

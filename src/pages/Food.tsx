@@ -159,25 +159,28 @@ export default function Food() {
             </span>
           </div>
 
-          {/* Category pills */}
-          <div
-            ref={navRef}
-            className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide -mx-1 px-1"
-          >
-            {categoryNames.map((name) => (
-              <button
-                key={name}
-                data-category={name}
-                onClick={() => scrollToCategory(name)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
-                  activeCategory === name
-                    ? 'bg-primary text-background'
-                    : 'bg-white/[0.06] text-text-muted hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {name}
-              </button>
-            ))}
+          {/* Category pills — right-edge fade signals the row scrolls */}
+          <div className="relative">
+            <div
+              ref={navRef}
+              className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide -mx-1 px-1 pr-10"
+            >
+              {categoryNames.map((name) => (
+                <button
+                  key={name}
+                  data-category={name}
+                  onClick={() => scrollToCategory(name)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+                    activeCategory === name
+                      ? 'bg-primary text-background'
+                      : 'bg-white/[0.06] text-text-muted hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent" />
           </div>
         </div>
       </div>

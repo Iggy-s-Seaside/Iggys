@@ -13,7 +13,7 @@ import {
 import SectionHeader from '../components/layout/SectionHeader';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useEvents, useSpecials, useCocktails, useOnTap } from '../hooks/useMenuData';
-import { images, drinkImages } from '../data/images';
+import { images } from '../data/images';
 
 function useHappyHourStatus() {
     const [status, setStatus] = useState(() => getHappyHourStatus());
@@ -158,6 +158,10 @@ export default function Home() {
     const draftBeers = onTapBeers.slice(0, 4);
     const activeEvents = events.filter((e) => e.active).slice(0, 2);
     const activeSpecials = specials.filter((s) => s.active).slice(0, 2);
+    // Only split into two columns when BOTH have content — otherwise a lone
+    // column leaves the other half of the grid an empty block.
+    const bothEventColumns =
+        activeEvents.length > 0 && activeSpecials.length > 0;
 
     // Pull prices from Supabase, use shortened ingredient descriptions
     const cocktailItems = FEATURED_COCKTAILS.map((featured) => {
@@ -178,14 +182,17 @@ export default function Home() {
             <section className="relative min-h-[85vh] md:min-h-screen overflow-hidden flex items-end">
                 {/* Background image with parallax */}
                 <div
-                    className="absolute inset-0 bg-cover bg-bottom md:bg-center md:bg-fixed"
+                    className="absolute inset-0 bg-cover bg-[center_35%] md:bg-center md:bg-fixed"
                     style={{
-                        backgroundImage: 'url(/images/real_bar.jpg)',
+                        backgroundImage: 'url(/images/opt/real-bar.jpg)',
                         willChange: 'transform',
                     }}
                 />
                 {/* Gradient: transparent top fading to solid dark at bottom */}
                 <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-background" />
+                {/* Mobile-only: crush the bright daylight patio corner so the
+                    hero stays noir and the info line pops (Gemini gate note) */}
+                <div className="absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-background via-background/85 to-transparent md:hidden" />
 
                 {/* Content — pinned to the bottom */}
                 <div className="relative z-10 w-full section-container pb-20 pt-40">
@@ -364,10 +371,16 @@ export default function Home() {
                         <SectionHeader
                             eyebrow="What's Happening"
                             title="Events & specials"
-                            subtitle="Live music, drag shows, seasonal cocktails — there's always something going on."
+                            subtitle="Live music, DJ nights, seasonal cocktails — there's always something going on."
                         />
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+                        <div
+                            className={`mt-12 ${
+                                bothEventColumns
+                                    ? 'grid grid-cols-1 lg:grid-cols-2 gap-8'
+                                    : 'max-w-2xl mx-auto'
+                            }`}
+                        >
                             {/* Events column */}
                             {activeEvents.length > 0 && (
                                 <div className="space-y-4">
@@ -517,8 +530,11 @@ export default function Home() {
                         {/* Right: Image */}
                         <div>
                             <img
-                                src={drinkImages[4]}
-                                alt="Handcrafted cocktails at Iggy's"
+                                src="/images/cocktails/iggys-old-fashion.jpg"
+                                alt="Iggy's Old Fashion — Bulleit rye, muddled orange and cherry"
+                                width={880}
+                                height={1100}
+                                loading="lazy"
                                 className="rounded-2xl shadow-2xl w-full"
                             />
                         </div>
