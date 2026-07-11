@@ -707,7 +707,8 @@ export interface MessageTemplate {
 
 // ── Luna (AI assistant) ──
 
-export const LUNA_MESSAGE_STATUSES = ['pending', 'processing', 'answered', 'error'] as const;
+// 'relaying' = the cloud Lighthouse relay has claimed the question (home offline).
+export const LUNA_MESSAGE_STATUSES = ['pending', 'processing', 'answered', 'error', 'relaying'] as const;
 export type LunaMessageStatus = (typeof LUNA_MESSAGE_STATUSES)[number];
 
 export interface LunaMessage {
@@ -719,6 +720,8 @@ export interface LunaMessage {
   reply_to: number | null;
   author_email: string | null;
   error: string | null;
+  // 'bridge' = answered by home PC1; 'relay' = answered by the cloud fallback.
+  source?: 'bridge' | 'relay' | null;
 }
 
 export const LUNA_INSIGHT_KINDS = ['briefing', 'alert', 'suggestion', 'note', 'pulse', 'special'] as const;

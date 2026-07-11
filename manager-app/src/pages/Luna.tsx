@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Moon, Send, RefreshCw, Eye, X, Loader2, MessageCircle, Lightbulb, WifiOff,
-  ArrowRight, Copy, FileText, BookHeart,
+  ArrowRight, Copy, FileText, BookHeart, CloudOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLunaMessages, useLunaInsights } from '../hooks/useLuna';
@@ -55,7 +55,17 @@ function MessageBubble({ msg, onRetry }: { msg: LunaMessage; onRetry: (msg: Luna
           <div className="bg-surface border border-purple-200/60 dark:border-purple-500/20 rounded-2xl rounded-bl-md px-4 py-2.5 shadow-card">
             <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">{msg.content}</p>
           </div>
-          <p className="text-[11px] text-text-muted mt-1 ml-1">Luna · {relativeTime(msg.created_at)}</p>
+          <p className="text-[11px] text-text-muted mt-1 ml-1">
+            Luna · {relativeTime(msg.created_at)}
+            {msg.source === 'relay' && (
+              <span
+                className="ml-1 inline-flex items-center gap-0.5"
+                title="The home system was offline, so Luna answered from the cloud with cached info — live cameras and deep memory weren't available."
+              >
+                · <CloudOff size={11} className="inline shrink-0" /> from cloud
+              </span>
+            )}
+          </p>
         </div>
       </div>
     );
@@ -273,7 +283,7 @@ function InsightCard({
 
 export function Luna() {
   const { user } = useAuth();
-  const { messages, loading, sendMessage, retryMessage } = useLunaMessages();
+  const { messages, loading, sendMessage, retryMessage, refresh } = useLunaMessages();
   // Control rows the dashboard writes (the camera "Look now" and special "Try again" buttons)
   // aren't real conversation — keep them out of the chat view.
   const visibleMessages = messages.filter(
@@ -296,7 +306,8 @@ export function Luna() {
   const lastMessage = messages[messages.length - 1];
   const waiting =
     lastMessage?.role === 'user' &&
-    (lastMessage.status === 'pending' || lastMessage.status === 'processing');
+    (lastMessage.status === 'pending' || lastMessage.status === 'processing' ||
+     lastMessage.status === 'relaying');
   // Re-evaluate "stuck" while waiting so the offline notice can appear
   // without any new realtime event arriving.
   useEffect(() => {
@@ -309,6 +320,22 @@ export function Luna() {
     : 0;
   const thinking = waiting && waitedMs < STUCK_AFTER_MS;
   const stuck = waiting && waitedMs >= STUCK_AFTER_MS;
+  // Self-heal a dropped realtime push: when a question crosses the stuck
+  // threshold, re-fetch the thread ONCE before the offline notice renders. If
+  // the bridge already answered server-side (the answer exists but the realtime
+  // event was missed — exactly today's false-offline), the refetch pulls the
+  // reply and `stuck` dissolves. The banner then only appears after a fresh read
+  // confirms the question is genuinely still unanswered.
+  const didStuckRefetch = useRef(false);
+  useEffect(() => {
+    if (!stuck) {
+      didStuckRefetch.current = false;
+      return;
+    }
+    if (didStuckRefetch.current) return;
+    didStuckRefetch.current = true;
+    void refresh();
+  }, [stuck, refresh]);
 
   // The daily pulse + creative special are their own dashboard cards — keep them out of the feed.
   const feedInsights = useMemo(
