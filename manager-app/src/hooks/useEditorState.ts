@@ -39,7 +39,8 @@ type EditorAction =
   | { type: 'UNDO' }
   | { type: 'REDO' };
 
-export type { EditorAction };
+export type { EditorAction, HistoryState };
+export { editorReducer, MAX_HISTORY };
 
 const MAX_HISTORY = 50;
 
@@ -57,10 +58,15 @@ function createInitialState(): EditorState {
 
 function editorReducer(state: HistoryState, action: EditorAction): HistoryState {
   if (action.type === 'UNDO') {
-    if (state.past.length === 0) return state;
-    const previous = state.past[state.past.length - 1];
+    // A transient drag baseline in flight must be folded into `past` first (as
+    // COMMIT_HISTORY does) so undo doesn't silently discard it.
+    const past = state.pendingPast
+      ? [...state.past.slice(-(MAX_HISTORY - 1)), state.pendingPast]
+      : state.past;
+    if (past.length === 0) return state;
+    const previous = past[past.length - 1];
     return {
-      past: state.past.slice(0, -1),
+      past: past.slice(0, -1),
       present: previous,
       future: [state.present, ...state.future],
       pendingPast: null,
@@ -69,9 +75,12 @@ function editorReducer(state: HistoryState, action: EditorAction): HistoryState 
 
   if (action.type === 'REDO') {
     if (state.future.length === 0) return state;
+    const past = state.pendingPast
+      ? [...state.past.slice(-(MAX_HISTORY - 1)), state.pendingPast]
+      : state.past;
     const next = state.future[0];
     return {
-      past: [...state.past, state.present],
+      past: [...past, state.present],
       present: next,
       future: state.future.slice(1),
       pendingPast: null,
@@ -103,7 +112,7 @@ function editorReducer(state: HistoryState, action: EditorAction): HistoryState 
     if (!state.pendingPast) return state;
     return {
       ...state,
-      past: [...state.past.slice(-MAX_HISTORY), state.pendingPast],
+      past: [...state.past.slice(-(MAX_HISTORY - 1)), state.pendingPast],
       pendingPast: null,
       future: [],
     };
@@ -114,7 +123,7 @@ function editorReducer(state: HistoryState, action: EditorAction): HistoryState 
   const baseline = state.pendingPast ?? state.present;
   const newPresent = applyAction(state.present, action);
   return {
-    past: [...state.past.slice(-MAX_HISTORY), baseline],
+    past: [...state.past.slice(-(MAX_HISTORY - 1)), baseline],
     present: newPresent,
     future: [],
     pendingPast: null,
@@ -176,14 +185,39 @@ function applyAction(state: EditorState, action: EditorAction): EditorState {
         ),
       };
 
-    case 'REORDER_LAYERS':
+    case 'REORDER_LAYERS': {
+      // Guard against a stale/foreign array (e.g. a drag-reorder computed against an
+      // outdated layer list) silently replacing the real layers.
+      const currentIds = new Set(state.layers.map((l) => l.id));
+      const isValidReorder =
+        action.layers.length === state.layers.length &&
+        action.layers.every((l) => currentIds.has(l.id));
+      if (!isValidReorder) return state;
       return { ...state, layers: action.layers };
+    }
 
     case 'LOAD_STATE':
       return action.state;
 
-    case 'SET_CANVAS_SIZE':
-      return { ...state, canvasWidth: action.width, canvasHeight: action.height };
+    case 'SET_CANVAS_SIZE': {
+      const { width, height } = action;
+      return {
+        ...state,
+        canvasWidth: width,
+        canvasHeight: height,
+        // Reposition/clamp layers stranded by an aspect-ratio change (e.g. 1:1 → 9:16).
+        // Layers that already fit are left untouched.
+        layers: state.layers.map((l) => {
+          const lHeight = l.imageHeight ?? estimateTextHeight(l.text || '', l.fontSize ?? 48, l.width ?? 300, l.lineHeight ?? 1.3);
+          const maxX = Math.max(0, width - (l.width ?? 300));
+          const maxY = Math.max(0, height - lHeight);
+          const clampedX = Math.min(Math.max(l.x, 0), maxX);
+          const clampedY = Math.min(Math.max(l.y, 0), maxY);
+          if (clampedX === l.x && clampedY === l.y) return l;
+          return { ...l, x: clampedX, y: clampedY };
+        }),
+      };
+    }
 
     default:
       return state;

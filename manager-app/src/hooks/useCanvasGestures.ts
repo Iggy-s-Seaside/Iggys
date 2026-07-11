@@ -3,6 +3,56 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3.0;
 
+/**
+ * Post-pan clamp for one axis, in two regimes:
+ *  - canvas FITS in the viewport (scaled ≤ viewport): keep it fully inside
+ *    ([0, viewport − scaled]).
+ *  - canvas LARGER than viewport (zoomed in): keep ≥25% on screen
+ *    ([viewport − 0.75·scaled, 0.25·scaled]).
+ * The old single-regime margin math inverted (min > max) whenever the canvas
+ * fit inside the viewport, so Math.max(min, …) slammed the pan to
+ * `viewport − 0.75·scaled` — the canvas jumped to the bottom-right corner on
+ * any background click. That was the owner-reported "canvas moves to the
+ * bottom corner" bug. Exported for tests.
+ */
+export function clampPanAxis(pan: number, viewport: number, scaled: number): number {
+  if (scaled <= viewport) {
+    return Math.max(0, Math.min(pan, viewport - scaled));
+  }
+  const margin = 0.25;
+  return Math.max(viewport - scaled * (1 - margin), Math.min(pan, scaled * margin));
+}
+
+/**
+ * Ground-truth post-pinch clamp for one axis. Unlike clampPanAxis (which works
+ * off the CSS-centered base math), this takes actual on-screen rect edges —
+ * a hard two-finger fling can leave the mobile canvas fully off-screen, and
+ * the mobile base offset lives in CSS left/top, not pan, so we can't derive
+ * the same range from pan alone. Returns the delta to add to that axis's pan
+ * to restore at least a 25% content/viewport overlap, or 0 if already met.
+ * Exported for tests.
+ */
+export function pinchOverlapDelta(
+  contentStart: number,
+  contentSize: number,
+  viewportStart: number,
+  viewportSize: number
+): number {
+  if (contentSize <= 0) return 0;
+  const minOverlap = contentSize * 0.25;
+  const contentEnd = contentStart + contentSize;
+  const viewportEnd = viewportStart + viewportSize;
+  // Drifted past the left/top edge — not enough of the trailing edge remains onscreen.
+  if (contentEnd < viewportStart + minOverlap) {
+    return viewportStart + minOverlap - contentEnd;
+  }
+  // Drifted past the right/bottom edge — not enough of the leading edge remains onscreen.
+  if (contentStart > viewportEnd - minOverlap) {
+    return viewportEnd - minOverlap - contentStart;
+  }
+  return 0;
+}
+
 interface UseCanvasGesturesOptions {
   viewportRef: React.RefObject<HTMLDivElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
@@ -205,6 +255,23 @@ export function useCanvasGestures({
       // Once we drop below two fingers, the pinch is over — commit and reset.
       if (activePointersRef.current.size < 2 && pinchStartRef.current) {
         pinchStartRef.current = null;
+
+        // Ground-truth clamp: a hard fling can leave the canvas mostly or
+        // fully off-screen. Reading actual rects (rather than replaying the
+        // CSS-centered base math) keeps this correct regardless of the
+        // mobile base offset.
+        const contentRect = contentRef.current?.getBoundingClientRect();
+        const viewportRect = viewportRef.current?.getBoundingClientRect();
+        if (contentRect && viewportRect) {
+          const dx = pinchOverlapDelta(contentRect.left, contentRect.width, viewportRect.left, viewportRect.width);
+          const dy = pinchOverlapDelta(contentRect.top, contentRect.height, viewportRect.top, viewportRect.height);
+          if (dx !== 0 || dy !== 0) {
+            panXRef.current += dx;
+            panYRef.current += dy;
+            applyTransform();
+          }
+        }
+
         setIsGesturing(false);
         commitToState();
       }
@@ -225,14 +292,23 @@ export function useCanvasGestures({
     };
   }, [isMobile, viewportRef, contentRef, applyTransform, commitToState]);
 
+  // Cumulative pointer travel for the active pan — lets us tell a real drag
+  // from a plain click (a click must never move or clamp the canvas).
+  const panTravelRef = useRef(0);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (isMobile) return;
     if (isEditing) return;
     if (hasSelectedElement) return;
     if (e.pointerType === 'mouse') {
       isPanningRef.current = true;
+      panTravelRef.current = 0;
       lastPanPointRef.current = { x: e.clientX, y: e.clientY };
       setIsGesturing(true);
+      // Without capture, releasing over a sibling panel never fires this
+      // viewport's onPointerUp, leaving isPanningRef stuck true. Mirrors
+      // useElementInteraction's pattern; release is implicit on pointerup/cancel.
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
     }
   }, [isMobile, hasSelectedElement, isEditing]);
 
@@ -240,6 +316,7 @@ export function useCanvasGestures({
     if (!isPanningRef.current) return;
     const dx = e.clientX - lastPanPointRef.current.x;
     const dy = e.clientY - lastPanPointRef.current.y;
+    panTravelRef.current += Math.abs(dx) + Math.abs(dy);
     panXRef.current += dx;
     panYRef.current += dy;
     lastPanPointRef.current = { x: e.clientX, y: e.clientY };
@@ -249,19 +326,12 @@ export function useCanvasGestures({
   const handlePointerUp = useCallback(() => {
     if (!isPanningRef.current) return;
     isPanningRef.current = false;
-    // Clamp pan so canvas can't go fully off-screen
-    if (viewportRef.current) {
+    // A plain click (≲3px of travel) is not a pan — leave the canvas alone.
+    if (panTravelRef.current > 3 && viewportRef.current) {
       const vw = viewportRef.current.clientWidth;
       const vh = viewportRef.current.clientHeight;
-      const scaledW = canvasWidth * zoomRef.current;
-      const scaledH = canvasHeight * zoomRef.current;
-      const margin = 0.25;
-      const minPanX = vw - scaledW * (1 - margin);
-      const maxPanX = scaledW * margin;
-      const minPanY = vh - scaledH * (1 - margin);
-      const maxPanY = scaledH * margin;
-      panXRef.current = Math.max(minPanX, Math.min(panXRef.current, maxPanX));
-      panYRef.current = Math.max(minPanY, Math.min(panYRef.current, maxPanY));
+      panXRef.current = clampPanAxis(panXRef.current, vw, canvasWidth * zoomRef.current);
+      panYRef.current = clampPanAxis(panYRef.current, vh, canvasHeight * zoomRef.current);
       applyTransform();
     }
     setIsGesturing(false);

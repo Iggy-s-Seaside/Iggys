@@ -80,13 +80,41 @@ async function resolveStateMediaRefs(state: EditorState): Promise<EditorState> {
   };
 }
 
+/**
+ * Read whatever draft JSON is already on disk for a key, tolerating storage
+ * access failures the same way the rest of this module does. Exported so the
+ * autosave seeding invariant below can be unit-tested without mounting the hook.
+ */
+export function readExistingDraftJson(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export function useDraftPersistence(
   specialId: string | undefined,
   state: EditorState,
   saveForm: DraftState['saveForm']
 ) {
   const draftKey = `${DRAFT_PREFIX}${specialId || 'new'}`;
+  // Last-written draft JSON, used by the autosave tick below to skip no-op
+  // writes. Seeded from disk (see the effect right below) rather than '' —
+  // an empty seed here is what let a pristine first tick clobber a real
+  // draft while the "Resume your draft?" prompt was still undecided.
   const lastSavedRef = useRef<string>('');
+
+  // Seed lastSavedRef from whatever is already on disk for this key BEFORE
+  // the autosave interval below can fire. Without this, a fresh mount over
+  // an existing draft starts lastSavedRef at '', so the first 5s tick always
+  // sees a "change" (pristine state !== '') and overwrites the real draft —
+  // even while the restore-vs-discard prompt is still undecided. Seeding to
+  // the actual on-disk snapshot means an untouched state compares equal and
+  // the tick is skipped; a genuine edit still diffs and saves normally.
+  useEffect(() => {
+    lastSavedRef.current = readExistingDraftJson(draftKey);
+  }, [draftKey]);
 
   // Auto-save every 5 seconds (sanitized — no blob/data URLs)
   useEffect(() => {

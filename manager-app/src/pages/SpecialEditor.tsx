@@ -29,7 +29,7 @@ import { TEMPLATES } from '../data/templates';
 import type { Special, TextLayer, UserTemplate } from '../types';
 import { DEFAULT_IMAGE_FILTERS } from '../types';
 import { VideoRefProvider } from '../context/VideoRefContext';
-import { storeMedia, generateMediaId, makeIdbRef } from '../lib/mediaStore';
+import { storeMedia, generateMediaId, makeIdbRef, isIdbRef } from '../lib/mediaStore';
 import { useMediaSync } from '../hooks/useMediaSync';
 import { exportToGif } from '../components/editor/exportToGif';
 import { ExportProgressModal } from '../components/editor/ExportProgressModal';
@@ -39,6 +39,66 @@ import { findContrastIssues } from '../utils/colorContrast';
 
 type RightTab = 'properties' | 'adjustments';
 type MobileSheet = 'layers' | 'properties' | 'adjustments' | 'templates' | null;
+
+/**
+ * Layers whose image/video source is still an idb:// reference. Exported (pure,
+ * no React) so handleSaveAsTemplate's "refuse to persist a dead ref" guard is
+ * unit-testable without mounting the editor.
+ */
+export function findUnresolvedMediaLayers(layers: TextLayer[]): TextLayer[] {
+  return layers.filter(
+    (l) => (!!l.imageSrc && isIdbRef(l.imageSrc)) || (!!l.videoSrc && isIdbRef(l.videoSrc))
+  );
+}
+
+/**
+ * Swap each layer's idb:// media source for its resolved Supabase URL, keyed by
+ * layer id. Layers with no matching entry (or one that failed to resolve) pass
+ * through unchanged — callers must refuse the save in that case rather than
+ * persist the untouched idb:// ref.
+ */
+export function applyResolvedMediaUrls(
+  layers: TextLayer[],
+  resolved: Array<{ id: string; url: string | null }>
+): TextLayer[] {
+  const urlById = new Map(resolved.filter((r) => r.url).map((r) => [r.id, r.url as string]));
+  return layers.map((l) => {
+    const url = urlById.get(l.id);
+    if (!url) return l;
+    return l.elementType === 'video' ? { ...l, videoSrc: url } : { ...l, imageSrc: url };
+  });
+}
+
+/** Editor overlay flags checked by the global Escape handler — grouped here (and
+ * exported) so the "close overlays instead of deselecting" branch condition is
+ * unit-testable independent of the keydown listener wiring. */
+export interface EditorOverlayFlags {
+  mobileFontPickerOpen: boolean;
+  mobileBlendPickerOpen: boolean;
+  libraryOpen: boolean;
+  mobileFiltersOpen: boolean;
+  mobileSheet: MobileSheet;
+  templatePickerOpen: boolean;
+  presetsOpen: boolean;
+  customSizeOpen: boolean;
+  exportModalOpen: boolean;
+  saveModalOpen: boolean;
+}
+
+export function isAnyEditorOverlayOpen(flags: EditorOverlayFlags): boolean {
+  return (
+    flags.mobileFontPickerOpen ||
+    flags.mobileBlendPickerOpen ||
+    flags.libraryOpen ||
+    flags.mobileFiltersOpen ||
+    flags.mobileSheet !== null ||
+    flags.templatePickerOpen ||
+    flags.presetsOpen ||
+    flags.customSizeOpen ||
+    flags.exportModalOpen ||
+    flags.saveModalOpen
+  );
+}
 
 export function SpecialEditor() {
   const { id } = useParams();
@@ -106,6 +166,24 @@ export function SpecialEditor() {
     setMobileFontPickerOpen(false);
     setMobileBlendPickerOpen(false);
     setMobileFiltersOpen(false);
+  }, []);
+
+  // The template picker renders as both a desktop Modal (templatePickerOpen) and a
+  // mobile BottomSheet (mobileSheet === 'templates') so each breakpoint gets its own
+  // affordance. If the viewport crosses the md breakpoint while one is open (window
+  // resize, tablet rotation, DevTools device toolbar), close the one for the
+  // breakpoint we just left — otherwise both can end up open at once.
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)');
+    const handleBreakpointChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setMobileSheet((s) => (s === 'templates' ? null : s));
+      } else {
+        setTemplatePickerOpen(false);
+      }
+    };
+    mql.addEventListener('change', handleBreakpointChange);
+    return () => mql.removeEventListener('change', handleBreakpointChange);
   }, []);
 
   const handleAlignCenterH = useCallback(() => {
@@ -629,6 +707,11 @@ export function SpecialEditor() {
     // Store blob in IndexedDB and get a persistent reference
     const mediaId = generateMediaId();
     const idbRef = makeIdbRef(mediaId);
+    // Generated up front (instead of reading it back from ADD_LAYER) so the
+    // background sync below can target this exact layer once it resolves,
+    // even though addTextLayer's own crypto.randomUUID() default is never
+    // returned to the caller.
+    const layerId = crypto.randomUUID();
 
     await storeMedia(mediaId, file, {
       filename: file.name,
@@ -675,6 +758,7 @@ export function SpecialEditor() {
           } catch { /* poster capture failed — non-critical */ }
 
           addTextLayer({
+            id: layerId,
             elementType: 'video',
             text: file.name,
             videoSrc: idbRef, // idb:// ref — VideoElement resolves to blob URL
@@ -707,6 +791,7 @@ export function SpecialEditor() {
         layerHeight = Math.round(layerHeight);
 
         addTextLayer({
+          id: layerId,
           elementType: 'image',
           text: file.name,
           imageSrc: idbRef, // idb:// ref — ImageElement will need resolution
@@ -720,9 +805,19 @@ export function SpecialEditor() {
       img.src = blobUrl;
     }
 
-    // Background Supabase upload (fire and forget)
-    syncToSupabase(idbRef, isVideo ? 'media/video' : 'media/image');
-  }, [state.canvasWidth, state.canvasHeight, addTextLayer, syncToSupabase]);
+    // Background Supabase upload. The idb:// ref stays as the layer's src for an
+    // instant local preview; once the upload resolves we swap it for the durable
+    // https URL so the layer survives IndexedDB eviction / a different device.
+    // UPDATE_LAYER no-ops if the layer id no longer exists (deleted meanwhile).
+    syncToSupabase(idbRef, isVideo ? 'media/video' : 'media/image').then((url) => {
+      if (!url) return;
+      dispatch({
+        type: 'UPDATE_LAYER',
+        id: layerId,
+        changes: isVideo ? { videoSrc: url } : { imageSrc: url },
+      });
+    });
+  }, [state.canvasWidth, state.canvasHeight, addTextLayer, syncToSupabase, dispatch]);
 
   const handleDuplicate = useCallback((layer: TextLayer) => {
     const { id: _id, ...rest } = layer;
@@ -820,6 +915,39 @@ export function SpecialEditor() {
   const handleSaveAsTemplate = useCallback(async () => {
     if (!templateForm.name.trim()) return;
     setSavingTemplate(true);
+
+    // Templates are the only persisted copy of their layers — unlike a draft
+    // (which re-resolves idb:// refs from this device's IndexedDB), a template
+    // is meant to be reused later or on another device, so an unresolved
+    // idb:// ref would 404 forever. Resolve any pending uploads now; if one
+    // doesn't finish quickly, refuse the save rather than persist a dead ref.
+    const idbLayers = findUnresolvedMediaLayers(state.layers);
+    let layersToSave = state.layers;
+    if (idbLayers.length > 0) {
+      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
+        Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
+
+      const resolved = await Promise.all(
+        idbLayers.map(async (l) => {
+          const isVideo = l.elementType === 'video';
+          const src = (isVideo ? l.videoSrc : l.imageSrc)!;
+          const url = await withTimeout(syncToSupabase(src, isVideo ? 'media/video' : 'media/image'), 8000);
+          return { id: l.id, url };
+        })
+      );
+
+      const stillPending = resolved.filter((r) => !r.url);
+      if (stillPending.length > 0) {
+        setSavingTemplate(false);
+        toast.error(
+          `${stillPending.length} media file${stillPending.length > 1 ? 's are' : ' is'} still uploading — wait a moment and try saving the template again.`
+        );
+        return;
+      }
+
+      layersToSave = applyResolvedMediaUrls(state.layers, resolved);
+    }
+
     dispatch({ type: 'SELECT_LAYER', id: null });
     await new Promise((r) => setTimeout(r, 150));
 
@@ -849,7 +977,7 @@ export function SpecialEditor() {
     }
 
     // Strip IDs from layers for storage
-    const layersForStorage = state.layers.map(({ id: _id, ...rest }) => rest);
+    const layersForStorage = layersToSave.map(({ id: _id, ...rest }) => rest);
 
     const ok = await createTemplate({
       name: templateForm.name.trim(),
@@ -867,7 +995,7 @@ export function SpecialEditor() {
       setSaveTemplateModalOpen(false);
       setTemplateForm({ name: '', category: 'drink' });
     }
-  }, [templateForm, state, dispatch, upload, createTemplate]);
+  }, [templateForm, state, dispatch, upload, createTemplate, syncToSupabase]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -930,14 +1058,32 @@ export function SpecialEditor() {
         return;
       }
 
-      // Escape — Deselect
+      // Escape — close whatever overlay is open; only deselect the layer when
+      // nothing is open. Without this check, an overlay's own Escape handling
+      // (e.g. the focus trap) and this global listener both react to the same
+      // keypress — closing the overlay AND deselecting the layer underneath —
+      // or, if the overlay unmounts without resetting its own open flag, this
+      // handler deselecting instead of closing leaves it ghost-open.
       if (e.key === 'Escape') {
+        if (isAnyEditorOverlayOpen({
+          mobileFontPickerOpen, mobileBlendPickerOpen, libraryOpen, mobileFiltersOpen,
+          mobileSheet, templatePickerOpen, presetsOpen, customSizeOpen, exportModalOpen,
+          saveModalOpen,
+        })) {
+          closeAllOverlays();
+          return;
+        }
         dispatch({ type: 'SELECT_LAYER', id: null });
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [dispatch, state.selectedLayerId, state.layers, selectedLayer, handleDuplicate]);
+  }, [
+    dispatch, state.selectedLayerId, state.layers, selectedLayer, handleDuplicate,
+    closeAllOverlays, mobileFontPickerOpen, mobileBlendPickerOpen, libraryOpen,
+    mobileFiltersOpen, mobileSheet, templatePickerOpen, presetsOpen, customSizeOpen,
+    exportModalOpen, saveModalOpen,
+  ]);
 
   return (
     <VideoRefProvider>

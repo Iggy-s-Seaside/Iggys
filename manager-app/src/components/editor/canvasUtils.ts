@@ -59,13 +59,35 @@ export function drawImageCover(
 }
 
 /**
+ * Split a gradient's stop-list on commas at parenthesis-depth 0 only, so a
+ * stop like 'rgba(0,0,0,0.5) 50%' survives intact instead of fragmenting on
+ * its internal commas.
+ */
+function splitGradientStops(stopsStr: string): string[] {
+  const stops: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < stopsStr.length; i++) {
+    const c = stopsStr[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    else if (c === ',' && depth === 0) {
+      stops.push(stopsStr.slice(start, i));
+      start = i + 1;
+    }
+  }
+  stops.push(stopsStr.slice(start));
+  return stops.map(s => s.trim());
+}
+
+/**
  * Parse CSS linear-gradient and render on canvas.
  */
 export function renderGradient(ctx: CanvasRenderingContext2D, gradientStr: string, w: number, h: number) {
   const match = gradientStr.match(/linear-gradient\(\s*([\d.]+)deg\s*,\s*(.+)\)/);
   if (!match) return;
   const angle = parseFloat(match[1]);
-  const stops = match[2].split(',').map(s => s.trim());
+  const stops = splitGradientStops(match[2]);
 
   const rad = (angle - 90) * Math.PI / 180;
   const cx = w / 2, cy = h / 2;

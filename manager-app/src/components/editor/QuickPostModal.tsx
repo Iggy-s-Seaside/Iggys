@@ -78,7 +78,7 @@ export function QuickPostModal({ open, onClose, onSaved }: QuickPostModalProps) 
         // Draw text if present
         if (overlayText) {
           const style = TEXT_STYLES[textStyleIndex].style;
-          const fontSize = parseInt(style.fontSize) * 27; // scale up from rem
+          const fontSize = parseFloat(style.fontSize) * 27; // scale up from rem
           ctx.font = `${style.fontWeight} ${fontSize}px Inter, sans-serif`;
           ctx.fillStyle = style.color;
           ctx.textAlign = 'center';

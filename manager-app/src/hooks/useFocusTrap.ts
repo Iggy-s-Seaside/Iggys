@@ -68,6 +68,10 @@ export function useFocusTrap(
       if (closeOnEscape && e.key === 'Escape') {
         e.preventDefault();
         onEscapeRef.current?.();
+        // An overlay consuming Escape should consume it fully — otherwise it bleeds
+        // past the container to page-level Escape handlers (e.g. SpecialEditor's
+        // window listener, which deselects the current layer) and can double-close.
+        e.stopPropagation();
         return;
       }
       if (e.key !== 'Tab' || !containerRef.current) return;

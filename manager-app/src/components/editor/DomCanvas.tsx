@@ -198,6 +198,16 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
     }
   }, [editingLayerId, onSelectLayer]);
 
+  // Clicking the gray workspace OUTSIDE the canvas deselects, same as clicking
+  // the canvas background. The gestures hook skips pan-start while a layer is
+  // selected, so without this that click was silently swallowed.
+  const handleViewportPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.target === viewportRef.current && state.selectedLayerId) {
+      onSelectLayer(null);
+    }
+    gestures.viewportHandlers.onPointerDown?.(e);
+  }, [state.selectedLayerId, onSelectLayer, gestures.viewportHandlers]);
+
   // Compute the final transform
   const zoom = gestures.currentZoom;
   const panX = gestures.currentPanX;
@@ -233,6 +243,7 @@ export const DomCanvas = memo(forwardRef<DomCanvasHandle, DomCanvasProps>(({
       className="relative w-full h-full overflow-hidden bg-black/20"
       style={{ touchAction: 'none' }}
       {...gestures.viewportHandlers}
+      onPointerDown={handleViewportPointerDown}
     >
       {/* Transformed canvas content */}
       <div

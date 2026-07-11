@@ -9,6 +9,55 @@ import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 import type { EditorState } from '../../types';
 import { exportToCanvasAsync } from './exportToCanvas';
 
+/**
+ * Map gifenc's documented quality knob (1-30, lower = better) onto the
+ * `maxColors` palette-size argument quantize() actually accepts.
+ */
+export function qualityToMaxColors(quality: number): number {
+  return Math.min(256, Math.max(64, Math.round(256 * (10 / Math.max(quality, 1)))));
+}
+
+/**
+ * Resolve the timestamp to seek a video layer to for a given shared-timeline
+ * `time`. Looping videos shorter than the timeline wrap via modulo instead
+ * of freezing on their last frame once `time` outruns their duration;
+ * non-looping videos pass `time` through unchanged (browsers clamp to end).
+ */
+export function computeVideoSeekTime(time: number, videoDuration: number, loops: boolean): number {
+  if (loops && isFinite(videoDuration) && videoDuration > 0 && time > videoDuration) {
+    return time % videoDuration;
+  }
+  return time;
+}
+
+/**
+ * Seek a single video element to `time` and resolve once it has settled.
+ *
+ * Mirrors VideoRefContext's seekAll, but per-video — needed here because each
+ * video may need a different target time (looping videos wrap the shared
+ * timeline via modulo; see the call site in the export loop).
+ */
+function seekVideoTo(video: HTMLVideoElement, time: number): Promise<void> {
+  if (video.readyState < 1) return Promise.resolve(); // Skip unloaded videos
+
+  if (Math.abs(video.currentTime - time) < 0.01) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    const onSeeked = () => {
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    };
+    video.addEventListener('seeked', onSeeked);
+    video.currentTime = time;
+
+    // Timeout safety — don't hang forever if seeked never fires
+    setTimeout(() => {
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    }, 2000);
+  });
+}
+
 export interface GifExportOptions {
   /** Frames per second (default: 15) */
   fps?: number;
@@ -44,10 +93,12 @@ export async function exportToGif(
 ): Promise<Blob> {
   const {
     fps = 15,
-    quality: _quality = 10,
+    quality = 10,
     onProgress,
     abortSignal,
   } = options;
+
+  const maxColors = qualityToMaxColors(quality);
 
   // Output dimensions — default to half resolution for performance
   const outW = options.width ?? Math.round(state.canvasWidth / 2);
@@ -95,7 +146,16 @@ export async function exportToGif(
     // Seek all videos to the current frame time
     if (hasVideo && totalDuration > 0) {
       const time = (i / totalFrames) * totalDuration;
-      await videoRefs.seekAll(time);
+
+      const allRefs = videoRefs.getAll();
+      const layerById = new Map(state.layers.map((layer) => [layer.id, layer]));
+      await Promise.all(
+        Array.from(allRefs, ([layerId, video]) => {
+          const layer = layerById.get(layerId);
+          const loops = layer?.videoLoop !== false; // Default true
+          return seekVideoTo(video, computeVideoSeekTime(time, video.duration, loops));
+        })
+      );
     }
 
     // Render full composition at native resolution
@@ -109,8 +169,8 @@ export async function exportToGif(
     const imageData = scaleCtx.getImageData(0, 0, outW, outH);
     const { data } = imageData;
 
-    // Quantize to 256 colors
-    const palette = quantize(data, 256, { format: 'rgba4444' });
+    // Quantize to the quality-derived palette size
+    const palette = quantize(data, maxColors, { format: 'rgba4444' });
     const indexed = applyPalette(data, palette, 'rgba4444');
 
     // Write frame
