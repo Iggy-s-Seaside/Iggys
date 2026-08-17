@@ -1,6 +1,7 @@
 import { useRef, useEffect, useLayoutEffect, useCallback, useState, useId, type ReactNode } from 'react';
 import { X, ChevronLeft, Check } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { useVisualViewport } from '../../hooks/useVisualViewport';
 
 interface BottomSheetProps {
   open: boolean;
@@ -13,7 +14,9 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ startY: 0, isDragging: false, startScrollTop: 0 });
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Keyboard detection is gated on `open` inside the hook — same listener
+  // lifecycle as the inline effect this replaced.
+  const { keyboardVisible } = useVisualViewport(open);
   const [closing, setClosing] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,17 +98,8 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  // Detect keyboard via visualViewport
-  useEffect(() => {
-    if (!open) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const handleResize = () => {
-      setKeyboardVisible(vv.height < window.innerHeight * 0.75);
-    };
-    vv.addEventListener('resize', handleResize);
-    return () => vv.removeEventListener('resize', handleResize);
-  }, [open]);
+  // Keyboard detection lives in useVisualViewport (see hook above) — the
+  // listener attaches only while `open`, exactly as the old inline effect.
 
   // Detect slider touch start via event delegation — enters peek mode
   useEffect(() => {
