@@ -730,7 +730,14 @@ export function Messages() {
         </div>
 
         {/* Message Detail */}
-        <div className={`flex-1 flex flex-col bg-background ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
+        {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto, so
+            without it this panel cannot shrink below its content's intrinsic
+            width. One long URL or email address in a message then widens the
+            panel past the viewport — and because the app shell is
+            overflow-x-hidden (DashboardLayout), the overflow is not scrollable,
+            it is simply CUT OFF on the right. That is the "I can't read the
+            right side of an email" bug. */}
+        <div className={`flex-1 min-w-0 flex flex-col bg-background ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
           {selected ? (
             <>
               {/* Detail Header */}
