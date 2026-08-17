@@ -48,6 +48,25 @@ export function useParties() {
     };
   }, [refresh]);
 
+  // A long-lived session (the installed PWA especially) can outlive its realtime
+  // websocket: the channel dies silently and the list freezes at whatever it showed
+  // when the socket dropped — new website inquiries never appear until a full reload.
+  // Refetch whenever the app comes back to the foreground or the network returns,
+  // so the worst case is "stale while hidden", never "stale forever".
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    window.addEventListener('online', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.removeEventListener('online', refresh);
+    };
+  }, [refresh]);
+
   const create = async (fields: Partial<Party>): Promise<Party | null> => {
     const { data, error } = await supabase.from('parties').insert(fields).select('*').single();
     if (error) {
