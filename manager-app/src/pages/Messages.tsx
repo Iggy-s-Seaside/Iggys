@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
   Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw,
-  PartyPopper, Zap, Moon, ChevronDown
+  PartyPopper, Zap, Moon, ChevronDown, MailCheck
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { ErrorState } from '../components/ui/ErrorState';
@@ -17,6 +17,7 @@ import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
 import type { Message, Party } from '../types';
 import { needsReplyNow, messageTriage, categoryLabel, isSolicitation } from '../utils/triage';
+import { canAcknowledge, buildAcknowledgement } from '../utils/acknowledge';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
 import { TemplateManager } from '../components/messages/TemplateManager';
@@ -414,6 +415,19 @@ export function Messages() {
     toast.success('Notes saved');
   };
 
+  // Reviewer stage (replaces the retired auto-reply trigger): pre-fill the
+  // reply composer with the standard warm acknowledgement, personalised to the
+  // sender. This NEVER sends — the manager reads, edits if they want, and
+  // presses the existing Send Reply themselves. That human review is the point.
+  const replyBoxRef = useRef<HTMLTextAreaElement>(null);
+  const handleAcknowledge = () => {
+    if (!selected || !canAcknowledge(selected)) return;
+    setReplyText(buildAcknowledgement(selected.name, selected.subject));
+    replyBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    replyBoxRef.current?.focus();
+    toast('Acknowledgement drafted — review it, then press Send Reply', { icon: '✉️' });
+  };
+
   // Convert an inbox lead into a private-party inquiry, pre-filled from the
   // sender and subject. Reuses the app's standard party-create path and sends no
   // email — the message stays in the inbox; this is purely additive.
@@ -774,6 +788,20 @@ export function Messages() {
                   </div>
                   <div className="flex items-center gap-2 flex-wrap shrink-0">
                     {statusBadge(selected.status)}
+                    {canAcknowledge(selected) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                        <Zap size={11} /> Awaiting first reply
+                      </span>
+                    )}
+                    {canAcknowledge(selected) && (
+                      <button
+                        onClick={handleAcknowledge}
+                        title="Pre-fill the standard warm acknowledgement — you review it, then press Send Reply. Nothing is sent automatically."
+                        className="btn-secondary text-xs py-1 px-2"
+                      >
+                        <MailCheck size={14} /> Acknowledge
+                      </button>
+                    )}
                     <button
                       onClick={handleMakeParty}
                       disabled={convertingParty}
@@ -851,6 +879,7 @@ export function Messages() {
                       </div>
                     </div>
                     <textarea
+                      ref={replyBoxRef}
                       className="input-field min-h-[100px] resize-y mb-3"
                       placeholder={`Reply to ${selected.name}...`}
                       value={replyText}
