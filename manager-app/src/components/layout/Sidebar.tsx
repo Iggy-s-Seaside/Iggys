@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, HelpCircle, ChevronDown, BookHeart } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRole, type Role } from '../../hooks/useRole';
@@ -87,6 +87,33 @@ const navSections: NavSection[] = [
 
 const COLLAPSED_KEY = 'iggys.sidebar.collapsed';
 
+/** Window event that opens the mobile nav drawer — fired by the bottom-nav
+ * "More" tab (mirrors the command palette's openCommandPalette pattern). */
+export const OPEN_MOBILE_NAV_EVENT = 'iggys:nav:open-mobile';
+
+export function openMobileNav() {
+  window.dispatchEvent(new CustomEvent(OPEN_MOBILE_NAV_EVENT));
+}
+
+// Below Tailwind's lg breakpoint (1024px) the sidebar renders as the mobile drawer.
+const NARROW_QUERY = '(max-width: 1023.98px)';
+
+function subscribeNarrow(cb: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+  const mql = window.matchMedia(NARROW_QUERY);
+  mql.addEventListener('change', cb);
+  return () => mql.removeEventListener('change', cb);
+}
+
+/** True on small screens where the nav is the mobile drawer. */
+function useIsNarrowScreen(): boolean {
+  return useSyncExternalStore(
+    subscribeNarrow,
+    () => typeof window !== 'undefined' && Boolean(window.matchMedia?.(NARROW_QUERY).matches),
+    () => true, // SSR/first-paint default: narrow (drawer context)
+  );
+}
+
 function readCollapsed(): string[] {
   try {
     const raw = localStorage.getItem(COLLAPSED_KEY);
@@ -121,7 +148,20 @@ export function Sidebar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
+  // Mobile drawer: sections default OPEN and collapse is session-only — the
+  // persisted desktop collapse state would otherwise make managers hunt for
+  // "which group was it in?" every time they open the drawer on a phone.
+  const isNarrow = useIsNarrowScreen();
+  const [mobileCollapsed, setMobileCollapsed] = useState<string[]>([]);
+  const effectiveCollapsed = isNarrow ? mobileCollapsed : collapsed;
   const unreadCount = useUnreadCount();
+
+  // The bottom-nav "More" tab opens this drawer via a window event.
+  useEffect(() => {
+    const onOpen = () => setMobileOpen(true);
+    window.addEventListener(OPEN_MOBILE_NAV_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_MOBILE_NAV_EVENT, onOpen);
+  }, []);
 
   // Trap focus inside the mobile nav drawer while open (ESC closes, focus restores).
   const mobileDrawerRef = useRef<HTMLDivElement>(null);
@@ -137,6 +177,11 @@ export function Sidebar() {
     .filter((s) => s.items.length > 0);
 
   const toggleSection = (id: string) => {
+    if (isNarrow) {
+      // Session-only on mobile — never written to localStorage.
+      setMobileCollapsed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+      return;
+    }
     setCollapsed((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
       try {
@@ -161,7 +206,7 @@ export function Sidebar() {
       <nav aria-label="Primary" className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
         {visibleSections.map((section) => {
           // The active route's section is always shown, even if the user collapsed it.
-          const isOpen = !collapsed.includes(section.id) || section.id === activeSection;
+          const isOpen = !effectiveCollapsed.includes(section.id) || section.id === activeSection;
           return (
             <div key={section.id}>
               <button

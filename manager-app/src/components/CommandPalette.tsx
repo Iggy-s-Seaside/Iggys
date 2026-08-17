@@ -7,7 +7,7 @@ import {
   FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt,
   Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare,
   Share2, Star, Megaphone, CalendarClock, Calculator, ShieldCheck, Moon,
-  Plus, PenSquare, DoorOpen, DoorClosed, Shirt, HelpCircle,
+  Plus, PenSquare, DoorOpen, DoorClosed, Shirt, HelpCircle, BookHeart,
 } from 'lucide-react';
 import { useCommandPaletteController } from '../hooks/useCommandPalette';
 
@@ -49,6 +49,9 @@ const PAGE_COMMANDS: Command[] = [
   { id: 'page:shift', label: 'Service', to: '/shift', icon: ClipboardCheck, kind: 'page', keywords: 'shift bar open close drawer service tonight' },
   { id: 'page:run-sheet', label: 'Run Sheet', to: '/run-sheet', icon: ClipboardList, kind: 'page', keywords: 'today tonight prep' },
   { id: 'page:luna', label: 'Luna', to: '/luna', icon: Moon, kind: 'page', keywords: 'ai insights assistant' },
+  { id: 'page:luna-room', label: "Luna's Room", to: '/luna/room', icon: BookHeart, kind: 'page', keywords: 'luna room journal memory notes' },
+  { id: 'page:shift-log', label: 'Shift Log', to: '/shift/log', icon: PenSquare, kind: 'page', keywords: 'shift log notes incidents handoff' },
+  { id: 'page:shift-checks', label: 'Checks', to: '/shift/checks', icon: ClipboardCheck, kind: 'page', keywords: 'opening checks par checks equipment line check 86' },
   { id: 'page:messages', label: 'Messages', to: '/messages', icon: MessageSquare, kind: 'page', keywords: 'inbox chat dm' },
   { id: 'page:reputation', label: 'Reviews', to: '/reputation', icon: Star, kind: 'page', keywords: 'reputation ratings google yelp' },
   { id: 'page:parties', label: 'Parties', to: '/parties', icon: PartyPopper, kind: 'page', keywords: 'events bookings functions' },

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
   Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw,
-  PartyPopper, Zap, Moon
+  PartyPopper, Zap, Moon, ChevronDown
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
 import { ErrorState } from '../components/ui/ErrorState';
@@ -16,7 +16,7 @@ import { Modal } from '../components/ui/Modal';
 import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
 import type { Message, Party } from '../types';
-import { needsReplyNow, messageTriage, categoryLabel } from '../utils/triage';
+import { needsReplyNow, messageTriage, categoryLabel, isSolicitation } from '../utils/triage';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
 import { TemplateManager } from '../components/messages/TemplateManager';
@@ -174,7 +174,9 @@ export function Messages() {
   const needsReplyCount = useMemo(() => messages.filter(needsReplyNow).length, [messages]);
 
   // Split the current view into the pinned high-priority board + the rest.
-  // Oldest-waiting first so the most overdue reply is on top.
+  // Oldest-waiting first so the most overdue reply is on top. Solicitations
+  // (cold pitches) are pulled OUT of the regular list entirely — they render
+  // in their own collapsed section below, never on the "Needs a reply" board.
   const { needsReplyList, regularList } = useMemo(() => {
     const byOldest = (a: Message, b: Message) => a.created_at.localeCompare(b.created_at);
     if (statusFilter === 'needs') {
@@ -184,10 +186,34 @@ export function Messages() {
     if (!showSection) return { needsReplyList: [] as Message[], regularList: filtered };
     const nr: Message[] = [];
     const rest: Message[] = [];
-    for (const m of filtered) (needsReplyNow(m) ? nr : rest).push(m);
+    for (const m of filtered) {
+      if (needsReplyNow(m)) nr.push(m);
+      else if (!isSolicitation(m)) rest.push(m);
+    }
     nr.sort(byOldest);
     return { needsReplyList: nr, regularList: rest };
   }, [filtered, statusFilter]);
+
+  // Cold pitches collected below the inbox. Collapsed by default; the manager
+  // reviews or bulk-archives them — nothing is ever auto-archived.
+  const solicitationList = useMemo(() => {
+    const showSection = statusFilter === 'all' || statusFilter === 'unread' || statusFilter === 'read';
+    if (!showSection) return [] as Message[];
+    return filtered.filter(isSolicitation);
+  }, [filtered, statusFilter]);
+  const [solicitationsOpen, setSolicitationsOpen] = useState(false);
+
+  const handleArchiveSolicitations = async () => {
+    const ids = solicitationList.map((m) => m.id);
+    if (ids.length === 0) return;
+    await bulkArchive(ids); // reversible status flip — they stay in the Archived filter
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    toast.success(`Archived ${ids.length} solicitation${ids.length === 1 ? '' : 's'}`);
+  };
 
   const selected = useMemo(
     () => messages.find((m) => m.id === selectedId) ?? null,
@@ -483,6 +509,7 @@ export function Messages() {
   // priority queue.
   const renderRow = (msg: Message) => {
     const nr = needsReplyNow(msg);
+    const sol = !nr && isSolicitation(msg);
     return (
       <div
         key={msg.id}
@@ -517,6 +544,11 @@ export function Messages() {
             {nr && (
               <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400">
                 {categoryLabel(messageTriage(msg).category)}
+              </span>
+            )}
+            {sol && (
+              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-hover text-text-muted">
+                Solicitation
               </span>
             )}
             <p className="text-xs text-text-muted truncate">{msg.message}</p>
@@ -666,6 +698,30 @@ export function Messages() {
                       </div>
                     )}
                     {regularList.map(renderRow)}
+                  </div>
+                )}
+                {solicitationList.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 bg-surface-hover/60 border-t border-border flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSolicitationsOpen((v) => !v)}
+                        aria-expanded={solicitationsOpen}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted hover:text-text-secondary transition-colors min-h-[32px]"
+                      >
+                        <ChevronDown size={12} className={`transition-transform ${solicitationsOpen ? '' : '-rotate-90'}`} aria-hidden="true" />
+                        Solicitations ({solicitationList.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleArchiveSolicitations}
+                        className="btn-ghost text-xs py-1 px-2"
+                        title="Archive all solicitations (reversible — they stay in the Archived filter)"
+                      >
+                        <Archive size={13} /> Archive all
+                      </button>
+                    </div>
+                    {solicitationsOpen && solicitationList.map(renderRow)}
                   </div>
                 )}
               </>

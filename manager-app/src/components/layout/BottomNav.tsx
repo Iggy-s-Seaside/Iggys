@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus, Hourglass, ClipboardCheck, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus, Hourglass, ClipboardCheck, HelpCircle, Menu } from 'lucide-react';
 import { useUnreadCount } from '../../hooks/useMessages';
 import { useNewInsightCount } from '../../hooks/useLuna';
 import { useRole } from '../../hooks/useRole';
 import { QuickCreateSheet } from '../QuickCreateSheet';
+import { openMobileNav } from './Sidebar';
 
 function Tab({ to, icon: Icon, label, end, badge }: {
   to: string; icon: React.ElementType; label: string; end?: boolean; badge?: number;
@@ -44,7 +45,7 @@ export function BottomNav() {
     <>
       <nav aria-label="Primary" className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
         {ops ? (
-          <div className="grid grid-cols-6 items-center">
+          <div className="grid grid-cols-7 items-center">
             <Tab to="/" icon={LayoutDashboard} label="Home" end />
             <Tab to="/parties" icon={PartyPopper} label="Parties" />
             <div className="flex justify-center">
@@ -61,6 +62,17 @@ export function BottomNav() {
             <Tab to="/luna" icon={Moon} label="Luna" badge={newInsights} />
             <Tab to="/calendar" icon={CalendarDays} label="Calendar" />
             <Tab to="/messages" icon={MessageSquare} label="Inbox" badge={unread} />
+            {/* Opens the full grouped drawer from Sidebar — every route 2 taps. */}
+            <button
+              type="button"
+              onClick={openMobileNav}
+              aria-label="More — open full navigation"
+              aria-haspopup="dialog"
+              className="relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] font-medium transition-colors text-text-muted hover:text-text-primary"
+            >
+              <Menu size={22} />
+              <span>More</span>
+            </button>
           </div>
         ) : (
           // Employee view: the surfaces they're allowed to run + Help.

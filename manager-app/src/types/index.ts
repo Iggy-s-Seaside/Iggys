@@ -467,6 +467,18 @@ export const LOG_REASONS = ['restock', 'usage', 'waste', 'count_adjustment', 'or
 
 // ── Messages / Inbox ──
 
+/** Message triage buckets. `solicitation` = cold pitch (SEO / review-service /
+ * link-building spam) — never promoted to the "Needs a reply" board; it lands
+ * in the collapsed Solicitations section instead. */
+export type MessageCategory =
+  | 'reservation'
+  | 'event'
+  | 'request'
+  | 'inquiry'
+  | 'notification'
+  | 'solicitation'
+  | 'other';
+
 export interface Message {
   id: number;
   created_at: string;
@@ -488,8 +500,9 @@ export interface Message {
   gmail_thread_id?: string | null;
   /** Triage importance — 'high' = a reservation/request that needs attention. */
   importance?: 'high' | 'normal' | null;
-  /** Triage bucket: reservation | event | request | inquiry | notification | other. */
-  category?: string | null;
+  /** Triage bucket — see MessageCategory (kept as `string` because Luna or older
+   * rows may carry values outside the known set). */
+  category?: MessageCategory | string | null;
   /** True when this is a customer asking something that expects a reply. */
   needs_reply?: boolean | null;
   /** When the home-lab Luna last classified this message. */
