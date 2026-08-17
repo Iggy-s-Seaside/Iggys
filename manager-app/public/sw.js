@@ -28,7 +28,10 @@
  * Bump CACHE_VERSION on any change to this file to evict old caches.
  */
 
-const CACHE_VERSION = 'iggys-mgr-v2';
+// v3 (2026-08-17): evicts caches poisoned by the bug fixed below — the SPA
+// fallback served index.html (200 text/html) for a deleted chunk, and this
+// worker cached that HTML under a .js URL, bricking the app permanently.
+const CACHE_VERSION = 'iggys-mgr-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -85,6 +88,26 @@ function isHashedAsset(url) {
   return url.origin === self.location.origin && url.pathname.startsWith('/assets/');
 }
 
+/*
+ * Is this response actually the asset we asked for — or the SPA shell wearing
+ * its name?
+ *
+ * Netlify's `/* -> /index.html 200` fallback answers a request for a DELETED
+ * chunk with index.html and a 200, not a 404. `resp.ok` is therefore true for a
+ * response that is really an HTML page. Caching it under a .js URL poisons the
+ * cache-first branch below permanently: every later load replays the HTML, the
+ * dynamic import fails to parse, and the user sits on "Something hiccuped" with
+ * reloading powerless to fix it (the reload re-reads the same poisoned entry).
+ * That is a brick, so content-type is checked on BOTH write and read.
+ */
+function isUsableAsset(resp, url) {
+  if (!resp || !resp.ok) return false;
+  const type = (resp.headers.get('content-type') || '').toLowerCase();
+  if (/\.css$/.test(url.pathname)) return type.includes('css');
+  if (/\.js$/.test(url.pathname)) return type.includes('javascript') || type.includes('ecmascript');
+  return !type.includes('text/html'); // fonts, images, source maps…
+}
+
 function isStaticIcon(url) {
   return (
     url.origin === self.location.origin &&
@@ -138,12 +161,21 @@ self.addEventListener('fetch', (event) => {
         const cache = await caches.open(ASSET_CACHE);
         const cached = await cache.match(request);
         const network = fetch(request)
-          .then((resp) => {
-            if (resp && resp.ok) cache.put(request, resp.clone());
+          .then(async (resp) => {
+            // Only ever store a response that really is the asset — never the
+            // SPA shell returned for a deleted chunk. See isUsableAsset().
+            if (isUsableAsset(resp, url)) await cache.put(request, resp.clone());
             return resp;
           })
           .catch(() => cached);
-        return cached || network;
+        // Self-heal: a cache poisoned by an older worker is ignored and evicted
+        // rather than replayed, so an already-bricked client recovers on its
+        // next load without waiting for a CACHE_VERSION bump.
+        if (cached) {
+          if (isUsableAsset(cached, url)) return cached;
+          await cache.delete(request);
+        }
+        return network;
       })()
     );
     return;

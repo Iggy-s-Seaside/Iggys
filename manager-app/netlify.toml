@@ -18,7 +18,18 @@
     # meta robots tag + robots.txt, in case the SPA fallback serves HTML for /robots.txt).
     X-Robots-Tag = "noindex, nofollow"
 
-# SPA routing — all paths serve index.html
+# A missing hashed asset must 404 — it must NOT fall through to the SPA rule
+# below. Answering a request for a deleted chunk with index.html (200 text/html)
+# makes the dynamic import fail with a parse error instead of a clean network
+# error, and lets a caching service worker store HTML under a .js URL, which
+# bricks the app until its cache is cleared. Netlify serves a real file when one
+# exists, so this only catches genuinely-missing assets.
+# MUST stay above the /* rule: first match wins.
+[[redirects]]
+  from = "/assets/*"
+  status = 404
+
+# SPA routing — all remaining paths serve index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
