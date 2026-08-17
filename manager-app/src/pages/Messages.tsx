@@ -6,6 +6,7 @@ import {
   PartyPopper, Zap, Moon, ChevronDown, MailCheck
 } from 'lucide-react';
 import { useMessages } from '../hooks/useMessages';
+import { useVisualViewport } from '../hooks/useVisualViewport';
 import { ErrorState } from '../components/ui/ErrorState';
 import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { useAuth } from '../context/AuthContext';
@@ -139,6 +140,14 @@ export function Messages() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // iOS keyboard: the layout viewport doesn't shrink when the keyboard opens,
+  // so the reply composer at the bottom of the scroll view slides underneath
+  // it. While the keyboard is up we add scroll padding equal to the covered
+  // height, which lets the composer (and Send Reply) scroll above the keys.
+  // Desktop never trips the threshold, so >=lg is untouched; browsers without
+  // visualViewport just never set this.
+  const { keyboardVisible, keyboardInset } = useVisualViewport();
 
   // Cleanup: if the component unmounts while a Luna draft is in-flight, clear the
   // timeout and remove the Supabase channel so we don't leak or setState on an
@@ -827,8 +836,14 @@ export function Messages() {
                 </div>
               </div>
 
-              {/* Detail Body */}
-              <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+              {/* Detail Body — when the iOS keyboard is up, pad the scroll
+                  area by the covered height so the reply composer can scroll
+                  clear of the keys. Only active while keyboardVisible, so the
+                  normal safe-area padding is never double-applied. */}
+              <div
+                className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6"
+                style={keyboardVisible ? { paddingBottom: keyboardInset } : undefined}
+              >
                 {/* Message / conversation */}
                 {selected.source === 'gmail' ? (
                   <GmailThreadView messages={thread} loading={threadLoading} fallback={selected.message} />
@@ -884,6 +899,15 @@ export function Messages() {
                       placeholder={`Reply to ${selected.name}...`}
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
+                      onFocus={() => {
+                        // The keyboard opens async and the visualViewport
+                        // shrink + inset padding land a beat later — wait for
+                        // the animation, then pull the composer (and the Send
+                        // Reply button below it) up into view.
+                        window.setTimeout(() => {
+                          replyBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 350);
+                      }}
                     />
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-text-muted">
