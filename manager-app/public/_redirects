@@ -1,1 +1,8 @@
+# A missing hashed asset must 404 rather than fall through to the SPA rule.
+# Serving index.html (200 text/html) for a deleted chunk makes dynamic imports
+# fail with a parse error and lets a caching service worker store HTML under a
+# .js URL, which bricks the app until its cache is cleared. Netlify still serves
+# any asset that actually exists. Must stay above /* — first match wins.
+# Kept in sync with netlify.toml, which declares the same pair.
+/assets/*                    404
 /*    /index.html   200
