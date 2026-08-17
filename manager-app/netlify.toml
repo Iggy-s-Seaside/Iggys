@@ -25,8 +25,11 @@
 # bricks the app until its cache is cleared. Netlify serves a real file when one
 # exists, so this only catches genuinely-missing assets.
 # MUST stay above the /* rule: first match wins.
+# The `to` is required: Netlify ignores a redirect with a bare status and no
+# target, which silently leaves the SPA fallback in charge.
 [[redirects]]
   from = "/assets/*"
+  to = "/assets/:splat"
   status = 404
 
 # SPA routing — all remaining paths serve index.html
