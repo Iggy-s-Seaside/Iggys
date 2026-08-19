@@ -6,8 +6,10 @@ database, plus a Python service that feeds it.
 
 Live at **[iggysseaside.com](https://iggysseaside.com)**.
 
-This is a working business's repository, not a portfolio piece. The menu on the public site is
-the same Postgres row a manager edited from their phone an hour earlier.
+This is a working business's repository, not a portfolio piece. The public site has been the
+bar's production site since 2023 and reads its content live from Postgres — edit the row and
+the site follows, no redeploy. The operations platform behind it is feature-complete and in
+final testing ahead of staff rollout.
 
 ---
 
@@ -90,7 +92,8 @@ are not wired into CI — the deploy gate is the typecheck.
 
 ## Status
 
-Stripe Checkout, webhooks, and refunds are integrated and verified end to end in **test mode**;
+The operations platform is in final testing ahead of staff rollout. Stripe Checkout, webhooks,
+and refunds are integrated and verified end to end in **test mode**;
 live mode is pending the owner's business account activation. Five of the 31 edge functions
 (`reviews-sync`, `send-campaign`, `send-sms`, `sms-webhook`, `social-publish`) are deliberate,
 labelled stubs awaiting third-party credentials — they are wired and inert, not broken.
