@@ -8,7 +8,7 @@ Plain-English guide to the external accounts + credentials that unlock the "gate
 **What works today:** the waitlist's "Text table is ready" button and the marketing texter are fully built but **safe-stubbed** — they log the message and mark the guest "notified" without actually sending, until Twilio credentials exist.
 
 **Two tiers:**
-- **Trial (instant, for testing):** a free Twilio trial can text **only verified numbers**. I can verify your phone (503-560-2288) and send you a real "table ready" text to prove the loop end-to-end. Trial numbers can't text customers and get carrier-filtered, so it's for validation only.
+- **Trial (instant, for testing):** a free Twilio trial can text **only verified numbers**. I can verify your phone ([REDACTED]) and send you a real "table ready" text to prove the loop end-to-end. Trial numbers can't text customers and get carrier-filtered, so it's for validation only.
 - **Production (real customers) — A2P 10DLC registration (needed before texting guests):**
   1. Create/confirm the Twilio account for Iggy's.
   2. Twilio Console → **Trust Hub** → register the **Brand** (sole-proprietor or standard; needs Iggy's legal name, address *200 S Franklin St, Seaside OR 97138*, EIN).
@@ -28,7 +28,7 @@ Plain-English guide to the external accounts + credentials that unlock the "gate
 
 **What you do:** pick an email sender — I recommend **Resend** (cheapest, one domain verification, great deliverability for a small list). Steps:
 1. Create a Resend account; verify the sending domain (e.g. `mail.iggysseaside.com`) with the DNS records it gives you.
-2. Hand me `RESEND_API_KEY` + the from-address → I set `RESEND_API_KEY`, `MARKETING_FROM` and wire the campaign "Send" button to it. I can test campaigns to **bradleyb1rd@icloud.com** first.
+2. Hand me `RESEND_API_KEY` + the from-address → I set `RESEND_API_KEY`, `MARKETING_FROM` and wire the campaign "Send" button to it. I can test campaigns to **[REDACTED]** first.
 
 ---
 
