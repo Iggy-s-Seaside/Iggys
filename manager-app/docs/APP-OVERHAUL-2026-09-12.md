@@ -1,0 +1,19 @@
+# Manager app overhaul — September 12, 2026
+
+The main navigation is Home, Calendar, Bookings, Inbox and More. More opens six task groups with search. Existing operational pages remain accessible. Home prioritises reply-needed conversations, booking requests and confirmed upcoming events. Shared controls are larger and pages include a way home. The manual bar check-in remains available; automatic advice cards and automatic shift creation were removed from Home.
+
+Recurring public events now have an optional inclusive season end date. Calendar expansion stops at that date, and the scheduled reminder worker disables expired series. Switching a series off removes all occurrences. Saturday DJ series 6 remains off following the earlier calendar repair.
+
+Event reminders cover confirmed private bookings and active public events, seven days before, one day before and on the day. The worker checks every 15 minutes, uses America/Los_Angeles dates and normally starts reminders at 9 AM; morning events receive their same-day reminder an hour before. Events already started are skipped for same-day delivery. Repeated runs use stable IDs and claims; obsolete reminders are removed when events are cancelled, moved, deleted or disabled. In-app reminders combine repeats for the same occurrence. Google-only calendar entries are not reminder sources.
+
+Phone/browser notifications require a one-time opt-in on each device. Existing VAPID configuration is present, but no device subscriptions were registered during this work, so real handset delivery remains unverified. In-app reminders require no device permission. On iOS, install from Safari using Add to Home Screen before enabling notifications: https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
+
+Reminder tables enforce manager/owner reads. Device subscriptions are restricted to their owning manager. The scheduled worker checks a private scheduler key, and the push sender accepts only the service role and filters recipients against the manager allowlist. The config table deliberately has no client-access policy. Its RLS advisory is expected. Existing unrelated advisories were not changed.
+
+The assistant's business context prohibits food-special, invented-menu and discount suggestions. Demand advice now points to booking follow-up, existing stock and event preparation. Scheduled special generation is disabled; explicitly requested creative work remains available. The weather suggestion now points to indoor seating/event setup. Live bridge edits were transplanted by function/assignment to preserve deployment-specific code; a pre-change backup remains on the host.
+
+Validation: 299 frontend unit tests, three Python classification tests, TypeScript/Vite build and Deno checks passed. Browser smoke checks covered 32 main screens at 390 and 1440 pixels without crashes or document overflow. Focused browser tests verified inbox grouping, categorisation, draft retention and conversion gating at both widths, plus saving a season end date on mobile. The live reminder job returned HTTP 200; anonymous trigger attempts were rejected with HTTP 401. No customer emails were sent. See INBOX-OVERHAUL-2026-09-12.md for the earlier email review and limits.
+
+Operational limits: reminder sends use the push service's acceptance as delivery evidence. A partial broadcast is marked sent to avoid repeating notifications on successful devices; there is no per-device retry ledger. New or changed events are reflected on the next scheduled pass. The 32-screen browser audit used controlled responses; it does not establish that every external integration works end to end.
+
+Production frontend: Netlify deploy `6aa61916018fd6f310a40461`, https://iggysmanagement.netlify.app. Verified the production asset matches the built bundle and mobile login protection remains in place.

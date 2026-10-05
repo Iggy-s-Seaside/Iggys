@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { uniqueTopic } from '../lib/realtimeTopic';
 import type { Message } from '../types';
+import { updateRow } from '../lib/rowMutations';
 import toast from 'react-hot-toast';
 
 export function useMessages() {
@@ -12,18 +13,22 @@ export function useMessages() {
 
   const fetchMessages = useCallback(async () => {
     if (!loadedRef.current) setLoading(true);
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    if (error) {
+    const rows: Message[] = [];
+    let loadError: string | null = null;
+    // Paging keeps older unanswered conversations visible as the inbox grows.
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await supabase.from('messages').select('*')
+        .order('created_at', { ascending: false }).order('id', { ascending: false })
+        .range(offset, offset + 499);
+      if (error) { loadError = error.message; break; }
+      rows.push(...(data as Message[] || []));
+      if (!data || data.length < 500) break;
+    }
+    if (loadError) {
       toast.error('Failed to load messages');
-      console.error(error);
-      setError(error.message);
+      setError(loadError);
     } else {
-      setMessages((data as Message[]) || []);
+      setMessages(rows);
       setError(null);
     }
     loadedRef.current = true;
@@ -43,7 +48,7 @@ export function useMessages() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const row = payload.new as Message;
-          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [row, ...prev].slice(0, 200)));
+          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [row, ...prev]));
           // Only announce genuinely-fresh mail — a Gmail backfill inserts rows
           // with their original (often old) date, which shouldn't toast.
           const ageMs = Date.now() - new Date(row.created_at).getTime();
@@ -75,62 +80,55 @@ export function useMessages() {
     };
   }, []);
 
-  const markAsRead = useCallback(async (id: number) => {
-    const { error } = await supabase
-      .from('messages')
-      .update({ status: 'read' })
-      .eq('id', id);
-    if (error) toast.error('Failed to update message');
-  }, []);
-
-  const markAsReplied = useCallback(async (id: number, replyText: string) => {
-    // replied_by is set server-side by the send-reply edge function
-    // using the authenticated JWT — never trust client-supplied identity
-    const { error } = await supabase
-      .from('messages')
-      .update({
-        status: 'replied',
-        reply_text: replyText,
-        replied_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+  const patchMessage = useCallback(async (id: number, fields: Partial<Message>) => {
+    const { error } = await updateRow(supabase, 'messages', id, fields);
     if (error) {
-      toast.error('Failed to update message');
+      toast.error('Message was not saved. Please try again.');
       return false;
     }
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, ...fields } : m));
     return true;
   }, []);
 
-  const archiveMessage = useCallback(async (id: number) => {
-    const { error } = await supabase
-      .from('messages')
-      .update({ status: 'archived' })
-      .eq('id', id);
-    if (error) toast.error('Failed to archive message');
-  }, []);
+  const markAsRead = useCallback((id: number) => patchMessage(id, { status: 'read' }), [patchMessage]);
+  const markAsReplied = useCallback((id: number, replyText: string) => patchMessage(id, {
+    status: 'replied', reply_text: replyText, replied_at: new Date().toISOString(),
+  }), [patchMessage]);
+  const archiveMessage = useCallback((id: number) => patchMessage(id, { status: 'archived' }), [patchMessage]);
+  const updateNotes = useCallback((id: number, notes: string) => patchMessage(id, { notes }), [patchMessage]);
 
-  const updateNotes = useCallback(async (id: number, notes: string) => {
-    const { error } = await supabase
-      .from('messages')
-      .update({ notes })
-      .eq('id', id);
-    if (error) toast.error('Failed to update notes');
-  }, []);
+  const setTriage = useCallback(async (message: Message, category: string, needsReply: boolean) => {
+    const ok = await patchMessage(message.id, {
+      ...(needsReply && (message.status === 'replied' || message.status === 'archived') ? { status: 'read' as const } : {}),
+      category, needs_reply: needsReply, importance: needsReply ? 'high' : 'normal',
+      luna_classified_at: new Date().toISOString(),
+      luna_classification: {
+        ...message.luna_classification, by: 'manager', category,
+        needs_reply: needsReply, reason: 'Reviewed by a manager',
+      },
+    });
+    if (ok) toast.success('Classification saved');
+    return ok;
+  }, [patchMessage]);
 
   const bulkMarkRead = useCallback(async (ids: number[]) => {
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from('messages')
-      .update({ status: 'read' })
+      .update({ status: 'read' }, { count: 'exact' })
       .in('id', ids);
-    if (error) toast.error('Failed to update messages');
+    if (error || count !== ids.length) { toast.error('Some messages could not be updated. Please refresh.'); await fetchMessages(); return false; }
+    await fetchMessages();
+    return true;
   }, []);
 
   const bulkArchive = useCallback(async (ids: number[]) => {
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from('messages')
-      .update({ status: 'archived' })
+      .update({ status: 'archived' }, { count: 'exact' })
       .in('id', ids);
-    if (error) toast.error('Failed to archive messages');
+    if (error || count !== ids.length) { toast.error('Some messages could not be archived. Please refresh.'); await fetchMessages(); return false; }
+    await fetchMessages();
+    return true;
   }, []);
 
   return {
@@ -142,6 +140,7 @@ export function useMessages() {
     markAsReplied,
     archiveMessage,
     updateNotes,
+    setTriage,
     bulkMarkRead,
     bulkArchive,
   };

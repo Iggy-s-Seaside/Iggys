@@ -35,6 +35,7 @@ export function EventForm() {
     space: 'downstairs' as Space,
     is_recurring: false,
     recurring_day: '',
+    recurring_until: '',
     active: true,
   });
   const [saving, setSaving] = useState(false);
@@ -57,6 +58,7 @@ export function EventForm() {
           space: (event.space as Space) ?? 'downstairs',
           is_recurring: event.is_recurring,
           recurring_day: event.recurring_day ?? '',
+          recurring_until: event.recurring_until ?? '',
           active: event.active,
         });
       }
@@ -81,6 +83,7 @@ export function EventForm() {
       toast.error('Pick a start time for the event.');
       return;
     }
+    if (form.is_recurring && (!form.recurring_day || (form.recurring_until && form.recurring_until < form.date))) { toast.error('Choose a repeat day and an end date on or after the first event.'); return; }
     setSaving(true);
     const start_min = form.all_day ? null : form.start_min;
     const end_min = form.all_day ? null : form.end_min;
@@ -97,6 +100,7 @@ export function EventForm() {
       space: form.space,
       is_recurring: form.is_recurring,
       recurring_day: form.is_recurring ? form.recurring_day : null,
+      recurring_until: form.is_recurring && form.recurring_until ? form.recurring_until : null,
       active: form.active,
     };
 
@@ -282,10 +286,13 @@ export function EventForm() {
             </Field>
           )}
 
+          {form.is_recurring && <Field label="Season end date (optional)">
+            {({ id }) => <><input id={id} type="date" className="input-field" min={form.date} value={form.recurring_until} onChange={e => setField('recurring_until', e.target.value)} /><p className="text-sm text-text-secondary mt-2">Repeats through this date. Leave blank to keep repeating. Switch off below to stop the whole series now.</p></>}
+          </Field>}
           <Toggle
             checked={form.active}
             onChange={(checked) => setField('active', checked)}
-            label="Active (visible on website)"
+            label="Show on the calendar and website"
           />
         </div>
 

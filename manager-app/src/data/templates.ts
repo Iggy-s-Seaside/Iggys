@@ -356,3 +356,19 @@ export const TEMPLATES: SpecialTemplate[] = [
     ],
   },
 ];
+
+// Simple starting layouts contain prompts for approved copy, never invented offers.
+for (const [id, name, backgroundColor, fill] of [
+  ['simple-coastal', 'Coastal', '#103f44', '#ffffff'],
+  ['simple-night', 'Night', '#221b38', '#ffffff'],
+  ['simple-clean', 'Classic', '#f7f0df', '#172a30'],
+]) {
+  const base = TEMPLATES[0].defaultLayers[0];
+  TEMPLATES.unshift({ id, name, category: 'drink', backgroundColor, canvasWidth: 1080, canvasHeight: 1080,
+    defaultLayers: [
+      { ...base, text: 'Your headline', x: 90, y: 260, width: 900, fontSize: 100, fontFamily: 'Oswald', fill, align: 'center', rotation: 0, shadowBlur: 0, strokeWidth: 0, textTransform: 'none', letterSpacing: 0 },
+      { ...base, text: 'Add the date and details', x: 90, y: 510, width: 900, fontSize: 48, fontFamily: 'Inter', fill, align: 'center', rotation: 0, shadowBlur: 0, strokeWidth: 0, textTransform: 'none', letterSpacing: 0 },
+      { ...base, text: "Iggy's • Seaside", x: 90, y: 880, width: 900, fontSize: 32, fontFamily: 'Inter', fill, align: 'center', rotation: 0, shadowBlur: 0, strokeWidth: 0, textTransform: 'none', letterSpacing: 0 },
+    ],
+  });
+}

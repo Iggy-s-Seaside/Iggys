@@ -38,7 +38,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header className={className}>
+    <header className={`page-heading ${className || ''}`}>
       {onBack && (
         <div className="mb-4">
           <button type="button" onClick={onBack} aria-label={backLabel} className="btn-ghost -ml-3">
@@ -49,7 +49,7 @@ export function PageHeader({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            {Icon && <Icon size={22} className="text-primary shrink-0" aria-hidden="true" />}
+            {Icon && <Icon size={22} className="heading-icon text-primary shrink-0" aria-hidden="true" />}
             <h1 className="text-2xl font-bold text-text-primary truncate">{title}</h1>
           </div>
           {subtitle && <p className="text-sm text-text-muted mt-1">{subtitle}</p>}

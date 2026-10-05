@@ -24,6 +24,7 @@ interface NotificationCenterProps {
 }
 
 const KIND_ICON: Record<ActivityKind, LucideIcon> = {
+  event: CalendarClock,
   party: PartyPopper,
   message: MessageSquare,
   insight: Moon,
@@ -34,6 +35,7 @@ const KIND_ICON: Record<ActivityKind, LucideIcon> = {
 
 /** Tinted icon chip per source — semantic tokens only, dark-mode safe. */
 const KIND_CHIP: Record<ActivityKind, string> = {
+  event: 'bg-primary-50 text-primary',
   party: 'bg-primary-50 text-primary',
   message: 'bg-primary-50 text-primary',
   insight: 'bg-primary-50 text-primary',
@@ -75,7 +77,8 @@ export function NotificationCenter({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Activity">
+    <Sheet open={open} onClose={onClose} title="Notifications">
+      <button className="btn-secondary w-full mb-4" onClick={() => go('/notifications')}>Event reminders & phone notifications</button>
       {items.length === 0 ? (
         <EmptyState
           icon={Bell}

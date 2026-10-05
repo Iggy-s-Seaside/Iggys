@@ -123,14 +123,14 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-surface dark:to-bg p-4">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
             <Waves size={28} className="text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-text-primary">Iggy's Manager</h1>
-          <p className="text-sm text-text-muted mt-1">
+          <h1 className="brand-wordmark text-6xl text-text-primary">Iggy’s</h1>
+          <p className="text-sm text-text-muted mt-4">
             {mode === 'pin' ? 'Tap your name and enter your PIN' : 'Sign in with email & password'}
           </p>
         </div>

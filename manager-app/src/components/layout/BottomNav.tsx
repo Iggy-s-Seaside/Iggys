@@ -1,11 +1,7 @@
-import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Moon, Plus, Hourglass, ClipboardCheck, HelpCircle, Menu } from 'lucide-react';
+import { LayoutDashboard, PartyPopper, CalendarDays, MessageSquare, Hourglass, HelpCircle, Menu } from 'lucide-react';
 import { useUnreadCount } from '../../hooks/useMessages';
-import { useNewInsightCount } from '../../hooks/useLuna';
 import { useRole } from '../../hooks/useRole';
-import { QuickCreateSheet } from '../QuickCreateSheet';
-import { openMobileNav } from './Sidebar';
 
 function Tab({ to, icon: Icon, label, end, badge }: {
   to: string; icon: React.ElementType; label: string; end?: boolean; badge?: number;
@@ -31,60 +27,32 @@ function Tab({ to, icon: Icon, label, end, badge }: {
   );
 }
 
-/** Thumb-reachable bottom navigation for mobile. The center FAB opens a
- * context-aware quick-create sheet (parties, reservations, walk-ins, to-dos,
- * posts, events, specials — plus shift actions when a shift is open). */
+/** Consistent mobile navigation, with a smaller set of destinations for staff. */
 export function BottomNav() {
   const unread = useUnreadCount();
-  const newInsights = useNewInsightCount();
   const { can } = useRole();
   const ops = can(['owner', 'manager']);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   return (
     <>
-      <nav aria-label="Primary" className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
+      <nav aria-label="Primary" className="app-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border safe-area-bottom">
         {ops ? (
-          <div className="grid grid-cols-7 items-center">
+          <div className="grid grid-cols-5 items-center">
             <Tab to="/" icon={LayoutDashboard} label="Home" end />
-            <Tab to="/parties" icon={PartyPopper} label="Parties" />
-            <div className="flex justify-center">
-              <button
-                onClick={() => setQuickCreateOpen(true)}
-                aria-label="Quick create"
-                aria-haspopup="dialog"
-                aria-expanded={quickCreateOpen}
-                className="-mt-6 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-              >
-                <Plus size={26} />
-              </button>
-            </div>
-            <Tab to="/luna" icon={Moon} label="Luna" badge={newInsights} />
+            <Tab to="/parties" icon={PartyPopper} label="Bookings" />
             <Tab to="/calendar" icon={CalendarDays} label="Calendar" />
             <Tab to="/messages" icon={MessageSquare} label="Inbox" badge={unread} />
-            {/* Opens the full grouped drawer from Sidebar — every route 2 taps. */}
-            <button
-              type="button"
-              onClick={openMobileNav}
-              aria-label="More — open full navigation"
-              aria-haspopup="dialog"
-              className="relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] font-medium transition-colors text-text-muted hover:text-text-primary"
-            >
-              <Menu size={22} />
-              <span>More</span>
-            </button>
+            <Tab to="/tools" icon={Menu} label="More" />
           </div>
         ) : (
           // Employee view: the surfaces they're allowed to run + Help.
-          <div className="grid grid-cols-3 items-center">
+          <div className="grid grid-cols-2 items-center">
             <Tab to="/waitlist" icon={Hourglass} label="Waitlist" />
-            <Tab to="/shift" icon={ClipboardCheck} label="Service" />
             <Tab to="/help" icon={HelpCircle} label="Help" />
           </div>
         )}
       </nav>
 
-      {ops && <QuickCreateSheet open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} />}
     </>
   );
 }

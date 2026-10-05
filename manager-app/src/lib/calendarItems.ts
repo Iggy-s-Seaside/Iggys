@@ -107,14 +107,13 @@ export function isPartyMirror(ev: CalendarEvent, parties: Party[]): boolean {
 }
 
 /** All dates (yyyy-MM-dd) a recurring weekly event lands on within [startKey, endKey].
- * Expansion starts at max(anchor date, range start); there is no series end
- * column, so occurrences run to the visible range end and no further. */
+ * Expansion respects the anchor date and optional season end date. */
 export function expandRecurringDates(ev: IggyEvent, startKey: string, endKey: string): string[] {
   const want = (ev.recurring_day ?? '').trim().toLowerCase();
   if (!want) return [];
   const out: string[] = [];
   let d = parseISO(ev.date > startKey ? ev.date : startKey);
-  const end = parseISO(endKey);
+  const end = parseISO(ev.recurring_until && ev.recurring_until < endKey ? ev.recurring_until : endKey);
   while (d <= end) {
     if (format(d, 'EEEE').toLowerCase() === want) out.push(format(d, 'yyyy-MM-dd'));
     d = addDays(d, 1);

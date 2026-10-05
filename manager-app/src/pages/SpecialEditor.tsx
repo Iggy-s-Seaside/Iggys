@@ -1,3 +1,5 @@
+import { prepareArtworkState, localDateTime } from '../lib/artworkState';
+import { SimpleDesignPanel } from '../components/editor/SimpleDesignPanel';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { buzz } from '../utils/haptics';
@@ -26,7 +28,7 @@ import { useLunaHandoff } from '../hooks/useLunaHandoff';
 import { useSupabaseCRUD } from '../hooks/useSupabaseCRUD';
 import { useDraftPersistence } from '../hooks/useDraftPersistence';
 import { TEMPLATES } from '../data/templates';
-import type { Special, TextLayer, UserTemplate } from '../types';
+import type { Special, TextLayer, UserTemplate, DraftState } from '../types';
 import { DEFAULT_IMAGE_FILTERS } from '../types';
 import { VideoRefProvider } from '../context/VideoRefContext';
 import { storeMedia, generateMediaId, makeIdbRef, isIdbRef } from '../lib/mediaStore';
@@ -112,11 +114,16 @@ export function SpecialEditor() {
 
   const { state, selectedLayer, canUndo, canRedo, dispatch, addTextLayer } = useEditorState();
   const { upload, uploading } = useImageUpload();
-  const { data: specials, create, update } = useSupabaseCRUD<Special>('specials');
+  const { data: specials, create, update, loading: specialsLoading, error: specialsError, refresh: refreshSpecials } = useSupabaseCRUD<Special>('specials');
   const { data: userTemplates, create: createTemplate, remove: removeTemplate } = useSupabaseCRUD<UserTemplate>('user_templates');
   const { syncToSupabase } = useMediaSync();
   // No more CSS-transform zoom wrapper — canvas handles its own scale internally.
 
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState<DraftState | null>(null);
+  const [advanced, setAdvanced] = useState(false);
+  const [pendingLayout, setPendingLayout] = useState<string | null>(null);
+  const loadedSpecialId = useRef<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -218,14 +225,14 @@ export function SpecialEditor() {
     expires_at: '',
   });
   const [publishOptions, setPublishOptions] = useState({
-    postToWebsite: true,
+    postToWebsite: false,
     shareToInstagram: false,
   });
 
   const isEdit = Boolean(id);
 
   // Draft persistence
-  const { loadDraft, clearDraft, hasDraft } = useDraftPersistence(id, state, saveForm);
+  const { loadDraft, clearDraft, hasDraft } = useDraftPersistence(id, state, saveForm, draftChecked && !resumeDraft && !isPristine);
 
   // Warn on browser close/refresh with unsaved changes
   useEffect(() => {
@@ -242,54 +249,28 @@ export function SpecialEditor() {
   const initialStateRef = useRef<string | null>(null);
   useEffect(() => {
     if (state.layers.length === 0 && !state.backgroundImage) return;
-    const snapshot = JSON.stringify({ layers: state.layers, bg: state.backgroundImage, bgColor: state.backgroundColor, grad: state.backgroundGradient });
+    if (!isEdit) setHasUnsavedChanges(true);
+    const snapshot = JSON.stringify({ layers: state.layers, bg: state.backgroundImage, bgColor: state.backgroundColor, grad: state.backgroundGradient, width: state.canvasWidth, height: state.canvasHeight });
     if (initialStateRef.current === null) {
       // First meaningful state — save as baseline (template or draft load)
       initialStateRef.current = snapshot;
     } else if (snapshot !== initialStateRef.current) {
       setHasUnsavedChanges(true);
     }
-  }, [state]);
+  }, [state, isEdit]);
 
   // Load draft on mount (ref guard prevents StrictMode double-fire)
   const draftPromptShown = useRef(false);
   useEffect(() => {
     if (draftPromptShown.current) return;
-    if (!hasDraft()) return;
+    if (!hasDraft()) { setDraftChecked(true); return; }
 
     draftPromptShown.current = true;
 
     // loadDraft is async (resolves idb:// media refs from IndexedDB)
     loadDraft().then((draft) => {
-      if (!draft) return;
-      toast((t) => (
-        <div className="flex items-center gap-3">
-          <span className="text-sm">Resume your draft?</span>
-          <button
-            onClick={() => {
-              const editorState = {
-                ...draft.editorState,
-                imageFilters: draft.editorState.imageFilters || { ...DEFAULT_IMAGE_FILTERS },
-              };
-              dispatch({ type: 'LOAD_STATE', state: editorState });
-              setSaveForm(draft.saveForm);
-              toast.dismiss(t.id);
-            }}
-            className="px-3 py-1 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary-hover"
-          >
-            Restore
-          </button>
-          <button
-            onClick={() => {
-              clearDraft();
-              toast.dismiss(t.id);
-            }}
-            className="px-3 py-1 text-xs font-medium bg-surface-hover text-text-secondary rounded-lg hover:bg-surface-active"
-          >
-            Discard
-          </button>
-        </div>
-      ), { duration: 10000 });
+      setResumeDraft(draft);
+      setDraftChecked(true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -319,19 +300,23 @@ export function SpecialEditor() {
 
   // Load existing special for editing
   useEffect(() => {
-    if (isEdit && specials.length > 0) {
+    if (isEdit && specials.length > 0 && loadedSpecialId.current !== id) {
       const special = specials.find((s) => s.id === Number(id));
       if (special) {
+        loadedSpecialId.current = id!;
+        setPublishOptions(p => ({ ...p, postToWebsite: special.active }));
         setSaveForm({
           title: special.title,
           description: special.description,
           type: special.type,
           price: special.price ?? '',
           // timestamptz ISO → datetime-local value (YYYY-MM-DDTHH:mm)
-          starts_at: special.starts_at ? special.starts_at.slice(0, 16) : '',
-          expires_at: special.expires_at ? special.expires_at.slice(0, 16) : '',
+          starts_at: localDateTime(special.starts_at),
+          expires_at: localDateTime(special.expires_at),
         });
-        if (special.image_url) {
+        if (special.editor_state) {
+          dispatch({ type: 'LOAD_STATE', state: { ...special.editor_state, selectedLayerId: null } });
+        } else if (special.image_url) {
           dispatch({ type: 'SET_BACKGROUND', url: special.image_url });
         }
       }
@@ -614,13 +599,22 @@ export function SpecialEditor() {
   }, [state, dispatch]);
 
   const handleSave = async () => {
+    if (saving) return;
+    if (!saveForm.title.trim() || !saveForm.description.trim()) { toast.error('Add a name and description before saving.'); return; }
+    if (saveForm.starts_at && saveForm.expires_at && new Date(saveForm.expires_at) <= new Date(saveForm.starts_at)) { toast.error('The end must be after the start.'); return; }
     setSaving(true);
 
     try {
       dispatch({ type: 'SELECT_LAYER', id: null });
       await new Promise((r) => setTimeout(r, 150));
 
+      const editorState = await prepareArtworkState(state, async src => {
+        if (isIdbRef(src)) return syncToSupabase(src);
+        const blob = await (await fetch(src)).blob();
+        return upload(new File([blob], `artwork-media-${crypto.randomUUID()}`, { type: blob.type }), 'specials/source');
+      });
       const dataUrl = await canvasRef.current?.exportImageAsync();
+      if (!dataUrl) throw new Error('The preview could not be created. Please try saving again.');
       let imageUrl: string | null = null;
       let imageFile: File | null = null;
 
@@ -629,6 +623,7 @@ export function SpecialEditor() {
         const blob = await res.blob();
         imageFile = new File([blob], `iggy-special-${Date.now()}.png`, { type: 'image/png' });
         imageUrl = await upload(imageFile, 'specials');
+        if (!imageUrl) throw new Error('The picture could not be uploaded. Your changes have not been saved.');
       }
 
       const payload = {
@@ -637,6 +632,7 @@ export function SpecialEditor() {
         type: saveForm.type,
         price: saveForm.price || null,
         image_url: imageUrl,
+        editor_state: editorState,
         active: publishOptions.postToWebsite,
         starts_at: saveForm.starts_at ? new Date(saveForm.starts_at).toISOString() : null,
         expires_at: saveForm.expires_at ? new Date(saveForm.expires_at).toISOString() : null,
@@ -680,7 +676,7 @@ export function SpecialEditor() {
       }
     } catch (error) {
       console.error('[handleSave]', error);
-      toast.error('Failed to save. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -1085,6 +1081,8 @@ export function SpecialEditor() {
     exportModalOpen, saveModalOpen,
   ]);
 
+  if (isEdit && (specialsLoading || specialsError || !specials.some(s => s.id === Number(id)))) return <div className="fixed inset-0 z-50 bg-background p-6 flex flex-col items-center justify-center gap-4"><p>{specialsLoading ? 'Loading your artwork…' : specialsError ? 'Your artwork could not be loaded.' : 'This artwork could not be found.'}</p>{specialsError && <button className="btn-primary" onClick={refreshSpecials}>Try again</button>}<button className="btn-secondary" onClick={() => navigate('/specials')}>Back to artwork</button></div>;
+
   return (
     <VideoRefProvider>
     {/* Full-screen focused surface on EVERY breakpoint. The old desktop
@@ -1094,8 +1092,20 @@ export function SpecialEditor() {
         covers the z-40 mobile top bar outright; the layout's z-50 floating
         chrome stands down via DashboardLayout's immersive-route check. */}
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <Modal open={!!resumeDraft} onClose={() => {}} title="Continue your unfinished artwork?">
+        <p className="text-text-secondary mb-5">There is an unfinished design saved on this device. Continue it, or discard it to start from the saved artwork.</p>
+        <div className="flex flex-wrap gap-3">
+          <button className="btn-primary" onClick={() => { if (resumeDraft) { if (id) loadedSpecialId.current = id; dispatch({ type: 'LOAD_STATE', state: { ...resumeDraft.editorState, imageFilters: resumeDraft.editorState.imageFilters || DEFAULT_IMAGE_FILTERS } }); setSaveForm(resumeDraft.saveForm); setHasUnsavedChanges(true); } setResumeDraft(null); }}>Continue design</button>
+          <button className="btn-secondary" onClick={() => { clearDraft(); setResumeDraft(null); }}>Discard unfinished design</button>
+        </div>
+      </Modal>
+      <header className="flex items-center gap-3 p-3 border-b border-border bg-surface safe-area-top shrink-0">
+        <button onClick={handleBack} className="btn-secondary" aria-label="Back to artwork"><ArrowLeft size={18} /><span className="hidden sm:inline">Artwork</span></button>
+        <div className="flex-1 min-w-0"><h1 className="font-semibold truncate">{isEdit ? 'Edit artwork' : 'Create artwork'}</h1><p className="text-xs text-text-secondary">{advanced ? 'Detailed design tools' : 'Choose a layout, change the words, then save'}</p></div>
+        <button className="btn-secondary text-sm" onClick={() => { closeAllOverlays(); setAdvanced(!advanced); setZoom(undefined); }}>{advanced ? 'Simple view' : 'More tools'}</button>
+      </header>
       {/* Desktop Toolbar — hidden on mobile (MobileToolbar handles it) */}
-      <div className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-surface border-b border-border shrink-0 overflow-x-auto">
+      <div className={`${advanced ? 'hidden md:flex' : 'hidden'} items-center gap-2 px-4 py-2.5 bg-surface border-b border-border shrink-0 overflow-x-auto`}>
         <button onClick={handleBack} className="btn-ghost text-xs py-1.5 px-2" aria-label="Back to specials">
           <ArrowLeft size={16} />
         </button>
@@ -1348,7 +1358,7 @@ export function SpecialEditor() {
 
       {/* Mobile header — ultra-minimal, just back + title */}
       <div
-        className="flex md:hidden items-center gap-3 px-3 py-1.5 shrink-0 bg-surface/90 backdrop-blur-xl border-b border-border/30 safe-area-top"
+        className={`${advanced ? 'flex md:hidden' : 'hidden'} items-center gap-3 px-3 py-1.5 shrink-0 bg-surface/90 backdrop-blur-xl border-b border-border/30 safe-area-top`}
         style={{
           opacity: isGesturing ? 0 : 1,
           transform: isGesturing ? 'translateY(-10px)' : 'translateY(0)',
@@ -1365,9 +1375,18 @@ export function SpecialEditor() {
       </div>
 
       {/* Editor Body */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className={advanced ? 'flex flex-1 min-h-0 overflow-hidden' : 'flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden'}>
+        {!advanced && <SimpleDesignPanel state={state}
+          legacy={isEdit && !specials.find(s => s.id === Number(id))?.editor_state}
+          onText={(id, changes) => dispatch({ type: 'UPDATE_LAYER', id, changes })}
+          onAddText={() => addTextLayer({ text: 'Your text' })}
+          onLayout={id => { if (state.layers.length || state.backgroundImage) setPendingLayout(id); else loadTemplate(id); }}
+          onPhoto={() => { setLibraryMode('background'); setLibraryOpen(true); }} onUpload={() => bgInputRef.current?.click()}
+          onBackground={color => { dispatch({ type: 'SET_BACKGROUND_COLOR', color }); dispatch({ type: 'SET_BACKGROUND_GRADIENT', gradient: undefined }); dispatch({ type: 'SET_BACKGROUND', url: null }); }}
+          onSize={(width,height) => { const sx = width/state.canvasWidth, sy = height/state.canvasHeight; dispatch({ type: 'LOAD_STATE', state: { ...state, canvasWidth: width, canvasHeight: height, layers: state.layers.map(l => ({ ...l, x: l.x*sx, y: l.y*sy, width: l.width*sx, fontSize: l.fontSize*sx })) } }); setZoom(undefined); }}
+          onAdvanced={() => setAdvanced(true)} />}
         {/* Left Panel - Layers (desktop only, narrower at md, wider at lg) */}
-        <div className="w-44 lg:w-56 bg-surface border-r border-border p-2 lg:p-3 overflow-y-auto hidden md:block">
+        <div className={`w-44 lg:w-56 bg-surface border-r border-border p-2 lg:p-3 overflow-y-auto ${advanced ? 'hidden md:block' : 'hidden'}`}>
           <LayerPanel
             layers={state.layers}
             selectedId={state.selectedLayerId}
@@ -1381,7 +1400,7 @@ export function SpecialEditor() {
         </div>
 
         {/* Canvas Area — DOM-based canvas with gesture handling */}
-        <div className="flex-1 bg-black/40 md:bg-surface-active overflow-hidden relative">
+        <div className={advanced ? "flex-1 bg-black/40 md:bg-surface-active overflow-hidden relative" : "h-[350px] min-h-[350px] md:h-auto md:min-h-0 md:flex-1 shrink-0 bg-surface-active overflow-hidden relative order-1 md:order-2"}>
           <DomCanvas
             ref={canvasRef}
             state={state}
@@ -1398,7 +1417,7 @@ export function SpecialEditor() {
           />
 
           {/* Empty canvas onboarding */}
-          {isPristine && (
+          {isPristine && advanced && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
               <div className="text-center pointer-events-auto">
                 <Sparkles size={36} className="mx-auto text-text-muted mb-3" />
@@ -1416,7 +1435,7 @@ export function SpecialEditor() {
         </div>
 
         {/* Right Panel - Properties / Adjustments (desktop only, narrower at md, wider at lg) */}
-        <div className="w-60 lg:w-72 bg-surface border-l border-border flex-col hidden md:flex">
+        <div className={`w-60 lg:w-72 bg-surface border-l border-border flex-col ${advanced ? 'hidden md:flex' : 'hidden'}`}>
           {/* Tab switcher */}
           <div className="flex border-b border-border shrink-0">
             <button
@@ -1473,7 +1492,7 @@ export function SpecialEditor() {
       </div>
 
       {/* Mobile Toolbar — fixed at bottom */}
-      <MobileToolbar
+      {advanced && <MobileToolbar
         onAddText={(overrides) => {
           closeAllOverlays();
           addTextLayer(overrides);
@@ -1512,8 +1531,14 @@ export function SpecialEditor() {
         isImageSelected={selectedLayer?.elementType === 'image' || selectedLayer?.elementType === 'video'}
         activeSheet={mobileSheet}
         gestureActive={isGesturing}
-      />
+      />}
 
+      {!advanced && <footer className="p-3 bg-surface border-t border-border flex items-center justify-between gap-2 shrink-0 safe-area-bottom">
+        <div className="flex gap-1"><button className="btn-secondary px-3" aria-label="Undo" disabled={!canUndo} onClick={() => dispatch({ type: 'UNDO' })}><Undo2 size={18} /></button><button className="btn-secondary px-3" aria-label="Redo" disabled={!canRedo} onClick={() => dispatch({ type: 'REDO' })}><Redo2 size={18} /></button></div>
+        <button className="btn-secondary" disabled={isExportingImage || isPristine} onClick={() => handleExport('png', 100)}><Download size={18} /><span>Download</span></button>
+        <button className="btn-primary" disabled={isPristine} onClick={() => { setSaveForm(f => ({ ...f, title: f.title || state.layers.find(l => !l.elementType || l.elementType === 'text')?.text || '', description: f.description || state.layers.filter(l => !l.elementType || l.elementType === 'text').slice(1).map(l => l.text).join('\n') })); setSaveModalOpen(true); }}><Save size={18} />Save</button>
+      </footer>}
+      <ConfirmDialog open={pendingLayout !== null} onClose={() => setPendingLayout(null)} onConfirm={() => { if (pendingLayout) loadTemplate(pendingLayout); setPendingLayout(null); }} title="Replace this layout?" message="This replaces the current picture and text. You can use Undo to get them back." confirmLabel="Replace layout" />
       {/* Mobile Bottom Sheets */}
       <BottomSheet
         open={mobileSheet === 'layers'}
@@ -1752,7 +1777,7 @@ export function SpecialEditor() {
             {/* Built-in templates */}
             <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Built-in</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {TEMPLATES.map((t) => (
+              {TEMPLATES.filter(t => t.category !== 'food').map((t) => (
                 <button
                   key={t.id}
                   onClick={() => { loadTemplate(t.id); setMobileSheet(null); }}
@@ -1813,7 +1838,6 @@ export function SpecialEditor() {
               onChange={(v) => setTemplateForm((f) => ({ ...f, category: v }))}
               options={[
                 { value: 'drink', label: 'Drink' },
-                { value: 'food', label: 'Food' },
                 { value: 'event', label: 'Event' },
                 { value: 'seasonal', label: 'Seasonal' },
               ]}
@@ -1832,7 +1856,7 @@ export function SpecialEditor() {
       </Modal>
 
       {/* Save Modal */}
-      <Modal open={saveModalOpen} onClose={() => setSaveModalOpen(false)} title="Save Special">
+      <Modal open={saveModalOpen} onClose={() => setSaveModalOpen(false)} title="Save artwork">
         <div className="space-y-4">
           <div>
             <label className="label">Title *</label>
@@ -1840,7 +1864,7 @@ export function SpecialEditor() {
               className="input-field"
               value={saveForm.title}
               onChange={(e) => setSaveForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="Happy Hour Special"
+              placeholder="Name this artwork"
               required
             />
           </div>
@@ -1850,7 +1874,7 @@ export function SpecialEditor() {
               className="input-field min-h-[80px] resize-y"
               value={saveForm.description}
               onChange={(e) => setSaveForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="$5 well drinks and $3 draft beers..."
+              placeholder="Add the approved details for this artwork"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -1862,7 +1886,7 @@ export function SpecialEditor() {
                 onChange={(v) => setSaveForm((f) => ({ ...f, type: v }))}
                 options={[
                   { value: 'drink', label: 'Drink' },
-                  { value: 'food', label: 'Food' },
+                  ...(saveForm.type === 'food' ? [{ value: 'food' as const, label: 'Food (existing)' }] : []),
                   { value: 'seasonal', label: 'Seasonal' },
                 ]}
               />
@@ -1908,6 +1932,7 @@ export function SpecialEditor() {
               <button
                 type="button"
                 role="switch"
+                aria-label="Post to website"
                 aria-checked={publishOptions.postToWebsite}
                 onClick={() => setPublishOptions(p => ({ ...p, postToWebsite: !p.postToWebsite }))}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
@@ -1927,6 +1952,7 @@ export function SpecialEditor() {
               <button
                 type="button"
                 role="switch"
+                aria-label="Share or download for Instagram"
                 aria-checked={publishOptions.shareToInstagram}
                 onClick={() => setPublishOptions(p => ({ ...p, shareToInstagram: !p.shareToInstagram }))}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${

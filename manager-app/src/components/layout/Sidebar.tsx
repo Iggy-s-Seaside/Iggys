@@ -1,328 +1,50 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed, LogOut, Menu, X, Sun, Moon, FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt, Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare, Share2, Star, Megaphone, Hourglass, Shirt, CalendarRange, Calculator, ShieldCheck, HelpCircle, ChevronDown, BookHeart } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Home, CalendarDays, MessageSquare, PartyPopper, Grid2X2, LogOut, Sun, Moon, HelpCircle, Hourglass } from 'lucide-react';
+import { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useRole, type Role } from '../../hooks/useRole';
-import { useUnreadCount } from '../../hooks/useMessages';
-import { useNewInsightCount } from '../../hooks/useLuna';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
 
-type NavItem = { to: string; icon: LucideIcon; label: string; badge?: 'messages' | 'luna'; roles?: Role[]; end?: boolean };
-type NavSection = { id: string; label: string; items: NavItem[] };
+// Kept for existing callers; More now opens a task page instead of a long drawer.
+export const OPEN_MOBILE_NAV_EVENT = 'iggys:nav:open-mobile';
+export function openMobileNav() { window.dispatchEvent(new CustomEvent(OPEN_MOBILE_NAV_EVENT)); }
 
-// Operational tier (owner + manager). Items with no `roles` are visible to ALL
-// roles incl. employees — that's just the host waitlist + the bar service cockpit.
-const OPS: Role[] = ['owner', 'manager'];
-
-// Grouped nav. Every existing route is kept — sections only label + organise them.
-const navSections: NavSection[] = [
-  {
-    id: 'tonight',
-    label: 'Tonight',
-    items: [
-      { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: OPS },
-      { to: '/shift', icon: ClipboardCheck, label: 'Service' },
-      { to: '/waitlist', icon: Hourglass, label: 'Waitlist' },
-      { to: '/help', icon: HelpCircle, label: 'Help' },
-      { to: '/run-sheet', icon: ClipboardList, label: 'Run Sheet', roles: OPS },
-    ],
-  },
-  {
-    id: 'bookings',
-    label: 'Bookings & Sales',
-    items: [
-      { to: '/parties', icon: PartyPopper, label: 'Parties', roles: OPS },
-      { to: '/pipeline', icon: KanbanSquare, label: 'Pipeline', roles: OPS },
-      { to: '/calendar', icon: CalendarDays, label: 'Calendar', roles: OPS },
-      { to: '/events', icon: Calendar, label: 'Events', roles: OPS },
-      { to: '/invoices', icon: Receipt, label: 'Invoices', roles: OPS },
-      { to: '/packages', icon: Tags, label: 'Packages', roles: OPS },
-    ],
-  },
-  {
-    id: 'marketing',
-    label: 'Marketing',
-    items: [
-      { to: '/specials', icon: Sparkles, label: 'Specials', roles: OPS },
-      { to: '/social', icon: Share2, label: 'Social', roles: OPS },
-      { to: '/marketing', icon: Megaphone, label: 'Marketing', roles: OPS },
-      { to: '/reputation', icon: Star, label: 'Reviews', roles: OPS },
-      { to: '/media', icon: FolderOpen, label: 'Media', roles: OPS },
-    ],
-  },
-  {
-    id: 'menu',
-    label: 'Menu & Stock',
-    items: [
-      { to: '/menu', icon: UtensilsCrossed, label: 'Menu', roles: OPS },
-      { to: '/inventory', icon: Package, label: 'Inventory', roles: OPS },
-      { to: '/inventory/count', icon: ClipboardCheck, label: 'Count Stock', roles: OPS },
-      { to: '/merch', icon: Shirt, label: 'Merch', roles: OPS },
-      { to: '/cogs', icon: Calculator, label: 'COGS', roles: OPS },
-    ],
-  },
-  {
-    id: 'boh',
-    label: 'Back-of-House',
-    items: [
-      { to: '/team', icon: Users, label: 'Team', roles: ['owner'] },
-      { to: '/schedule', icon: CalendarRange, label: 'Schedule', roles: OPS },
-      { to: '/todos', icon: ListChecks, label: 'To-Do', roles: OPS },
-      { to: '/compliance', icon: ShieldCheck, label: 'Compliance', roles: OPS },
-    ],
-  },
-  {
-    id: 'insights',
-    label: 'Insights',
-    items: [
-      { to: '/reports', icon: BarChart3, label: 'Reports', roles: OPS },
-      { to: '/luna', icon: Moon, label: 'Luna', badge: 'luna', roles: OPS, end: true },
-      { to: '/luna/room', icon: BookHeart, label: "Luna's Room", roles: OPS },
-      { to: '/messages', icon: MessageSquare, label: 'Messages', badge: 'messages', roles: OPS },
-    ],
-  },
+export const MAIN_NAV = [
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/parties', label: 'Bookings', icon: PartyPopper },
+  { to: '/messages', label: 'Inbox', icon: MessageSquare },
+  { to: '/tools', label: 'More tasks', icon: Grid2X2 },
+];
+const STAFF_NAV = [
+  { to: '/waitlist', label: 'Waitlist', icon: Hourglass },
+  { to: '/help', label: 'Help', icon: HelpCircle },
 ];
 
-const COLLAPSED_KEY = 'iggys.sidebar.collapsed';
-
-/** Window event that opens the mobile nav drawer — fired by the bottom-nav
- * "More" tab (mirrors the command palette's openCommandPalette pattern). */
-export const OPEN_MOBILE_NAV_EVENT = 'iggys:nav:open-mobile';
-
-export function openMobileNav() {
-  window.dispatchEvent(new CustomEvent(OPEN_MOBILE_NAV_EVENT));
-}
-
-// Below Tailwind's lg breakpoint (1024px) the sidebar renders as the mobile drawer.
-const NARROW_QUERY = '(max-width: 1023.98px)';
-
-function subscribeNarrow(cb: () => void) {
-  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
-  const mql = window.matchMedia(NARROW_QUERY);
-  mql.addEventListener('change', cb);
-  return () => mql.removeEventListener('change', cb);
-}
-
-/** True on small screens where the nav is the mobile drawer. */
-function useIsNarrowScreen(): boolean {
-  return useSyncExternalStore(
-    subscribeNarrow,
-    () => typeof window !== 'undefined' && Boolean(window.matchMedia?.(NARROW_QUERY).matches),
-    () => true, // SSR/first-paint default: narrow (drawer context)
-  );
-}
-
-function readCollapsed(): string[] {
-  try {
-    const raw = localStorage.getItem(COLLAPSED_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-// Returns the section id that owns the current pathname (longest matching route wins).
-function activeSectionId(pathname: string): string | undefined {
-  let bestId: string | undefined;
-  let bestLen = -1;
-  for (const section of navSections) {
-    for (const item of section.items) {
-      const matches = item.to === '/' ? pathname === '/' : pathname === item.to || pathname.startsWith(item.to + '/');
-      if (matches && item.to.length > bestLen) {
-        bestLen = item.to.length;
-        bestId = section.id;
-      }
-    }
-  }
-  return bestId;
-}
-
 export function Sidebar() {
-  const { signOut, user } = useAuth();
+  const { role, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { can } = useRole();
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
-  // Mobile drawer: sections default OPEN and collapse is session-only — the
-  // persisted desktop collapse state would otherwise make managers hunt for
-  // "which group was it in?" every time they open the drawer on a phone.
-  const isNarrow = useIsNarrowScreen();
-  const [mobileCollapsed, setMobileCollapsed] = useState<string[]>([]);
-  const effectiveCollapsed = isNarrow ? mobileCollapsed : collapsed;
-  const unreadCount = useUnreadCount();
-
-  // The bottom-nav "More" tab opens this drawer via a window event.
+  const navigate = useNavigate();
+  const ops = role === 'owner' || role === 'manager';
   useEffect(() => {
-    const onOpen = () => setMobileOpen(true);
-    window.addEventListener(OPEN_MOBILE_NAV_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_MOBILE_NAV_EVENT, onOpen);
-  }, []);
-
-  // Trap focus inside the mobile nav drawer while open (ESC closes, focus restores).
-  const mobileDrawerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(mobileOpen, mobileDrawerRef, { onEscape: () => setMobileOpen(false) });
-  const newInsightCount = useNewInsightCount();
-
-  const activeSection = activeSectionId(location.pathname);
-
-  // Role-filter: items with no `roles` are visible to everyone (employees see
-  // just Service + Waitlist). Sections with nothing left drop out entirely.
-  const visibleSections = navSections
-    .map((s) => ({ ...s, items: s.items.filter((i) => !i.roles || can(i.roles)) }))
-    .filter((s) => s.items.length > 0);
-
-  const toggleSection = (id: string) => {
-    if (isNarrow) {
-      // Session-only on mobile — never written to localStorage.
-      setMobileCollapsed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-      return;
-    }
-    setCollapsed((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try {
-        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
-      } catch {
-        // ignore persistence failures (private mode etc.)
-      }
-      return next;
-    });
-  };
-
-  const navContent = (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-6 py-5 border-b border-border">
-        <h1 className="text-xl font-bold text-text-primary tracking-tight">
-          Iggy's <span className="text-primary">Manager</span>
-        </h1>
-      </div>
-
-      {/* Nav Links */}
-      <nav aria-label="Primary" className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
-        {visibleSections.map((section) => {
-          // The active route's section is always shown, even if the user collapsed it.
-          const isOpen = !effectiveCollapsed.includes(section.id) || section.id === activeSection;
-          return (
-            <div key={section.id}>
-              <button
-                type="button"
-                onClick={() => toggleSection(section.id)}
-                aria-expanded={isOpen}
-                className="flex items-center justify-between w-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors"
-              >
-                <span>{section.label}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${isOpen ? '' : '-rotate-90'}`}
-                  aria-hidden="true"
-                />
-              </button>
-              {isOpen && (
-                <div className="mt-1 space-y-1">
-                  {section.items.map(({ to, icon: Icon, label, badge, end }) => {
-                    const badgeCount =
-                      badge === 'messages' ? unreadCount : badge === 'luna' ? newInsightCount : 0;
-                    return (
-                      <NavLink
-                        key={to}
-                        to={to}
-                        end={to === '/' || end}
-                        onClick={() => setMobileOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'bg-primary-50 text-primary-dark border-l-3 border-primary'
-                              : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                          }`
-                        }
-                      >
-                        <Icon size={18} />
-                        {label}
-                        {badgeCount > 0 && (
-                          <span className="ml-auto bg-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                            {badgeCount > 9 ? '9+' : badgeCount}
-                          </span>
-                        )}
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+    const open = () => navigate(ops ? '/tools' : '/help');
+    window.addEventListener(OPEN_MOBILE_NAV_EVENT, open);
+    return () => window.removeEventListener(OPEN_MOBILE_NAV_EVENT, open);
+  }, [navigate, ops]);
+  return <>
+    <header className="app-mobile-header lg:hidden fixed top-0 inset-x-0 z-40 bg-surface border-b border-border h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] px-5 flex items-center">
+      <NavLink to={ops ? '/' : '/waitlist'} className="min-h-[44px] inline-flex items-center"><span className="brand-wordmark">Iggy’s</span><span className="brand-place">Seaside<br />Oregon</span></NavLink>
+      <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Use light screen' : 'Use dark screen'} className="ml-auto mr-12 inline-flex items-center gap-1.5 min-h-[44px] px-2 text-sm text-text-secondary">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}{theme === 'dark' ? 'Light' : 'Dark'}</button>
+    </header>
+    <aside className="app-sidebar hidden lg:flex w-56 bg-surface border-r border-border h-screen sticky top-0 shrink-0 flex-col">
+      <NavLink to={ops ? '/' : '/waitlist'} className="px-8 pt-10 pb-6"><span className="brand-wordmark">Iggy’s</span><span className="brand-place mt-3">Seaside, Oregon</span></NavLink>
+      <nav aria-label="Main navigation" className="p-4 space-y-2 flex-1">
+        {(ops ? MAIN_NAV : STAFF_NAV).map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `nav-item flex items-center gap-3 px-4 py-4 rounded-xl font-semibold ${isActive ? 'bg-primary-50 text-primary-dark' : 'text-text-secondary hover:bg-surface-hover'}`}><Icon size={22} />{label}</NavLink>)}
       </nav>
-
-      {/* Theme Toggle + User & Sign Out */}
-      <div className="px-3 py-4 border-t border-border space-y-2">
-        <button
-          onClick={toggleTheme}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-        </button>
-
-        <p className="px-3 text-xs text-text-muted truncate">{user?.email}</p>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-danger transition-colors"
-        >
-          <LogOut size={18} />
-          Sign Out
-        </button>
+      <div className="sidebar-footer p-4 border-t border-border space-y-1">
+        <NavLink to="/help" className="flex items-center gap-3 min-h-[48px] px-4 text-text-secondary"><HelpCircle size={20} />Help</NavLink>
+        <button onClick={toggleTheme} className="flex items-center gap-3 min-h-[48px] px-4 text-text-secondary w-full">{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}{theme === 'dark' ? 'Light screen' : 'Dark screen'}</button>
+        <button onClick={signOut} className="flex items-center gap-3 min-h-[48px] px-4 text-text-secondary w-full"><LogOut size={20} />Sign out</button>
       </div>
-    </div>
-  );
-
-  return (
-    <>
-      {/* Mobile header bar */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-surface border-b border-border">
-        <button
-          onClick={() => setMobileOpen(true)}
-          aria-label="Open navigation menu"
-          className="p-2.5 -ml-1 rounded-lg hover:bg-surface-hover transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-        >
-          <Menu size={20} />
-        </button>
-        <h1 className="text-sm font-bold text-text-primary tracking-tight">
-          Iggy's <span className="text-primary">Manager</span>
-        </h1>
-        {can(OPS) && unreadCount > 0 && (
-          <NavLink to="/messages" className="ml-auto flex items-center gap-1 text-xs text-primary">
-            <MessageSquare size={14} />
-            <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
-          </NavLink>
-        )}
-      </header>
-
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Navigation menu">
-          <div className="fixed inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <div ref={mobileDrawerRef} tabIndex={-1} className="relative w-64 h-full bg-surface border-r border-border focus:outline-none">
-            <button
-              onClick={() => setMobileOpen(false)}
-              aria-label="Close navigation menu"
-              className="absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
-            >
-              <X size={18} />
-            </button>
-            {navContent}
-          </div>
-        </div>
-      )}
-
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:block w-64 bg-surface border-r border-border h-screen sticky top-0 shrink-0">
-        {navContent}
-      </aside>
-    </>
-  );
+    </aside>
+  </>;
 }

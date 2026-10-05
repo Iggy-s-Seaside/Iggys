@@ -47,7 +47,7 @@ export function MessageWidget({ messages, loading }: MessageWidgetProps) {
           {recent.map((msg) => (
             <Link
               key={msg.id}
-              to="/messages"
+              to={`/messages?message=${msg.id}`}
               className="flex items-start gap-3 px-5 py-3 hover:bg-surface-hover transition-colors"
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${

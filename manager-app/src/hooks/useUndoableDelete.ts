@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { supabase } from '../lib/supabase';
+import { deleteRow } from '../lib/rowMutations';
 import { enqueue, isOffline } from '../lib/outbox';
 import toast from 'react-hot-toast';
 
@@ -83,7 +84,7 @@ export function undoableDelete<T extends { id: string | number }>(
   };
   const commit = setTimeout(async () => {
     if (undone) return;
-    const { error: err } = await supabase.from(table).delete().eq('id', id);
+    const { error: err } = await deleteRow(supabase, table, id);
     clearPending(table, id);
     if (err) {
       console.error(`[${table}] delete error:`, err.message);

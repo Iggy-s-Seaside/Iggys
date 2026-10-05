@@ -40,7 +40,7 @@ export function Events() {
 
   return (
     <div>
-      <PageHeader title="Events" subtitle={`${events.length} total events`}>
+      <PageHeader title="Public events" subtitle="DJ nights, live music and events shown on the website">
         {events.filter(e => e.active).length > 0 && (
           <button
             onClick={() => downloadBulkIcs(events.filter(e => e.active))}

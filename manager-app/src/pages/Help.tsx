@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { LifeBuoy, Search, X, ShieldCheck, Sparkles } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -33,7 +34,7 @@ export function Help() {
 
   // Owners see everything; everyone else sees only the "all" audience topics.
   const visibleTopics = useMemo(
-    () => HELP_TOPICS.filter((t) => isOwner || t.audience === 'all'),
+    () => HELP_TOPICS.filter((t) => !t.link?.to.startsWith('/shift') && (isOwner || t.audience === 'all')),
     [isOwner]
   );
 
@@ -68,6 +69,15 @@ export function Help() {
         subtitle="Quick how-tos for every shift. Search, or browse by what you’re doing."
       />
 
+      <section className="card p-5 mb-6 space-y-3">
+        <h2 className="text-xl font-semibold">Start here</h2>
+        <p><strong>Home</strong> shows messages waiting for a reply and upcoming events.</p>
+        <p><strong>Bookings</strong> holds private party requests. A request becomes a booking only when you confirm it.</p>
+        <p><strong>Calendar</strong> shows dates. Open a public event to change it, switch it off, or set its season end date.</p>
+        <p><strong>Inbox</strong> separates booking requests from other email. Use “Change type / reply status” if a message is in the wrong group.</p>
+        <p><strong>More</strong> groups everything else by task. You can search there if you cannot find something.</p>
+        <Link to="/notifications" className="btn-secondary">Set up event reminders</Link>
+      </section>
       {/* Search */}
       <div className="relative mb-4">
         <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" />
@@ -193,7 +203,7 @@ export function Help() {
 
       {/* Warm footer */}
       <p className="text-xs text-text-muted text-center mt-10">
-        New here? Take a breath — you’ve got this. Start with “Run the waitlist” or “Open the bar.”
+        Start with Home for upcoming events, or Inbox for messages waiting for a reply.
       </p>
     </div>
   );

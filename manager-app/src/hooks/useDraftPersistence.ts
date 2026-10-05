@@ -96,7 +96,8 @@ export function readExistingDraftJson(key: string): string {
 export function useDraftPersistence(
   specialId: string | undefined,
   state: EditorState,
-  saveForm: DraftState['saveForm']
+  saveForm: DraftState['saveForm'],
+  enabled = true
 ) {
   const draftKey = `${DRAFT_PREFIX}${specialId || 'new'}`;
   // Last-written draft JSON, used by the autosave tick below to skip no-op
@@ -116,8 +117,10 @@ export function useDraftPersistence(
     lastSavedRef.current = readExistingDraftJson(draftKey);
   }, [draftKey]);
 
+  // Never overwrite a saved draft while its restore choice is pending.
   // Auto-save every 5 seconds (sanitized — no blob/data URLs)
   useEffect(() => {
+    if (!enabled) return;
     const interval = setInterval(() => {
       try {
         const sanitizedState = sanitizeStateForStorage(state);
@@ -141,11 +144,12 @@ export function useDraftPersistence(
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [state, saveForm, draftKey, specialId]);
+  }, [state, saveForm, draftKey, specialId, enabled]);
 
   // Save on beforeunload (sanitized)
   useEffect(() => {
     const handler = () => {
+      if (!enabled) return;
       try {
         const sanitizedState = sanitizeStateForStorage(state);
         const draft: DraftState = {
@@ -161,7 +165,7 @@ export function useDraftPersistence(
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [state, saveForm, draftKey, specialId]);
+  }, [state, saveForm, draftKey, specialId, enabled]);
 
   // Load draft (async — resolves idb:// references to blob URLs)
   const loadDraft = useCallback(async (): Promise<DraftState | null> => {

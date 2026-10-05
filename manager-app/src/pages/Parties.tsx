@@ -78,9 +78,9 @@ export function Parties() {
 
   return (
     <div>
-      <PageHeader title="Parties" subtitle="Private event inquiries, bookings & follow-ups">
+      <PageHeader title="Bookings" subtitle="Requests are not confirmed until you approve them.">
         <button onClick={() => setFormOpen(true)} className="btn-primary">
-          <Plus size={18} /> New Party
+          <Plus size={18} /> Add a booking
         </button>
       </PageHeader>
 
@@ -128,7 +128,7 @@ export function Parties() {
           description={tab === 'inquiry' ? 'Website requests and ones you log will show up here.' : `Parties marked ${tab} will appear here.`}
           action={tab === 'inquiry' ? (
             <button onClick={() => setFormOpen(true)} className="btn-primary inline-flex">
-              <Plus size={18} /> New Party
+              <Plus size={18} /> Add a booking
             </button>
           ) : undefined}
         />

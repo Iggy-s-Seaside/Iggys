@@ -175,10 +175,28 @@ describe('needsReplyNow', () => {
 
 describe('categoryLabel', () => {
   it('maps known categories and capitalises unknowns', () => {
-    expect(categoryLabel('event')).toBe('Private event');
+    expect(categoryLabel('event')).toBe('Private booking');
     expect(categoryLabel('reservation')).toBe('Reservation');
     expect(categoryLabel(null)).toBe('Inquiry');
     expect(categoryLabel('custom')).toBe('Custom');
+  });
+});
+
+describe('reviewed inbox examples', () => {
+  it('separates a comedy promoter from a customer renting a room', () => {
+    expect(classifyMessage("Love Iggy's", 'We handle the booking, advertising and public ticket sales for comedy shows. Interested in hosting?', 'promoter@example.com').category).toBe('entertainment');
+  });
+  it('does not turn a question about the DJ into a private booking', () => {
+    expect(classifyMessage('Other', 'Are you guys still having a DJ upstairs?').category).toBe('request');
+  });
+  it('keeps an SEO audit pitch out of the reply queue', () => {
+    const result = classifyMessage('General Inquiry', 'Your website looks great, but I found a few SEO issues. Reply to receive a short audit.');
+    expect(result.category).toBe('solicitation');
+    expect(result.needsReply).toBe(false);
+  });
+  it('keeps a manager correction authoritative', () => {
+    expect(messageTriage(msg({ subject: 'SEO question', category: 'business', needs_reply: true,
+      luna_classification: { by: 'manager' }, luna_classified_at: '2026-09-12' })).category).toBe('business');
   });
 });
 

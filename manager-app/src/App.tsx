@@ -28,6 +28,8 @@ const PartyBEO = lazy(() => import('./pages/PartyBEO').then((m) => ({ default: m
 const PartyInvoice = lazy(() => import('./pages/PartyInvoice').then((m) => ({ default: m.PartyInvoice })));
 const Pipeline = lazy(() => import('./pages/Pipeline').then((m) => ({ default: m.Pipeline })));
 const SocialQueue = lazy(() => import('./pages/SocialQueue').then((m) => ({ default: m.SocialQueue })));
+const Notifications = lazy(() => import('./pages/Notifications').then((m) => ({ default: m.Notifications })));
+const Tools = lazy(() => import('./pages/Tools').then((m) => ({ default: m.Tools })));
 const Calendar = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.Calendar })));
 const Packages = lazy(() => import('./pages/Packages').then((m) => ({ default: m.Packages })));
 const Todos = lazy(() => import('./pages/Todos').then((m) => ({ default: m.Todos })));
@@ -35,10 +37,6 @@ const Invoices = lazy(() => import('./pages/Invoices').then((m) => ({ default: m
 const Luna = lazy(() => import('./pages/Luna').then((m) => ({ default: m.Luna })));
 const LunaRoom = lazy(() => import('./pages/LunaRoom').then((m) => ({ default: m.LunaRoom })));
 const Team = lazy(() => import('./pages/Team').then((m) => ({ default: m.Team })));
-const Shift = lazy(() => import('./pages/Shift').then((m) => ({ default: m.Shift })));
-const Checks = lazy(() => import('./pages/Checks').then((m) => ({ default: m.Checks })));
-const ShiftLog = lazy(() => import('./pages/ShiftLog').then((m) => ({ default: m.ShiftLog })));
-const CloseOut = lazy(() => import('./pages/CloseOut').then((m) => ({ default: m.CloseOut })));
 const Reputation = lazy(() => import('./pages/Reputation').then((m) => ({ default: m.Reputation })));
 const Marketing = lazy(() => import('./pages/Marketing').then((m) => ({ default: m.Marketing })));
 const Waitlist = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
@@ -76,10 +74,7 @@ export default function App() {
           {/* Employee-allowed (all roles): the host waitlist + the bar service/checklist surfaces */}
           <Route path="/waitlist" element={<Waitlist />} />
           <Route path="/reservations" element={<Navigate to="/waitlist" replace />} />
-          <Route path="/shift" element={<Shift />} />
-          <Route path="/shift/checks" element={<Checks />} />
-          <Route path="/shift/log" element={<ShiftLog />} />
-          <Route path="/shift/close" element={<CloseOut />} />
+          <Route path="/shift/*" element={<Navigate to="/waitlist" replace />} />
           <Route path="/help" element={<Help />} />
 
           {/* Operational (owner + manager) */}
@@ -104,6 +99,8 @@ export default function App() {
           <Route path="/parties/:id/invoice" element={<Ops><PartyInvoice /></Ops>} />
           <Route path="/pipeline" element={<Ops><Pipeline /></Ops>} />
           <Route path="/social" element={<Ops><SocialQueue /></Ops>} />
+          <Route path="/notifications" element={<Ops><Notifications /></Ops>} />
+          <Route path="/tools" element={<Ops><Tools /></Ops>} />
           <Route path="/calendar" element={<Ops><Calendar /></Ops>} />
           <Route path="/todos" element={<Ops><Todos /></Ops>} />
           <Route path="/invoices" element={<Ops><Invoices /></Ops>} />

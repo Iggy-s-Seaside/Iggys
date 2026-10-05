@@ -1,0 +1,7 @@
+# Coastal visual refresh
+
+Shared theme now uses deep coastal greens, warm cream surfaces, sage accents and clear text contrast in both light and dark modes. Serif page headings and an Iggy's wordmark replace the generic dashboard presentation. Home uses larger attention counts and simple date rows. The task directory uses open rows instead of repeated boxed cards. Navigation, inputs, buttons, sign-in, inbox heading and notification trigger follow the same styling. Existing button sizes and focus indicators remain available. Phone users can switch light/dark screens directly from the header; the choice persists and updates the browser theme colour.
+
+Verification: production build and 303 existing tests passed. Browser checks covered Home, tasks, calendar, inbox, bookings and the artwork editor at 390 and 1440 pixels in both themes with representative controlled data. No page crashes or document overflow occurred. Inbox grouping, filtering, saving and draft retention passed at both widths. The mobile theme preference survived reload. Visual review included phone calendar and desktop inbox, plus Home in both themes. Mocked calendar authentication errors in test screenshots are fixture limitations, not evidence of a live integration failure.
+
+Published Netlify deploy `6aa641d288403e69b997ca71` to https://iggysmanagement.netlify.app. Production bundle verified against the build; unauthenticated users still reach the login screen. No operational records or customer communications were changed.

@@ -27,7 +27,7 @@ const KIND_CHIP_CLASSES: Record<LunaInsightKind, string> = {
 const EXAMPLE_PROMPTS = [
   'How did this weekend look compared to last?',
   'What should we 86 or push tonight?',
-  'Draft a special for Thursday',
+  'Which bookings need a follow-up?',
 ];
 
 function relativeTime(iso: string) {
@@ -493,7 +493,7 @@ export function Luna() {
                 </div>
                 <p className="text-sm font-medium text-text-primary">Ask Luna anything about the bar</p>
                 <p className="text-xs text-text-muted mt-1 mb-4">
-                  Sales, inventory, parties, specials — she's watching the whole operation.
+                  Bookings, inventory, event setup — she's watching the whole operation.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {EXAMPLE_PROMPTS.map((prompt) => (

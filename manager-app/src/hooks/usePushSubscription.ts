@@ -84,6 +84,12 @@ export interface UsePushSubscription {
   disable: () => Promise<{ ok: boolean; reason?: string }>;
 }
 
+async function readyWorker(): Promise<ServiceWorkerRegistration> {
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) throw new Error('Reload the app, then try turning on reminders again.');
+  return Promise.race([navigator.serviceWorker.ready, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('The app is still updating. Reload and try again.')), 10000))]);
+}
+
 export function usePushSubscription(): UsePushSubscription {
   const { user } = useAuth();
 
@@ -105,9 +111,10 @@ export function usePushSubscription(): UsePushSubscription {
     let cancelled = false;
     (async () => {
       try {
-        const registration = await navigator.serviceWorker.ready;
+        const registration = await readyWorker();
         const existing = await registration.pushManager.getSubscription();
-        if (!cancelled) setSubscribed(!!existing);
+        const { data, error } = existing ? await supabase.from('push_subscriptions').select('endpoint').eq('endpoint', existing.endpoint).maybeSingle() : { data: null, error: null };
+        if (!cancelled) setSubscribed(!!existing && !!data && !error);
       } catch {
         if (!cancelled) setSubscribed(false);
       }
@@ -115,7 +122,7 @@ export function usePushSubscription(): UsePushSubscription {
     return () => {
       cancelled = true;
     };
-  }, [supported]);
+  }, [supported, user?.email]);
 
   const enable = useCallback(async (): Promise<{ ok: boolean; reason?: string }> => {
     if (!browserOk) return { ok: false, reason: 'unsupported' };
@@ -136,7 +143,7 @@ export function usePushSubscription(): UsePushSubscription {
 
       // 2) Subscribe via the active service worker. Reuse an existing subscription if
       //    one is already present (idempotent re-enable).
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await readyWorker();
       const subscription =
         (await registration.pushManager.getSubscription()) ??
         (await registration.pushManager.subscribe({
@@ -176,7 +183,7 @@ export function usePushSubscription(): UsePushSubscription {
 
     setBusy(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await readyWorker();
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         const { endpoint } = subscriptionToRow(subscription);

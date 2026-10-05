@@ -5,9 +5,9 @@ import {
   Search, X, CornerDownLeft, ArrowUp, ArrowDown, Clock, Zap,
   LayoutDashboard, Calendar, CalendarDays, Sparkles, UtensilsCrossed,
   FolderOpen, Package, MessageSquare, PartyPopper, ListChecks, Receipt,
-  Tags, Users, ClipboardList, ClipboardCheck, BarChart3, KanbanSquare,
+  Tags, Users, ClipboardList, BarChart3, KanbanSquare,
   Share2, Star, Megaphone, CalendarClock, Calculator, ShieldCheck, Moon,
-  Plus, PenSquare, DoorOpen, DoorClosed, Shirt, HelpCircle, BookHeart,
+  Plus, PenSquare, Shirt, HelpCircle, BookHeart,
 } from 'lucide-react';
 import { useCommandPaletteController } from '../hooks/useCommandPalette';
 
@@ -46,32 +46,29 @@ function fireEvent(name: string) {
 /* ── Pages: mirrors the nav list in Sidebar.tsx (keep in sync) ───────────── */
 const PAGE_COMMANDS: Command[] = [
   { id: 'page:dashboard', label: 'Dashboard', to: '/', icon: LayoutDashboard, kind: 'page', keywords: 'home overview' },
-  { id: 'page:shift', label: 'Service', to: '/shift', icon: ClipboardCheck, kind: 'page', keywords: 'shift bar open close drawer service tonight' },
   { id: 'page:run-sheet', label: 'Run Sheet', to: '/run-sheet', icon: ClipboardList, kind: 'page', keywords: 'today tonight prep' },
   { id: 'page:luna', label: 'Luna', to: '/luna', icon: Moon, kind: 'page', keywords: 'ai insights assistant' },
   { id: 'page:luna-room', label: "Luna's Room", to: '/luna/room', icon: BookHeart, kind: 'page', keywords: 'luna room journal memory notes' },
-  { id: 'page:shift-log', label: 'Shift Log', to: '/shift/log', icon: PenSquare, kind: 'page', keywords: 'shift log notes incidents handoff' },
-  { id: 'page:shift-checks', label: 'Checks', to: '/shift/checks', icon: ClipboardCheck, kind: 'page', keywords: 'opening checks par checks equipment line check 86' },
   { id: 'page:messages', label: 'Messages', to: '/messages', icon: MessageSquare, kind: 'page', keywords: 'inbox chat dm' },
   { id: 'page:reputation', label: 'Reviews', to: '/reputation', icon: Star, kind: 'page', keywords: 'reputation ratings google yelp' },
   { id: 'page:parties', label: 'Parties', to: '/parties', icon: PartyPopper, kind: 'page', keywords: 'events bookings functions' },
   { id: 'page:waitlist', label: 'Waitlist', to: '/waitlist', icon: CalendarClock, kind: 'page', keywords: 'waitlist walk-in walk in wait queue host table ready reservation seating' },
-  { id: 'page:pipeline', label: 'Pipeline', to: '/pipeline', icon: KanbanSquare, kind: 'page', keywords: 'leads sales kanban' },
+  { id: 'page:pipeline', label: 'Follow up on bookings', to: '/pipeline', icon: KanbanSquare, kind: 'page', keywords: 'leads sales kanban' },
   { id: 'page:calendar', label: 'Calendar', to: '/calendar', icon: CalendarDays, kind: 'page', keywords: 'schedule month' },
   { id: 'page:todos', label: 'To-Do', to: '/todos', icon: ListChecks, kind: 'page', keywords: 'tasks checklist' },
   { id: 'page:invoices', label: 'Invoices', to: '/invoices', icon: Receipt, kind: 'page', keywords: 'billing payments money' },
   { id: 'page:reports', label: 'Reports', to: '/reports', icon: BarChart3, kind: 'page', keywords: 'analytics stats numbers' },
   { id: 'page:compliance', label: 'Compliance', to: '/compliance', icon: ShieldCheck, kind: 'page', keywords: 'licence safety legal' },
-  { id: 'page:events', label: 'Events', to: '/events', icon: Calendar, kind: 'page', keywords: 'gigs whats on' },
+  { id: 'page:events', label: 'Public events', to: '/events', icon: Calendar, kind: 'page', keywords: 'gigs whats on' },
   { id: 'page:specials', label: 'Specials', to: '/specials', icon: Sparkles, kind: 'page', keywords: 'deals promos drinks' },
   { id: 'page:social', label: 'Social', to: '/social', icon: Share2, kind: 'page', keywords: 'instagram facebook posts queue' },
   { id: 'page:marketing', label: 'Marketing', to: '/marketing', icon: Megaphone, kind: 'page', keywords: 'campaigns promo email' },
   { id: 'page:menu', label: 'Menu', to: '/menu', icon: UtensilsCrossed, kind: 'page', keywords: 'food drinks items prices' },
   { id: 'page:inventory', label: 'Inventory', to: '/inventory', icon: Package, kind: 'page', keywords: 'stock supplies counts mark low out 86' },
-  { id: 'page:inventory-count', label: 'Count Stock', to: '/inventory/count', icon: ClipboardCheck, kind: 'page', keywords: 'count inventory periodic variance reconcile shrink' },
+  { id: 'page:inventory-count', label: 'Count Stock', to: '/inventory/count', icon: Package, kind: 'page', keywords: 'count inventory periodic variance reconcile shrink' },
   { id: 'page:merch', label: 'Merch', to: '/merch', icon: Shirt, kind: 'page', keywords: 'merch shirts crop sweatshirt hats variants sizes stock apparel' },
   { id: 'page:help', label: 'Help & Guide', to: '/help', icon: HelpCircle, kind: 'page', keywords: 'help guide how to docs support training onboarding' },
-  { id: 'page:cogs', label: 'COGS', to: '/cogs', icon: Calculator, kind: 'page', keywords: 'cost of goods margins pour' },
+  { id: 'page:cogs', label: 'Costs & margins', to: '/cogs', icon: Calculator, kind: 'page', keywords: 'cost of goods margins pour' },
   { id: 'page:packages', label: 'Packages', to: '/packages', icon: Tags, kind: 'page', keywords: 'party packages pricing' },
   { id: 'page:media', label: 'Media', to: '/media', icon: FolderOpen, kind: 'page', keywords: 'photos images library assets' },
   { id: 'page:team', label: 'Team', to: '/team', icon: Users, kind: 'page', keywords: 'staff people roster' },
@@ -81,10 +78,7 @@ const PAGE_COMMANDS: Command[] = [
 /* ── Quick actions ──────────────────────────────────────────────────────── */
 const ACTION_COMMANDS: Command[] = [
   { id: 'action:new-event', label: 'New Event', to: '/events/new', icon: Plus, kind: 'action', keywords: 'create add gig' },
-  { id: 'action:new-special', label: 'New Special', to: '/specials/editor', icon: Plus, kind: 'action', keywords: 'create add deal promo' },
   { id: 'action:new-party', label: 'New Party', run: () => fireEvent(CMD_NEW_PARTY), icon: Plus, kind: 'action', keywords: 'create add booking function quick' },
-  { id: 'action:open-shift', label: 'Open Shift', to: '/shift', icon: DoorOpen, kind: 'action', keywords: 'start bar drawer begin' },
-  { id: 'action:close-shift', label: 'Close Shift', to: '/shift/close', icon: DoorClosed, kind: 'action', keywords: 'end bar drawer cash out close the bar' },
   { id: 'action:quick-post', label: 'Quick Post', run: () => fireEvent(CMD_QUICK_POST), icon: PenSquare, kind: 'action', keywords: 'social instagram compose new caption' },
 ];
 

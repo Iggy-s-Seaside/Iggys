@@ -79,6 +79,14 @@ describe('party mirror dedupe', () => {
 describe('recurring events', () => {
   const weekly = iggyEvent({ is_recurring: true, recurring_day: 'Saturday' });
 
+  it('removes every occurrence when a weekly series is switched off', () => {
+    expect(buildCalendarItems([], [{ ...weekly, active: false }], [], ...RANGE)).toEqual([]);
+  });
+
+  it('stops at the inclusive season end date', () => {
+    expect(expandRecurringDates({ ...weekly, recurring_until: '2026-08-29' }, '2026-08-17', '2026-09-30')).toEqual(['2026-08-22', '2026-08-29']);
+  });
+
   it('expands weekly across the visible range (every Saturday lights up the grid)', () => {
     const dates = expandRecurringDates(weekly, '2026-08-17', '2026-09-05');
     expect(dates).toEqual(['2026-08-22', '2026-08-29', '2026-09-05']);

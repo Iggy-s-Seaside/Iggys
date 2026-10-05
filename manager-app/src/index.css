@@ -5,39 +5,42 @@
 
 /* ── Theme Variables ── */
 :root {
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f1f5f9;
-  --color-surface-active: #e2e8f0;
-  --color-border: #e2e8f0;
-  --color-primary-50: #f0fdfa;
-  --color-danger-light: #fecaca;
-  --color-success-light: #bbf7d0;
-  --color-warning-light: #fef3c7;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748b;
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --brand-primary: 39 92 76;
+  --brand-hover: 27 69 56;
+  --color-background: #f4f1e9;
+  --color-surface: #fffcf6;
+  --color-surface-hover: #eeeade;
+  --color-surface-active: #e4e0d4;
+  --color-border: #d9d8cc;
+  --color-primary-50: #e2eade;
+  --color-danger-light: #fae4de;
+  --color-success-light: #e0eadc;
+  --color-warning-light: #f2e6c6;
+  --color-text-primary: #213b32;
+  --color-text-secondary: #52645a;
+  --color-text-muted: #617066;
+  --shadow-card: none;
+  --shadow-card-hover: 0 10px 28px -18px #203c3240;
+  --shadow-modal: 0 24px 100px #142e3340;
 }
-
 .dark {
-  --color-background: #0a0f0f;
-  --color-surface: #111827;
-  --color-surface-hover: #1e293b;
-  --color-surface-active: #334155;
-  --color-border: #1f2937;
-  --color-primary-50: rgba(45, 212, 191, 0.1);
-  --color-danger-light: rgba(239, 68, 68, 0.15);
-  --color-success-light: rgba(34, 197, 94, 0.15);
-  --color-warning-light: rgba(245, 158, 11, 0.15);
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #95a5b8;
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.2);
-  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
-  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+  --brand-primary: 178 213 185;
+  --brand-hover: 205 230 209;
+  --color-background: #142720;
+  --color-surface: #1c3229;
+  --color-surface-hover: #263e33;
+  --color-surface-active: #324b3e;
+  --color-border: #3a5144;
+  --color-primary-50: #2c4637;
+  --color-danger-light: #51342c;
+  --color-success-light: #2b4935;
+  --color-warning-light: #4a432d;
+  --color-text-primary: #f2eee2;
+  --color-text-secondary: #c0cabb;
+  --color-text-muted: #a9b9aa;
+  --shadow-card: none;
+  --shadow-card-hover: 0 12px 30px -20px #0009;
+  --shadow-modal: 0 24px 100px #0008;
 }
 
 @layer base {
@@ -81,22 +84,6 @@
   }
   .btn-primary {
     @apply btn bg-primary text-white hover:bg-primary-hover active:bg-primary-hover focus:ring-primary;
-  }
-  /* Light mode: bright teal + white label is only ~1.86:1. Darken the bg to
-     teal-700/800 so the white label clears WCAG AA (5.47:1) without changing
-     the dark-mode brand teal. */
-  :root:not(.dark) .btn-primary {
-    background-color: #0f766e;
-  }
-  :root:not(.dark) .btn-primary:hover {
-    background-color: #115e59;
-  }
-  /* Dark mode (the default theme): keep the vivid brand teal background but use a
-     near-black label instead of white. white-on-#2dd4bf is only 1.86:1; near-black
-     on #2dd4bf is ~11:1 — clears WCAG AA while preserving the brand pop. Icons use
-     currentColor, so they darken to match. */
-  .dark .btn-primary {
-    color: #03201c;
   }
   .btn-secondary {
     @apply btn bg-surface border border-border text-text-secondary hover:bg-surface-hover active:bg-surface-active focus:ring-primary;
@@ -156,7 +143,7 @@
 
   /* Focus ring offset for dark mode */
   .dark .btn {
-    @apply focus:ring-offset-[#111827];
+    --tw-ring-offset-color: var(--color-background);
   }
 }
 
@@ -204,7 +191,7 @@ button, a, label, [role="button"] {
 
 /* ── Brand-tint native form controls instead of the OS blue/grey ── */
 input[type="checkbox"], input[type="radio"] {
-  accent-color: #2dd4bf;
+  accent-color: rgb(var(--brand-primary));
 }
 
 /* ── Mobile safe area ── */
@@ -303,3 +290,75 @@ input[type="checkbox"], input[type="radio"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Readable controls across the management screens; artwork previews keep their own sizing. */
+.simple-app .text-xs { font-size: 0.875rem; line-height: 1.4; }
+.simple-app .text-sm { font-size: 1rem; line-height: 1.5; }
+.simple-app .btn { min-height: 48px; }
+.simple-app .input-field { min-height: 48px; }
+.simple-app h1 { white-space: normal; overflow: visible; text-overflow: clip; }
+.simple-app button:focus-visible, .simple-app a:focus-visible { outline: 3px solid #0d9488; outline-offset: 3px; }
+
+/* Iggy's: a coastal workspace, with clear type and restrained surfaces. */
+body { font-feature-settings: 'ss01' on; }
+.btn { border-radius: 9px; font-weight: 600; letter-spacing: -.015em; }
+:root:not(.dark) .btn-primary { background-color: rgb(var(--brand-primary)); }
+:root:not(.dark) .btn-primary:hover { background-color: rgb(var(--brand-hover)); }
+.dark .btn-primary { color: #193426; }
+.card { border-radius: 16px; }
+.card:not([class*="border-"]) { border-color: transparent; }
+.card-hover { border: 1px solid transparent; }
+.card-hover:hover { border-color: var(--color-border); }
+.input-field { border-radius: 9px; background: var(--color-background); }
+.page-heading { margin-bottom: 2rem; }
+.page-heading h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: clamp(2rem, 3.2vw, 3rem); letter-spacing: -.045em; line-height: 1.15; }
+.page-heading > div:last-child { margin-bottom: 0; }
+.page-heading .heading-icon { display: none; }
+.brand-wordmark { font-family: Georgia, 'Times New Roman', serif; letter-spacing: -.065em; font-weight: 400; }
+.app-sidebar { background: #11271e; color: #efe9d8; border-right: 0; width: 240px; }
+.app-sidebar .brand-wordmark { font-size: 48px; line-height: 1; }
+.brand-place { display: block; font: 500 10px/1.5 Inter, sans-serif; letter-spacing: .24em; text-transform: uppercase; }
+.app-sidebar nav { padding-top: 36px; }
+.app-sidebar .nav-item { color: #bfccbd; font-weight: 500; border-radius: 9px; padding: 15px 18px; }
+.app-sidebar .nav-item:hover { background: #233c2e; }
+.app-sidebar .nav-item[aria-current=page] { background: #e8eddb; color: #183629; }
+.app-sidebar .sidebar-footer { border-color: #34493a; }
+.app-sidebar .sidebar-footer a, .app-sidebar .sidebar-footer button { color: #bfccbd; font-size: 14px; }
+.app-mobile-header { background: var(--color-background); border: 0; }
+.app-mobile-header .brand-wordmark { font-size: 32px; }
+.app-mobile-header .brand-place { margin-left: 13px; font-size: 9px; letter-spacing: .2em; }
+.app-bottom-nav { background: var(--color-surface); border-top: 1px solid var(--color-border); }
+.app-bottom-nav a { margin: 5px 3px; border-radius: 10px; gap: 4px; }
+.app-bottom-nav a[aria-current=page] { background: var(--color-primary-50); }
+.app-bottom-nav svg { width: 20px; height: 20px; stroke-width: 1.7; }
+.day-header { padding: 24px 0 28px; position: relative; border-bottom: 1px solid var(--color-border); }
+.day-eyebrow { font-size: 12px; letter-spacing: .13em; text-transform: uppercase; font-weight: 600; color: var(--color-text-secondary); }
+.day-title { font: 400 clamp(3rem, 5.8vw, 5rem)/1.03 Georgia, 'Times New Roman', serif; letter-spacing: -.055em; margin: 18px 0; max-width: 760px; }
+.day-subtitle { color: var(--color-text-secondary); max-width: 460px; line-height: 1.6; }
+.attention-tile { padding: 26px; border-radius: 14px; display: flex; gap: 20px; align-items: center; min-height: 146px; transition: background-color 160ms; }
+.attention-tile:first-child { background: var(--color-primary-50); }
+.attention-tile:last-child { background: var(--color-surface); }
+.attention-tile:hover { background: var(--color-surface-active); }
+.attention-number { font: 400 64px/1 Georgia, serif; letter-spacing: -.06em; min-width: 56px; }
+.day-section-title { font: 400 30px/1.2 Georgia, serif; letter-spacing: -.035em; }
+.day-calendar { border-top: 1px solid var(--color-border); }
+.day-calendar-row { border-bottom: 1px solid var(--color-border); transition: background-color 160ms; }
+.day-calendar-row:hover { background: var(--color-surface); }
+.day-date { border-right: 1px solid var(--color-border); padding-right: 20px; min-width: 76px; text-align: left; }
+.day-date strong { font: 400 36px/1.1 Georgia, serif; }
+.day-text-link { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; color: rgb(var(--brand-primary)); font-weight: 600; }
+.task-directory { border-top: 1px solid var(--color-border); gap: 0 32px; }
+.task-directory > button { border: 0; border-bottom: 1px solid var(--color-border); background: transparent; border-radius: 0; box-shadow: none; padding: 28px 8px; }
+.task-directory > button:hover { background: var(--color-surface); }
+.task-directory > button > span > span:first-child { font-family: Georgia, serif; font-size: 25px; font-weight: 400; letter-spacing: -.03em; }
+.simple-app button:focus-visible, .simple-app a:focus-visible { outline-color: rgb(var(--brand-primary)); }
+@media (max-width: 639px) {
+  .day-header { padding: 24px 0; }
+  .attention-tile { min-height: 114px; padding: 22px; }
+  .attention-number { font-size: 48px; }
+  .day-date { min-width: 64px; padding-right: 12px; }
+}
+
+.dark .bg-primary.text-white { color: #193426; }
+
+.inbox-heading { font-family: Georgia, serif; font-size: 30px; font-weight: 400; letter-spacing: -.04em; }

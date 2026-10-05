@@ -29,6 +29,7 @@ export function Specials() {
       type: special.type,
       price: special.price,
       image_url: special.image_url,
+      editor_state: special.editor_state,
       active: false,
       starts_at: special.starts_at,
       expires_at: special.expires_at,
@@ -93,12 +94,12 @@ export function Specials() {
 
   return (
     <div>
-      <PageHeader title="Specials" subtitle={`${specials.length} total specials`}>
+      <PageHeader title="Promotions & artwork" subtitle="Create a picture, save your work, then choose where it goes.">
         <button onClick={() => setShowTemplates(!showTemplates)} className="btn-secondary">
           <Palette size={18} /> Templates
         </button>
         <Link to="/specials/editor" className="btn-primary">
-          <Plus size={18} /> New Special
+          <Plus size={18} /> Create artwork
         </Link>
       </PageHeader>
 
@@ -142,11 +143,10 @@ export function Specials() {
           <h3 className="text-sm font-semibold text-text-primary mb-3">Quick Start with a Template</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
             {[
-              { id: 'happy-hour', name: 'Happy Hour', color: 'from-amber-500 to-orange-600' },
-              { id: 'dj-night', name: 'DJ Night', color: 'from-purple-600 to-blue-600' },
-              { id: 'holiday', name: 'Holiday Special', color: 'from-red-600 to-green-600' },
+              { id: 'simple-coastal', name: 'Coastal', color: 'from-amber-500 to-orange-600' },
+              { id: 'simple-night', name: 'Night', color: 'from-purple-600 to-blue-600' },
+              { id: 'simple-clean', name: 'Classic', color: 'from-red-600 to-green-600' },
               { id: 'drink', name: 'Drink Special', color: 'from-teal-500 to-cyan-500' },
-              { id: 'food', name: 'Food Special', color: 'from-orange-500 to-red-500' },
               { id: 'sunset-sessions', name: 'Sunset Sessions', color: 'from-amber-500 to-rose-700' },
             ].map((tmpl) => (
               <Link
@@ -176,8 +176,8 @@ export function Specials() {
       ) : specials.length === 0 ? (
         <EmptyState
           icon={Sparkles}
-          title="No specials yet"
-          description="Create your first special or start from a template"
+          title="No artwork yet"
+          description="Start with a simple layout, then add your approved words and photos."
           action={
             <Link to="/specials/editor" className="btn-primary inline-flex">
               <Plus size={18} /> Create Special

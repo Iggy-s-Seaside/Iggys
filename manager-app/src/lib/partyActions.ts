@@ -95,7 +95,7 @@ export async function fetchGmailThread(args: { threadId?: string | null; message
 }
 
 /** Pull new Gmail inbox mail into the Messages table. Returns how many were synced. */
-export async function syncGmailInbox(): Promise<{ synced: number; scanned: number }> {
+export async function syncGmailInbox(): Promise<{ synced: number; scanned: number; truncated?: boolean; reconciled?: number }> {
   await requireSession();
   const { data, error } = await supabase.functions.invoke('gmail-sync', { body: {} });
   if (error) {
@@ -107,5 +107,5 @@ export async function syncGmailInbox(): Promise<{ synced: number; scanned: numbe
     throw new Error(message);
   }
   if (data?.error) throw new Error(data.error);
-  return data as { synced: number; scanned: number };
+  return data as { synced: number; scanned: number; truncated?: boolean; reconciled?: number };
 }

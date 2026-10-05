@@ -74,6 +74,12 @@ export function classifyMessage(subject = '', body = '', email = ''): Triage {
   if (NO_REPLY.test(email) || NO_REPLY.test(subject)) {
     return { importance: 'normal', category: 'notification', needsReply: false };
   }
+  // A performer offering a show is a programming decision, not a room rental.
+  const entertainment = /\b(we handle (the )?(booking|public ticket sales)|zero.cost show|comedy shows|our (band|act)|could we play|perform at|book.{0,30}(singer|band|artist)|performer booking)\b/i.test(text);
+  if (entertainment) return { importance: 'normal', category: 'entertainment', needsReply: false };
+  if (/\b(currently hiring|job opening|part.time (servers|bartenders)|resume|résumé)\b/i.test(text)) {
+    return { importance: 'normal', category: 'employment', needsReply: true };
+  }
   const isReservation = RESERVATION.test(text);
   const isEvent = EVENT.test(text);
   const isSolicitation = looksLikeSolicitation(text);
@@ -121,11 +127,14 @@ export function isSolicitation(m: Message): boolean {
   return messageTriage(m).category === 'solicitation';
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
+export const CATEGORY_LABELS: Record<string, string> = {
   reservation: 'Reservation',
-  event: 'Private event',
-  request: 'Request',
-  inquiry: 'Inquiry',
+  event: 'Private booking',
+  entertainment: 'Entertainment proposal',
+  business: 'Business & suppliers',
+  employment: 'Job inquiry',
+  request: 'General question',
+  inquiry: 'Customer inquiry',
   notification: 'Notification',
   solicitation: 'Solicitation',
   other: 'Other',

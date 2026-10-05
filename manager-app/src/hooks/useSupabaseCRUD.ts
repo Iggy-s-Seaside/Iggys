@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { updateRow, deleteRow } from '../lib/rowMutations';
 import { enqueue, flush, subscribeOnline, isOffline, type OutboxEntry } from '../lib/outbox';
 import { undoableDelete, filterPendingDeletes } from './useUndoableDelete';
 import toast from 'react-hot-toast';
@@ -78,7 +79,7 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
     const row = data.find((r) => r.id === id);
     if (!row) {
       // Row not in local state yet — skip the optimistic patch; just hit the DB.
-      const { error: err } = await supabase.from(table).update(fields as Record<string, unknown>).eq('id', id);
+      const { error: err } = await updateRow(supabase, table, id, fields as Record<string, unknown>);
       if (err) {
         console.error(`[${table}] update error:`, err.message);
         if (isOffline()) {
@@ -102,7 +103,7 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
     // fresh realtime data intact (snapshotting the whole array would stomp a
     // second in-flight edit on flaky bar wifi).
     setData((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)));
-    const { error: err } = await supabase.from(table).update(fields as Record<string, unknown>).eq('id', id);
+    const { error: err } = await updateRow(supabase, table, id, fields as Record<string, unknown>);
     if (err) {
       console.error(`[${table}] update error:`, err.message);
       if (isOffline()) {
@@ -124,7 +125,7 @@ export function useSupabaseCRUD<T extends { id: number }>(table: string) {
   const remove = async (id: number) => {
     const item = data.find((r) => r.id === id);
     if (!item) {
-      const { error: err } = await supabase.from(table).delete().eq('id', id);
+      const { error: err } = await deleteRow(supabase, table, id);
       if (err) { console.error(`[${table}] delete error:`, err.message); toast.error('Failed to delete. Please try again.'); return false; }
       await refresh();
       return true;

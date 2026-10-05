@@ -13,9 +13,9 @@ export default {
         },
         border: 'var(--color-border)',
         primary: {
-          DEFAULT: '#2dd4bf',
-          hover: '#14b8a6',
-          dark: '#0d9488',
+          DEFAULT: 'rgb(var(--brand-primary) / <alpha-value>)',
+          hover: 'rgb(var(--brand-hover) / <alpha-value>)',
+          dark: 'rgb(var(--brand-primary) / <alpha-value>)',
           light: '#99f6e4',
           50: 'var(--color-primary-50)',
         },

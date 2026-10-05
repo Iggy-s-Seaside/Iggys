@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Mail, MailOpen, Reply, Archive, Search, Filter, Check, CheckCheck,
   Clock, Phone, User, ArrowLeft, Send, Loader2, StickyNote, MailWarning, FileText, RefreshCw,
@@ -17,7 +17,8 @@ import { Modal } from '../components/ui/Modal';
 import { parseISO, formatDistanceToNow } from 'date-fns';
 import { safeFmtDate } from '../utils/format';
 import type { Message, Party } from '../types';
-import { needsReplyNow, messageTriage, categoryLabel, isSolicitation } from '../utils/triage';
+import { needsReplyNow, messageTriage, categoryLabel, isSolicitation, CATEGORY_LABELS } from '../utils/triage';
+import { latestConversations } from '../lib/messageConversations';
 import { canAcknowledge, buildAcknowledgement } from '../utils/acknowledge';
 import toast from 'react-hot-toast';
 import { TemplatePicker } from '../components/messages/TemplatePicker';
@@ -72,13 +73,20 @@ function GmailThreadView({ messages, loading, fallback }: { messages: ThreadMess
 
 export function Messages() {
   const {
-    messages, loading, error, refresh, markAsRead, markAsReplied,
-    archiveMessage, updateNotes, bulkMarkRead, bulkArchive
+    messages: rawMessages, loading, error, refresh, markAsRead, markAsReplied,
+    archiveMessage, updateNotes, bulkMarkRead, bulkArchive, setTriage
   } = useMessages();
+  const messages = useMemo(() => latestConversations(rawMessages), [rawMessages]);
+  const [searchParams] = useSearchParams();
   const handoff = useLunaHandoff();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSynced, setLastSynced] = useState<number | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [triageSaving, setTriageSaving] = useState(false);
+  const [triageEditing, setTriageEditing] = useState(false);
   const [convertingParty, setConvertingParty] = useState(false);
   // A same-contact open party found at Make-a-party time — drives the
   // duplicate-warning dialog. Dismissing it (X/Escape/backdrop) is a no-op.
@@ -91,6 +99,8 @@ export function Messages() {
     try {
       const r = await syncGmailInbox();
       lastAutoSync = Date.now();
+      setLastSynced(Date.now());
+      setSyncError(r.truncated ? 'More email is waiting to import. Sync again to continue.' : null);
       toast.success(
         r.synced > 0
           ? `${r.synced} new email${r.synced === 1 ? '' : 's'} pulled from Gmail`
@@ -98,7 +108,9 @@ export function Messages() {
       );
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Gmail sync failed');
+      const message = e instanceof Error ? e.message : 'Gmail sync failed';
+      setSyncError(message);
+      toast.error(message);
     }
     setSyncing(false);
   };
@@ -108,9 +120,15 @@ export function Messages() {
     let cancelled = false;
     const run = async () => {
       try {
-        await syncGmailInbox();
-        if (!cancelled) await refresh();
-      } catch { /* silent — manual button surfaces errors */ }
+        const result = await syncGmailInbox();
+        if (!cancelled) {
+          setLastSynced(Date.now());
+          setSyncError(result.truncated ? 'More email is waiting to import. Sync again to continue.' : null);
+          await refresh();
+        }
+      } catch (e) {
+        if (!cancelled) setSyncError(e instanceof Error ? e.message : 'Gmail sync failed');
+      }
     };
     if (Date.now() - lastAutoSync > AUTO_SYNC_MS) {
       lastAutoSync = Date.now();
@@ -123,20 +141,20 @@ export function Messages() {
     return () => { cancelled = true; clearInterval(iv); };
   }, [refresh]);
 
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(() => Number(searchParams.get('message')) || null);
   // Tracks the live selection so an async Luna draft only lands if the user is
   // still on the message it was requested for (no dropping A's draft into B).
   const selectedIdRef = useRef<number | null>(null);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => searchParams.get('view') === 'needs' ? 'needs' : 'all');
   const [search, setSearch] = useState('');
   const [replyText, setReplyText] = useState('');
   const [replying, setReplying] = useState(false);
   const [notes, setNotes] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [showMobileDetail, setShowMobileDetail] = useState(() => !!searchParams.get('message'));
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -166,6 +184,7 @@ export function Messages() {
     } else if (statusFilter !== 'all') {
       result = result.filter((m) => m.status === statusFilter);
     }
+    if (categoryFilter !== 'all') result = result.filter((m) => messageTriage(m).category === categoryFilter);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -177,7 +196,7 @@ export function Messages() {
       );
     }
     return result;
-  }, [messages, statusFilter, search]);
+  }, [messages, statusFilter, categoryFilter, search]);
 
   // How many reservations/requests are still waiting on a reply (drives the
   // filter-chip count + the pinned "Needs a reply" section).
@@ -216,7 +235,7 @@ export function Messages() {
   const handleArchiveSolicitations = async () => {
     const ids = solicitationList.map((m) => m.id);
     if (ids.length === 0) return;
-    await bulkArchive(ids); // reversible status flip — they stay in the Archived filter
+    if (!await bulkArchive(ids)) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
@@ -226,8 +245,8 @@ export function Messages() {
   };
 
   const selected = useMemo(
-    () => messages.find((m) => m.id === selectedId) ?? null,
-    [messages, selectedId]
+    () => rawMessages.find((m) => m.id === selectedId) ?? null,
+    [rawMessages, selectedId]
   );
 
   // Auto-mark as read when selected
@@ -241,7 +260,10 @@ export function Messages() {
   useEffect(() => {
     setNotes(selected?.notes || '');
     setReplyText('');
-  }, [selected]);
+    setTriageEditing(false);
+  // Only changing conversations clears a draft; sync/read/classification updates must not.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
 
   // Luna handoff: a draft_reply insight deep-links here with the target message
   // id in the payload and Luna's drafted reply. Select that message and pre-fill
@@ -273,7 +295,7 @@ export function Messages() {
 
   // Load the Gmail conversation for the selected message (when it's from Gmail).
   const refetchThread = async () => {
-    const msg = messages.find((m) => m.id === selectedId);
+    const msg = rawMessages.find((m) => m.id === selectedId);
     if (!msg || msg.source !== 'gmail') {
       setThread([]);
       return;
@@ -290,7 +312,7 @@ export function Messages() {
   // Only refetch when the selection changes (not on every realtime message update).
   useEffect(() => {
     let cancelled = false;
-    const msg = messages.find((m) => m.id === selectedId);
+    const msg = rawMessages.find((m) => m.id === selectedId);
     setThread([]);
     if (!msg || msg.source !== 'gmail') return;
     setThreadLoading(true);
@@ -420,8 +442,7 @@ export function Messages() {
 
   const handleSaveNotes = async () => {
     if (!selected) return;
-    await updateNotes(selected.id, notes);
-    toast.success('Notes saved');
+    if (await updateNotes(selected.id, notes)) toast.success('Notes saved');
   };
 
   // Reviewer stage (replaces the retired auto-reply trigger): pre-fill the
@@ -488,8 +509,8 @@ export function Messages() {
   const handleBulkAction = async (action: 'read' | 'archive') => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    if (action === 'read') await bulkMarkRead(ids);
-    else await bulkArchive(ids);
+    const ok = action === 'read' ? await bulkMarkRead(ids) : await bulkArchive(ids);
+    if (!ok) return;
     setSelectedIds(new Set());
   };
 
@@ -536,6 +557,9 @@ export function Messages() {
     return (
       <div
         key={msg.id}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleSelect(msg); } }}
         onClick={() => handleSelect(msg)}
         className={`flex items-start gap-3 px-3 py-3 border-b border-border cursor-pointer transition-colors hover:bg-surface-hover ${
           selectedId === msg.id ? 'bg-surface-hover' : ''
@@ -545,6 +569,7 @@ export function Messages() {
           type="checkbox"
           checked={selectedIds.has(msg.id)}
           onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
+          onClick={(e) => e.stopPropagation()}
           aria-label="Select message"
           className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
         />
@@ -564,7 +589,7 @@ export function Messages() {
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            {nr && (
+            {!sol && (
               <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400">
                 {categoryLabel(messageTriage(msg).category)}
               </span>
@@ -582,7 +607,7 @@ export function Messages() {
   };
 
   return (
-    <div className="flex flex-col min-h-0 h-[calc(100dvh-4rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-4rem)]">
+    <div className="flex flex-col min-h-0 h-[calc(100dvh-7.5rem-6.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh-7.5rem)]">
       {/* Header — lg:pr-16 keeps the action buttons clear of the global fixed notification bell (top-right). */}
       <div className="flex items-center justify-between gap-2 px-4 lg:px-6 lg:pr-16 py-3 bg-surface border-b border-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -595,7 +620,7 @@ export function Messages() {
               <ArrowLeft size={18} className="text-text-primary" />
             </button>
           )}
-          <h1 className="text-lg font-bold text-text-primary truncate">Messages</h1>
+          <h1 className="inbox-heading text-text-primary truncate">Inbox</h1>
           {unreadCount > 0 && (
             <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full shrink-0">
               {unreadCount}
@@ -629,6 +654,11 @@ export function Messages() {
         </div>
       </div>
 
+      <div className="px-4 py-2 border-b border-border text-xs text-text-secondary bg-surface" role="status">
+        {syncError ? <span className="text-red-600">Gmail needs attention: {syncError}</span>
+          : lastSynced ? `Gmail checked at ${safeFmtDate(new Date(lastSynced).toISOString(), 'h:mm a')}` : 'Checking Gmail…'}
+        <span className="block mt-1">{messages.length} conversations · Private bookings, table requests and other mail are separated below.</span>
+      </div>
       <TemplateManager open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
 
       <div className="flex flex-1 min-h-0">
@@ -647,11 +677,18 @@ export function Messages() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-0.5">
+            <label className="block text-xs text-text-secondary">
+              Message type
+              <select aria-label="Filter by message type" className="input-field mt-1 text-sm min-h-[44px]" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="all">All types</option>
+                {Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label} ({messages.filter((m) => messageTriage(m).category === value).length})</option>)}
+              </select>
+            </label>
+            <div className="flex gap-1 flex-wrap pb-0.5">
               {needsReplyCount > 0 && (
                 <button
                   onClick={() => setStatusFilter('needs')}
-                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-2 min-h-[44px] rounded-full text-xs font-semibold transition-colors ${
                     statusFilter === 'needs'
                       ? 'bg-amber-500 text-white'
                       : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25'
@@ -664,7 +701,7 @@ export function Messages() {
                 <button
                   key={f}
                   onClick={() => setStatusFilter(f)}
-                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  className={`shrink-0 px-2.5 py-2 min-h-[44px] rounded-full text-xs font-medium transition-colors ${
                     statusFilter === f
                       ? 'bg-primary text-white'
                       : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
@@ -811,15 +848,15 @@ export function Messages() {
                         <MailCheck size={14} /> Acknowledge
                       </button>
                     )}
-                    <button
+                    {messageTriage(selected).category === 'event' && <button
                       onClick={handleMakeParty}
                       disabled={convertingParty}
                       title="Turn this inquiry into a private-party lead (no email sent)"
                       className="btn-secondary text-xs py-1 px-2"
                     >
                       {convertingParty ? <Loader2 size={14} className="animate-spin" /> : <PartyPopper size={14} />}
-                      Make a party
-                    </button>
+                      Create booking lead
+                    </button>}
                     {selected.status !== 'archived' && (
                       <button
                         onClick={() => archiveMessage(selected.id)}
@@ -836,6 +873,26 @@ export function Messages() {
                 </div>
               </div>
 
+              <div className="px-4 py-2 bg-surface border-b border-border flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-text-primary">{categoryLabel(messageTriage(selected).category)}</span>
+                <span className="text-xs text-text-muted">{needsReplyNow(selected) ? 'Needs reply' : 'No reply due'}</span>
+                <button type="button" className="btn-ghost text-xs ml-auto min-h-[44px]" aria-expanded={triageEditing} onClick={() => setTriageEditing((v) => !v)}>{triageEditing ? 'Done' : 'Change type / reply status'}</button>
+              </div>
+              {triageEditing && <div className="px-4 py-3 bg-surface border-b border-border flex flex-wrap items-end gap-3">
+                <label className="text-xs text-text-secondary flex-1 min-w-[180px]">
+                  Message type · you can correct this
+                  <select aria-label="Message type" disabled={triageSaving} value={messageTriage(selected).category} className="input-field mt-1 text-sm min-h-[44px]"
+                    onChange={async (e) => { setTriageSaving(true); try { await setTriage(selected, e.target.value, needsReplyNow(selected)); } finally { setTriageSaving(false); } }}>
+                    {Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+                <label className="min-h-[44px] flex items-center gap-2 text-sm text-text-secondary">
+                  <input type="checkbox" className="h-5 w-5 accent-primary" disabled={triageSaving} checked={needsReplyNow(selected)}
+                    onChange={async (e) => { setTriageSaving(true); try { await setTriage(selected, messageTriage(selected).category, e.target.checked); } finally { setTriageSaving(false); } }} />
+                  Needs a reply
+                </label>
+                <p className="w-full text-xs text-text-muted">{typeof selected.luna_classification?.reason === 'string' ? selected.luna_classification.reason : 'Suggested from the message text. Review if uncertain.'} · A private booking label does not confirm a date or create a calendar event.</p>
+              </div>}
               {/* Detail Body — when the iOS keyboard is up, pad the scroll
                   area by the covered height so the reply composer can scroll
                   clear of the keys. Only active while keyboardVisible, so the

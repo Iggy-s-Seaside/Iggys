@@ -66,6 +66,7 @@ export interface IggyEvent {
   image_url: string | null;
   is_recurring: boolean;
   recurring_day: string | null;
+  recurring_until?: string | null;
   category: string | null;
   active: boolean;
   start_min: number | null;
@@ -75,6 +76,7 @@ export interface IggyEvent {
 }
 
 export interface Special {
+  editor_state?: EditorState | null;
   id: number;
   created_at: string;
   title: string;
@@ -477,6 +479,9 @@ export type MessageCategory =
   | 'inquiry'
   | 'notification'
   | 'solicitation'
+  | 'entertainment'
+  | 'business'
+  | 'employment'
   | 'other';
 
 export interface Message {

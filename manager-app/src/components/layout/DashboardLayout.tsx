@@ -1,5 +1,6 @@
+import { useAuth } from '../../context/AuthContext';
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { QuickAddParty } from '../parties/QuickAddParty';
@@ -7,12 +8,11 @@ import { CommandPalette, CMD_NEW_PARTY, CMD_QUICK_POST } from '../CommandPalette
 import { ShortcutsSheet } from '../ShortcutsSheet';
 import { OfflineBanner } from '../OfflineBanner';
 import { SyncPendingPill } from '../SyncPendingPill';
-import { LunaReachBanner } from '../LunaReachBanner';
 import { NotificationBell } from '../NotificationBell';
-import { MobileCommandButton } from '../MobileCommandButton';
 import { ScrollToTop } from '../ui/ScrollToTop';
 
 export function DashboardLayout() {
+  const { role } = useAuth();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -55,12 +55,12 @@ export function DashboardLayout() {
             THIS lg container: overflow-x-hidden + overflow-y-visible is an invalid
             combo where the visible axis silently computes to auto, which would
             re-introduce an inner scrollbar on desktop.) */}
-        <div ref={scrollRef} className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
+        <div ref={scrollRef} className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] lg:overflow-visible px-4 sm:px-6 pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] lg:p-8 lg:pt-8 lg:pb-8">
           <OfflineBanner />
           {/* Back-online-but-still-replaying signal so offline writes aren't stranded. */}
           <SyncPendingPill />
           {/* Luna's unprompted reach — top of every screen when she raises one. */}
-          <LunaReachBanner />
+
           {/* Width-bounded, horizontally-clipped wrapper around the routed page.
               This element stays overflow-x-hidden at ALL breakpoints. Per the CSS
               overflow rules, pairing overflow-x:hidden with an unset overflow-y
@@ -69,7 +69,8 @@ export function DashboardLayout() {
               anything to scroll vertically (no inner scrollbar; the body keeps
               owning desktop vertical scroll). The x-clip is what contains any stray
               too-wide child, so the page can never exceed viewport width. */}
-          <div className="w-full min-w-0 max-w-full overflow-x-hidden">
+          <div className={`w-full min-w-0 max-w-full overflow-x-hidden ${immersive ? '' : 'simple-app'}`}>
+            {!immersive && pathname !== '/' && <Link to={role === 'employee' ? '/waitlist' : '/'} className="inline-flex items-center min-h-[44px] text-sm font-medium text-primary mb-3">← Back to Home</Link>}
             <Outlet />
           </div>
         </div>
@@ -90,7 +91,7 @@ export function DashboardLayout() {
       {!immersive && <NotificationBell />}
 
       {/* Mobile-only command-palette entry — fixed top-right beside the bell */}
-      {!immersive && <MobileCommandButton />}
+
 
       {/* Mobile-only "back to top" once the content scroller is a screenful down */}
       <ScrollToTop scrollRef={scrollRef} />

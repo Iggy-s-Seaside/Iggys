@@ -1,3 +1,4 @@
+import { useEventReminders } from './useEventReminders';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getLowStockItems } from './useInventory';
@@ -27,6 +28,7 @@ import type {
  */
 
 export type ActivityKind =
+  | 'event'
   | 'party'
   | 'message'
   | 'insight'
@@ -63,6 +65,7 @@ function readLastSeen(): number {
 }
 
 export function useActivityFeed() {
+  const { reminders } = useEventReminders();
   const [parties, setParties] = useState<Party[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [insights, setInsights] = useState<LunaInsight[]>([]);
@@ -151,7 +154,7 @@ export function useActivityFeed() {
   }, [refresh]);
 
   const items = useMemo<ActivityItem[]>(() => {
-    const out: ActivityItem[] = [];
+    const out: ActivityItem[] = reminders.map(r => ({ id: r.id, kind: 'event', title: r.title, subtitle: r.body, time: r.created_at, to: r.url, read: false }));
 
     for (const p of parties) {
       const label = p.title?.trim() || p.contact_name || 'New inquiry';
@@ -182,7 +185,7 @@ export function useActivityFeed() {
       });
     }
 
-    for (const i of insights) {
+    for (const i of insights.filter(i => i.kind !== 'special' && i.kind !== 'pulse' && !/food special|cozy indoor special|fire off a special/i.test(i.body || ''))) {
       out.push({
         id: `insight-${i.id}`,
         kind: 'insight',
@@ -239,7 +242,7 @@ export function useActivityFeed() {
       ...it,
       read: Date.parse(it.time) <= lastSeen,
     }));
-  }, [parties, messages, insights, waitlist, reviews, inventory, lastSeen]);
+  }, [parties, messages, insights, waitlist, reviews, inventory, lastSeen, reminders]);
 
   const unseenCount = useMemo(() => items.filter((it) => !it.read).length, [items]);
 
