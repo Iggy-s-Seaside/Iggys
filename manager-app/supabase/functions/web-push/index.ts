@@ -152,6 +152,8 @@ serve(async (req: Request) => {
   const json = (obj: unknown, status = 200) =>
     new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.headers.get("Authorization") !== `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`) return json({ error: "Unauthorized" }, 401);
   try {
     // Payload to broadcast. Defaults make a harmless ping if none supplied.
     let payload: PushPayload = {};
@@ -161,7 +163,7 @@ serve(async (req: Request) => {
     const notification: PushPayload = {
       title: payload.title || "Iggy's Manager",
       body: payload.body || "",
-      url: payload.url || "/",
+      url: payload.url && /^\/(?![\/\\])/.test(payload.url) ? payload.url : "/notifications",
       tag: payload.tag || "iggys-mgr",
     };
 
@@ -172,9 +174,12 @@ serve(async (req: Request) => {
 
     const { data, error } = await admin
       .from("push_subscriptions")
-      .select("id,endpoint,p256dh,auth");
+      .select("id,endpoint,p256dh,auth,user_email");
     if (error) throw new Error(error.message);
-    const subs = (data || []) as PushSubscriptionRow[];
+    const { data: managers, error: managersError } = await admin.from("manager_allowlist").select("email").in("role", ["owner", "manager"]);
+    if (managersError) throw managersError;
+    const allowed = new Set((managers || []).map(m => m.email.toLowerCase()));
+    const subs = (data || []).filter(s => allowed.has(s.user_email?.toLowerCase())) as PushSubscriptionRow[];
 
     // ── SEND GATE ───────────────────────────────────────────────────────
     // Sending requires BOTH VAPID keys. They are intentionally absent until push is
@@ -222,7 +227,7 @@ serve(async (req: Request) => {
             Authorization: `vapid t=${jwt}, k=${vapidPublic}`,
             "Content-Encoding": "aes128gcm",
             "Content-Type": "application/octet-stream",
-            TTL: "60",
+            TTL: "3600",
           },
           body,
         });

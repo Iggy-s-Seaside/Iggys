@@ -36,6 +36,48 @@ const clean = (v: unknown, max = 2000): string | null => {
   return t ? t.slice(0, max) : null;
 };
 
+/** Strip CRLF + control chars from header-bound values (header-injection guard). */
+function sanitizeHeader(value: string): string {
+  return value.replace(/[\r\n\x00-\x1f]/g, "").trim();
+}
+
+/**
+ * RFC 2047 encode a header that carries non-ASCII. Raw UTF-8 bytes in a header
+ * have no charset declaration, so mail clients read them as Latin-1 and the text
+ * lands mojibaked ("—" arrives as "Ã¢Â€Â”"). Pure-ASCII values pass through as-is.
+ */
+function encodeHeaderValue(value: string): string {
+  const safe = sanitizeHeader(value);
+  if (!/[^\x20-\x7e]/.test(safe)) return safe;
+  const enc = new TextEncoder();
+  const words: string[] = [];
+  let buf: number[] = [];
+  const flush = () => {
+    if (buf.length) { words.push(`=?UTF-8?B?${btoa(String.fromCharCode(...buf))}?=`); buf = []; }
+  };
+  // Split on code-point boundaries so multi-byte chars are never cut in half, and
+  // cap each word at 42 bytes so the encoded word stays inside RFC 2047's 75 chars.
+  for (const ch of safe) {
+    const b = enc.encode(ch);
+    if (buf.length + b.length > 42) flush();
+    for (const byte of b) buf.push(byte);
+  }
+  flush();
+  return words.join("\r\n ");
+}
+
+/**
+ * UTF-8 safe base64url for the Gmail API `raw` field. Replaces
+ * btoa(unescape(encodeURIComponent(x))), which throws URIError on a lone
+ * surrogate — exactly what slicing user input mid-emoji produces.
+ */
+function toBase64Url(message: string): string {
+  const bytes = new TextEncoder().encode(message);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 /** Best-effort E.164 normalization for US numbers (matches contacts.normalized_phone). */
 function normalizePhone(raw: string): string | null {
   const digits = raw.replace(/[^\d+]/g, "");
@@ -60,16 +102,16 @@ async function notifyOwner(lines: string[], subject: string): Promise<void> {
   if (!tokRes.ok) return;
   const accessToken = (await tokRes.json()).access_token;
 
-  const safeSubject = subject.replace(/[\r\n\x00-\x1f]/g, "").trim();
   const raw = [
     `From: Iggy's Booking <${OWNER_EMAIL}>`,
     `To: ${OWNER_EMAIL}`,
-    `Subject: ${safeSubject}`,
+    `Subject: ${encodeHeaderValue(subject)}`,
+    `MIME-Version: 1.0`,
     `Content-Type: text/plain; charset=UTF-8`,
     "",
-    lines.join("\n"),
+    lines.join("\r\n"),
   ].join("\r\n");
-  const encoded = btoa(unescape(encodeURIComponent(raw))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const encoded = toBase64Url(raw);
 
   await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",

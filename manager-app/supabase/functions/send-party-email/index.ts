@@ -29,6 +29,43 @@ function sanitizeHeader(value: string): string {
   return value.replace(/[\r\n\x00-\x1f]/g, "").trim();
 }
 
+/**
+ * RFC 2047 encode a header that carries non-ASCII. Raw UTF-8 bytes in a header
+ * have no charset declaration, so mail clients read them as Latin-1 and the text
+ * lands mojibaked ("—" arrives as "Ã¢Â€Â”"). Pure-ASCII values pass through as-is.
+ */
+function encodeHeaderValue(value: string): string {
+  const safe = sanitizeHeader(value);
+  if (!/[^\x20-\x7e]/.test(safe)) return safe;
+  const enc = new TextEncoder();
+  const words: string[] = [];
+  let buf: number[] = [];
+  const flush = () => {
+    if (buf.length) { words.push(`=?UTF-8?B?${btoa(String.fromCharCode(...buf))}?=`); buf = []; }
+  };
+  // Split on code-point boundaries so multi-byte chars are never cut in half, and
+  // cap each word at 42 bytes so the encoded word stays inside RFC 2047's 75 chars.
+  for (const ch of safe) {
+    const b = enc.encode(ch);
+    if (buf.length + b.length > 42) flush();
+    for (const byte of b) buf.push(byte);
+  }
+  flush();
+  return words.join("\r\n ");
+}
+
+/**
+ * UTF-8 safe base64url for the Gmail API `raw` field. Replaces
+ * btoa(unescape(encodeURIComponent(x))), which throws URIError on a lone
+ * surrogate — exactly what slicing user input mid-emoji produces.
+ */
+function toBase64Url(message: string): string {
+  const bytes = new TextEncoder().encode(message);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 /** Escape HTML special characters to prevent injection in email bodies. */
 function escapeHtml(text: string): string {
   return text
@@ -78,8 +115,8 @@ function buildRawEmail(
   fromEmail = "iggysbarevents@gmail.com"
 ): string {
   const safeTo = sanitizeHeader(to);
-  const safeSubject = sanitizeHeader(subject);
-  const safeFromName = sanitizeHeader(fromName);
+  const safeSubject = encodeHeaderValue(subject);
+  const safeFromName = encodeHeaderValue(fromName);
 
   const boundary = "boundary_" + crypto.randomUUID().replace(/-/g, "");
 
@@ -125,10 +162,7 @@ function buildRawEmail(
     `--${boundary}--`,
   ].join("\r\n");
 
-  return btoa(unescape(encodeURIComponent(message)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return toBase64Url(message);
 }
 
 serve(async (req: Request) => {

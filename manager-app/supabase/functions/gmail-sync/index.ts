@@ -7,6 +7,7 @@
 // SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN,
 // optional CRON_SECRET.
 
+import { collectMissingMessages } from "./pagination.ts";
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -16,10 +17,9 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5174",
 ];
 const OWNER = "iggysbarevents@gmail.com";
-// Exclude promo/social noise WITHOUT requiring tabbed categories (category:primary
-// returns nothing on accounts that don't use Inbox tabs). If categories aren't
-// enabled, the -category: clauses simply match nothing and all inbox mail flows in.
-const QUERY = "in:inbox newer_than:30d -category:promotions -category:social";
+// Import inbox mail even when Gmail assigns a Promotions/Social tab: those
+// labels do not reliably distinguish a customer from a vendor pitch.
+const QUERY = "in:inbox newer_than:90d -from:iggysbarevents@gmail.com";
 const MAX_FETCH = 40;
 
 function corsHeaders(req: Request) {
@@ -125,27 +125,25 @@ serve(async (req: Request) => {
     let q = QUERY;
     try { const b = await req.json(); if (typeof b?.q === "string" && b.q.trim()) q = b.q.trim(); } catch { /* no body */ }
 
-    // 1) List candidate message ids.
-    const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=50`,
-      { headers: { Authorization: `Bearer ${token}` } },
+    const { todo, scanned, truncated } = await collectMissingMessages(
+      async (pageToken) => {
+        const params = new URLSearchParams({ q, maxResults: '100' });
+        if (pageToken) params.set('pageToken', pageToken);
+        const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Gmail list failed: ' + response.status);
+        const page = await response.json();
+        return { ids: (page.messages || []).map((m: { id: string }) => m.id), nextPageToken: page.nextPageToken };
+      },
+      async (ids) => {
+        if (!ids.length) return new Set<string>();
+        const { data, error } = await admin.from('messages').select('gmail_id').in('gmail_id', ids);
+        if (error) throw new Error(error.message);
+        return new Set((data || []).map((row: { gmail_id: string }) => row.gmail_id));
+      },
+      MAX_FETCH,
     );
-    if (!listRes.ok) throw new Error("gmail list failed: " + (await listRes.text()).slice(0, 160));
-    const listData = await listRes.json();
-    const ids: string[] = (listData.messages || []).map((m: { id: string }) => m.id);
-
-    // 2) Drop ids we already have.
-    let have = new Set<string>();
-    if (ids.length) {
-      const { data: existing } = await admin.from("messages").select("gmail_id").in("gmail_id", ids);
-      have = new Set((existing || []).map((r: { gmail_id: string }) => r.gmail_id));
-    }
-    const fresh = ids.filter((id) => !have.has(id));
-    const todo = fresh.slice(0, MAX_FETCH);
-    const truncated = fresh.length > MAX_FETCH || Boolean(listData.nextPageToken);
-    if (truncated) {
-      console.warn(`gmail-sync: ${fresh.length} new beyond cap ${MAX_FETCH} (nextPageToken=${!!listData.nextPageToken}); run again to catch up`);
-    }
 
     // 3) Fetch + map each new message.
     const rows: Record<string, unknown>[] = [];
@@ -154,7 +152,7 @@ serve(async (req: Request) => {
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      if (!mRes.ok) continue;
+      if (!mRes.ok) throw new Error(`Gmail message fetch failed: ${mRes.status}`);
       const msg = await mRes.json();
       const hs: Hdr[] = msg.payload?.headers || [];
       const { name, email } = parseFrom(header(hs, "From"));
@@ -246,7 +244,7 @@ serve(async (req: Request) => {
       console.warn("gmail-sync reconcile failed (non-fatal):", e);
     }
 
-    return json({ synced: rows.length, scanned: ids.length, reconciled, truncated });
+    return json({ synced: rows.length, scanned, reconciled, truncated });
   } catch (error) {
     console.error("gmail-sync error:", error);
     return json({ error: error instanceof Error ? error.message : "sync failed" }, 500);

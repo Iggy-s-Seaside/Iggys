@@ -1,0 +1,41 @@
+{
+  "version": "5",
+  "redirects": {
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.110.8"
+  },
+  "remote": {
+    "https://deno.land/std@0.208.0/async/delay.ts": "a6142eb44cdd856b645086af2b811b1fcce08ec06bb7d50969e6a872ee9b8659",
+    "https://deno.land/std@0.208.0/http/server.ts": "f3cde6672e631d3e00785743cfa96bfed275618c0352c5ae84abbe5a2e0e4afc",
+    "https://esm.sh/@supabase/supabase-js@2.110.8": "3fe5b529aba9ea7d19e980feb977d4da1f9300cb5378942b32f1522c21649623"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@eslint/js@^9.39.4",
+        "npm:@floating-ui/react@~0.27.19",
+        "npm:@supabase/supabase-js@^2.99.1",
+        "npm:@types/react-dom@^19.2.3",
+        "npm:@types/react@^19.2.14",
+        "npm:@vitejs/plugin-react@6",
+        "npm:autoprefixer@^10.4.27",
+        "npm:date-fns@^4.1.0",
+        "npm:eslint-plugin-react-hooks@^7.0.1",
+        "npm:eslint-plugin-react-refresh@~0.5.2",
+        "npm:eslint@^9.39.4",
+        "npm:gifenc@^1.0.3",
+        "npm:globals@^17.4.0",
+        "npm:lucide-react@0.577",
+        "npm:postcss@^8.5.8",
+        "npm:react-dom@^19.2.4",
+        "npm:react-hot-toast@^2.5.2",
+        "npm:react-router-dom@^7.13.1",
+        "npm:react@^19.2.4",
+        "npm:tailwindcss@^3.4.19",
+        "npm:typescript-eslint@^8.56.1",
+        "npm:typescript@~5.9.3",
+        "npm:vite@8",
+        "npm:vitest@^2.1.9"
+      ]
+    }
+  }
+}
