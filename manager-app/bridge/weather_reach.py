@@ -168,8 +168,8 @@ def compute_weather_flags(now, daily, parties, staffing, demand):
             flags.append({
                 "id": f"rain-deck-{day['date']}",
                 "kind": "rain_deck", "severity": "plan", "date": day["date"],
-                "message": f"Rain'll keep the deck empty {day_word(day['date'], now)} — post a cozy indoor special.",
-                "deep_link": "/specials/editor",
+                "message": f"Rain'll keep the deck empty {day_word(day['date'], now)} — check indoor seating and any booked event setup.",
+                "deep_link": "/calendar",
             })
 
     # A specific "move indoors" beats a general deck plan on the same day.
